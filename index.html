@@ -721,6 +721,39 @@
       </div>
     </fieldset>
 
+    <div class="section-title">Photo &amp; Documents</div>
+    <div class="upload-grid">
+      <div class="photo-slot">
+        <div class="photo-preview" id="c11PhotoPreview">Passport size photo</div>
+        <label class="upload-label">Upload Photo
+          <input type="file" accept="image/*" onchange="handleC11Photo(event)">
+        </label>
+      </div>
+      <div class="doc-list">
+        <div class="doc-item">
+          <span class="doc-name">Class X Marksheet</span>
+          <label class="upload-label">Attach
+            <input type="file" accept="image/*,application/pdf" onchange="handleC11Doc(event,'class10Marksheet')">
+          </label>
+          <span class="doc-status" id="c11-status-class10Marksheet">Not attached</span>
+        </div>
+        <div class="doc-item">
+          <span class="doc-name">Transfer Certificate</span>
+          <label class="upload-label">Attach
+            <input type="file" accept="image/*,application/pdf" onchange="handleC11Doc(event,'transferCert')">
+          </label>
+          <span class="doc-status" id="c11-status-transferCert">Not attached</span>
+        </div>
+        <div class="doc-item">
+          <span class="doc-name">Candidate's Aadhar Card</span>
+          <label class="upload-label">Attach
+            <input type="file" accept="image/*,application/pdf" onchange="handleC11Doc(event,'aadharCard')">
+          </label>
+          <span class="doc-status" id="c11-status-aadharCard">Not attached</span>
+        </div>
+      </div>
+    </div>
+
     <div class="field" style="margin-bottom:14px;">
       <label for="c11Email">Email ID</label>
       <input type="text" id="c11Email" name="email">
@@ -1634,7 +1667,7 @@ function submitStudentEmail(){
 }
 
 /* ============ CLASS XI FORM LOGIC ============ */
-const c11Files = { pwdCert: null };
+const c11Files = { pwdCert: null, photo: null, class10Marksheet: null, transferCert: null, aadharCard: null };
 
 function toggleC11Pwd(show){
   document.getElementById('c11PwdDocRow').style.display = show ? 'flex' : 'none';
@@ -1645,6 +1678,27 @@ async function handleC11PwdDoc(event){
   if(!file) return;
   c11Files.pwdCert = file;
   const statusEl = document.getElementById('c11-status-pwdCert');
+  statusEl.textContent = file.name;
+  statusEl.classList.add('attached');
+}
+
+async function handleC11Photo(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const dataUrl = await readFileAsDataURL(file);
+  c11Files.photo = file;
+  const preview = document.getElementById('c11PhotoPreview');
+  preview.innerHTML = '';
+  const img = document.createElement('img');
+  img.src = dataUrl;
+  preview.appendChild(img);
+}
+
+async function handleC11Doc(event, key){
+  const file = event.target.files[0];
+  if(!file) return;
+  c11Files[key] = file;
+  const statusEl = document.getElementById('c11-status-' + key);
   statusEl.textContent = file.name;
   statusEl.classList.add('attached');
 }
@@ -1678,6 +1732,10 @@ async function submitClass11Registration(){
   if(obj.email && !isValidEmail(obj.email)) errors.push('Email address looks invalid.');
   const pwdSizeErr = checkFileSize(c11Files.pwdCert);
   if(pwdSizeErr) errors.push(pwdSizeErr);
+  [c11Files.photo, c11Files.class10Marksheet, c11Files.transferCert, c11Files.aadharCard].forEach(f => {
+    const sizeErr = checkFileSize(f);
+    if(sizeErr) errors.push(sizeErr);
+  });
   if(errors.length){
     showValidationErrors('c11StatusMsg', errors);
     return;
@@ -1693,27 +1751,41 @@ async function submitClass11Registration(){
   showC11Status('Submitting... please wait, this may take a moment while documents upload.');
   const folder = 'class11/' + Date.now() + '-' + Math.random().toString(36).slice(2,8);
   try{
-    const pwdCertPath = await uploadFile(c11Files.pwdCert, folder);
+    const [pwdCertPath, photoPath, class10MarksheetPath, transferCertPath, aadharCardPath] = await Promise.all([
+      uploadFile(c11Files.pwdCert, folder),
+      uploadFile(c11Files.photo, folder),
+      uploadFile(c11Files.class10Marksheet, folder),
+      uploadFile(c11Files.transferCert, folder),
+      uploadFile(c11Files.aadharCard, folder)
+    ]);
     const record = {
       adm_no: obj.admNo || '', adm_date: obj.admDate || '', section: obj.section || '',
       candidate_name: obj.candidateName || '', mother_name: obj.motherName || '', father_name: obj.fatherName || '',
       gender: obj.gender || '', category: obj.category || '', address: obj.address || '',
       minority: obj.minority || '', only_child: obj.onlyChild || '', pwd: obj.pwd || '',
-      pwd_cert_path: pwdCertPath,
+      pwd_cert_path: pwdCertPath, photo_path: photoPath, class10_marksheet_path: class10MarksheetPath,
+      transfer_cert_path: transferCertPath, aadhar_card_path: aadharCardPath,
       mobile: obj.mobile || '', email: obj.email || '', stream: obj.stream || '',
       subject2: obj.subject2 || '', subject3: obj.subject3 || '', subject4: obj.subject4 || '',
       subject5: obj.subject5 || '', subject6: obj.subject6 || '', income: obj.income || '',
       roll_no: obj.rollNo || '', board: obj.board || '', year: obj.year || ''
     };
-    const { error } = await supabaseClient.from('class11_registrations').insert([record]);
+    let { error } = await supabaseClient.from('class11_registrations').insert([record]);
+    for(let attempts = 0; error && attempts < 6; attempts++){
+      const m = /column "?(\w+)"? .*does not exist/i.exec(error.message || '');
+      if(!m || !(m[1] in record)) break;
+      delete record[m[1]];
+      ({ error } = await supabaseClient.from('class11_registrations').insert([record]));
+    }
     if(error) throw error;
 
     showC11Status('Registration submitted successfully.');
     document.getElementById('class11Form').reset();
     clearDraft('draft_class11_form');
-    c11Files.pwdCert = null;
-    document.getElementById('c11-status-pwdCert').textContent = 'Not attached';
-    document.getElementById('c11-status-pwdCert').classList.remove('attached');
+    c11Files.pwdCert = null; c11Files.photo = null; c11Files.class10Marksheet = null;
+    c11Files.transferCert = null; c11Files.aadharCard = null;
+    document.getElementById('c11PhotoPreview').innerHTML = 'Passport size photo';
+    document.querySelectorAll('#class11FormView .doc-status').forEach(el => { el.textContent = 'Not attached'; el.classList.remove('attached'); });
     document.getElementById('c11PwdDocRow').style.display = 'none';
   } catch(err){
     console.error(err);
@@ -1728,6 +1800,7 @@ function downloadClass11CSV(){
   const headers = [
     'Adm No','Date of Adm','Class','Candidate Name',"Mother's Name","Father's/Guardian's Name",
     'Gender','Category','Address','Minority Section','Only Child','PWD','PWD Certificate File',
+    'Photo File','Class X Marksheet File','Transfer Certificate File',"Candidate's Aadhar Card File",
     'Mobile','Email','Subject Stream','Subject 2','Subject 3','Subject 4','Subject 5','Subject 6',
     'Annual Income','Roll No','Board','Year'
   ];
@@ -1735,6 +1808,10 @@ function downloadClass11CSV(){
     obj.admNo, obj.admDate, obj.section, obj.candidateName, obj.motherName, obj.fatherName,
     obj.gender, obj.category, obj.address, obj.minority, obj.onlyChild, obj.pwd,
     c11Files.pwdCert ? c11Files.pwdCert.name : '',
+    c11Files.photo ? c11Files.photo.name : '',
+    c11Files.class10Marksheet ? c11Files.class10Marksheet.name : '',
+    c11Files.transferCert ? c11Files.transferCert.name : '',
+    c11Files.aadharCard ? c11Files.aadharCard.name : '',
     obj.mobile, obj.email, obj.stream, obj.subject2, obj.subject3, obj.subject4, obj.subject5, obj.subject6,
     obj.income, obj.rollNo, obj.board, obj.year
   ];
@@ -1757,6 +1834,10 @@ function submitClass11Email(){
     'Category: ' + (obj.category || ''), 'Address: ' + (obj.address || ''),
     'Minority Section: ' + (obj.minority || ''), 'Only Child: ' + (obj.onlyChild || ''),
     'PWD: ' + (obj.pwd || ''), 'PWD Certificate: ' + (c11Files.pwdCert ? c11Files.pwdCert.name : 'not attached'),
+    'Photo: ' + (c11Files.photo ? c11Files.photo.name : 'not attached'),
+    'Class X Marksheet: ' + (c11Files.class10Marksheet ? c11Files.class10Marksheet.name : 'not attached'),
+    'Transfer Certificate: ' + (c11Files.transferCert ? c11Files.transferCert.name : 'not attached'),
+    "Candidate's Aadhar Card: " + (c11Files.aadharCard ? c11Files.aadharCard.name : 'not attached'),
     'Mobile: ' + (obj.mobile || ''), 'Email: ' + (obj.email || ''), 'Subject Stream: ' + (obj.stream || ''),
     'Subject 1: 301 - English Core',
     'Subject 2: ' + (obj.subject2 || ''), 'Subject 3: ' + (obj.subject3 || ''),
@@ -1985,6 +2066,8 @@ function mapRow(row, tab){
       candidateName: row.candidate_name, motherName: row.mother_name, fatherName: row.father_name,
       gender: row.gender, category: row.category, address: row.address, minority: row.minority,
       onlyChild: row.only_child, pwd: row.pwd, pwdCertFile: row.pwd_cert_path,
+      photoFile: row.photo_path, class10MarksheetFile: row.class10_marksheet_path,
+      transferCertFile: row.transfer_cert_path, aadharCardFile: row.aadhar_card_path,
       mobile: row.mobile, email: row.email, stream: row.stream,
       subject2: row.subject2, subject3: row.subject3, subject4: row.subject4, subject5: row.subject5, subject6: row.subject6,
       income: row.income, rollNo: row.roll_no, board: row.board, year: row.year, submittedAt: row.submitted_at
@@ -2214,12 +2297,14 @@ function exportAllCSV(){
     headers = [
       'Adm No','Date of Adm','Class','Candidate Name',"Mother's Name","Father's/Guardian's Name",
       'Gender','Category','Address','Minority Section','Only Child','PWD','PWD Certificate File',
+      'Photo File','Class X Marksheet File','Transfer Certificate File',"Candidate's Aadhar Card File",
       'Mobile','Email','Subject Stream','Subject 2','Subject 3','Subject 4','Subject 5','Subject 6',
       'Annual Income','Roll No','Board','Year','Submitted At'
     ];
     keys = [
       'admNo','admDate','section','candidateName','motherName','fatherName',
       'gender','category','address','minority','onlyChild','pwd','pwdCertFile',
+      'photoFile','class10MarksheetFile','transferCertFile','aadharCardFile',
       'mobile','email','stream','subject2','subject3','subject4','subject5','subject6',
       'income','rollNo','board','year','submittedAt'
     ];
