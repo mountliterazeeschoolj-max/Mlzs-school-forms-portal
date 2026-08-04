@@ -400,22 +400,47 @@
       </div>
       <div class="field">
         <label for="designation">Designation<span class="required">*</span></label>
-        <input type="text" id="designation" name="designation" placeholder="e.g. PGT English, Accountant">
+        <select id="designation" name="designation">
+          <option value="">Select</option>
+          <option value="PRINCIPAL">PRINCIPAL</option>
+          <option value="VICE-PRINCIPAL">VICE-PRINCIPAL</option>
+          <option value="HM">HM</option>
+          <option value="PGT">PGT</option>
+          <option value="PET">PET</option>
+          <option value="PTI">PTI</option>
+          <option value="TGT">TGT</option>
+          <option value="PRT">PRT</option>
+          <option value="NTT">NTT</option>
+          <option value="SPECIAL EDUCATOR">SPECIAL EDUCATOR</option>
+          <option value="WELLNESS TEACHER (SOCIO-EMOTIONAL COUNSELOR)">WELLNESS TEACHER (SOCIO-EMOTIONAL COUNSELOR)</option>
+          <option value="CAREER COUNSELOR">CAREER COUNSELOR</option>
+          <option value="OTHER">OTHER</option>
+          <option value="GUEST TEACHER">GUEST TEACHER</option>
+        </select>
       </div>
     </div>
     <div class="row two">
       <div class="field">
-        <label>Father's Name / Husband's Name</label>
-        <div class="relation-choice">
-          <label><input type="radio" name="parentRelation" value="Father"> Father</label>
-          <label><input type="radio" name="parentRelation" value="Husband"> Husband</label>
-        </div>
-        <input type="text" id="parentName" name="parentName" placeholder="Enter name">
+        <label for="staffGender">Gender<span class="required">*</span></label>
+        <select id="staffGender" name="gender">
+          <option value="">Select</option>
+          <option value="Male">Male</option>
+          <option value="Female">Female</option>
+          <option value="Other">Other</option>
+        </select>
       </div>
       <div class="field">
         <label for="staffDob">Date of Birth</label>
         <input type="text" id="staffDob" name="dob" placeholder="DD/MM/YYYY" inputmode="numeric" maxlength="10" oninput="formatDateInput(this)">
       </div>
+    </div>
+    <div class="field" style="margin-bottom:14px;">
+      <label>Father's Name / Husband's Name</label>
+      <div class="relation-choice">
+        <label><input type="radio" name="parentRelation" value="Father"> Father</label>
+        <label><input type="radio" name="parentRelation" value="Husband"> Husband</label>
+      </div>
+      <input type="text" id="parentName" name="parentName" placeholder="Enter name">
     </div>
 
     <div class="section-title">Contact Details</div>
@@ -473,11 +498,25 @@
         <label for="subjectsTaught">Subjects Taught</label>
         <input type="text" id="subjectsTaught" name="subjectsTaught">
       </div>
-      <div class="field">
-        <label for="classTaught">Class Taught</label>
-        <input type="text" id="classTaught" name="classTaught">
-      </div>
     </div>
+    <fieldset style="margin:0 0 14px;">
+      <legend>Select Classes Taught</legend>
+      <div class="choice-group">
+        <label class="choice"><input type="checkbox" name="classTaught" value="KG-NURSERY"> KG-NURSERY</label>
+        <label class="choice"><input type="checkbox" name="classTaught" value="CLASS I"> CLASS I</label>
+        <label class="choice"><input type="checkbox" name="classTaught" value="CLASS II"> CLASS II</label>
+        <label class="choice"><input type="checkbox" name="classTaught" value="CLASS III"> CLASS III</label>
+        <label class="choice"><input type="checkbox" name="classTaught" value="CLASS IV"> CLASS IV</label>
+        <label class="choice"><input type="checkbox" name="classTaught" value="CLASS V"> CLASS V</label>
+        <label class="choice"><input type="checkbox" name="classTaught" value="CLASS VI"> CLASS VI</label>
+        <label class="choice"><input type="checkbox" name="classTaught" value="CLASS VII"> CLASS VII</label>
+        <label class="choice"><input type="checkbox" name="classTaught" value="CLASS VIII"> CLASS VIII</label>
+        <label class="choice"><input type="checkbox" name="classTaught" value="CLASS IX"> CLASS IX</label>
+        <label class="choice"><input type="checkbox" name="classTaught" value="CLASS X"> CLASS X</label>
+        <label class="choice"><input type="checkbox" name="classTaught" value="CLASS XI"> CLASS XI</label>
+        <label class="choice"><input type="checkbox" name="classTaught" value="CLASS XII"> CLASS XII</label>
+      </div>
+    </fieldset>
     <div class="field" style="margin-bottom:14px;">
       <label for="oasisId">CBSE Oasis ID (if any)</label>
       <input type="text" id="oasisId" name="oasisId">
@@ -1760,7 +1799,13 @@ const STAFF_EMAIL = "zeeschooljhansi@gmail.com";
 function collectStaffData(){
   const data = new FormData(document.getElementById('staffForm'));
   const obj = {};
-  for(const [key,val] of data.entries()){ obj[key] = val; }
+  for(const [key,val] of data.entries()){
+    if(key === 'classTaught'){
+      obj.classTaught = obj.classTaught ? obj.classTaught + ', ' + val : val;
+    } else {
+      obj[key] = val;
+    }
+  }
   return obj;
 }
 
@@ -1776,6 +1821,7 @@ async function submitStaffData(){
   const errors = [];
   if(!obj.fullName || !obj.fullName.trim()) errors.push('Full Name is required.');
   if(!obj.designation || !obj.designation.trim()) errors.push('Designation is required.');
+  if(!obj.gender) errors.push('Please select Gender.');
   if(!obj.contactNumber) errors.push('Contact Number is required.');
   else if(!isValidMobile(obj.contactNumber)) errors.push('Contact Number must be a valid 10-digit number.');
   if(obj.parentContactNumber && !isValidMobile(obj.parentContactNumber)) errors.push("Father's/Husband's Number must be a valid 10-digit number.");
@@ -1800,7 +1846,7 @@ async function submitStaffData(){
       uploadFile(stfFiles.passbook, folder)
     ]);
     const record = {
-      full_name: obj.fullName || '', designation: obj.designation || '',
+      full_name: obj.fullName || '', designation: obj.designation || '', gender: obj.gender || '',
       parent_name: obj.parentName || '', parent_relation: obj.parentRelation || '', dob: obj.dob || '',
       contact_number: obj.contactNumber || '', parent_contact_number: obj.parentContactNumber || '',
       email_id: obj.emailId || '', current_address: obj.currentAddress || '', full_address: obj.fullAddress || '',
@@ -1812,11 +1858,13 @@ async function submitStaffData(){
       photo_path: photoPath, aadhar_card_path: aadharCardPath, pan_card_path: panCardPath, passbook_path: passbookPath
     };
     let { error } = await supabaseClient.from('staff_records').insert([record]);
-    if(error && /parent_relation/i.test(error.message || '')){
-      /* Older Supabase tables may not yet have a parent_relation column — retry without it
-         so submissions still succeed. Add a "parent_relation" text column to staff_records
-         in Supabase to start storing this going forward. */
-      delete record.parent_relation;
+    for(let attempts = 0; error && attempts < 6; attempts++){
+      const m = /column "?(\w+)"? .*does not exist/i.exec(error.message || '');
+      if(!m || !(m[1] in record)) break;
+      /* The staff_records table is missing a column this form now sends (e.g. gender,
+         parent_relation). Retrying without it so the submission still goes through —
+         add that column in Supabase to start storing it going forward. */
+      delete record[m[1]];
       ({ error } = await supabaseClient.from('staff_records').insert([record]));
     }
     if(error) throw error;
@@ -1845,13 +1893,13 @@ function submitAnotherStaff(){
 function downloadStaffCSV(){
   const obj = collectStaffData();
   const headers = [
-    'Full Name','Designation',"Father's/Husband's Name",'Relation','Date of Birth','Contact Number',
+    'Full Name','Designation','Gender',"Father's/Husband's Name",'Relation','Date of Birth','Contact Number',
     "Father's/Husband's Number",'Email ID','Current Address','Full Address','Highest Qualification',
     'B.Ed','Date of Joining','Total Experience','Subjects Taught','Class Taught','CBSE Oasis ID',
     'Account Number','IFSC Code','Aadhar Number','PAN Number','Photo File','Aadhar Card File','PAN Card File','Passbook File'
   ];
   const row = [
-    obj.fullName, obj.designation, obj.parentName, obj.parentRelation, obj.dob, obj.contactNumber,
+    obj.fullName, obj.designation, obj.gender, obj.parentName, obj.parentRelation, obj.dob, obj.contactNumber,
     obj.parentContactNumber, obj.emailId, obj.currentAddress, obj.fullAddress, obj.qualification,
     obj.bed, obj.dateOfJoining, obj.totalExperience, obj.subjectsTaught, obj.classTaught, obj.oasisId,
     obj.accountNumber, obj.ifscCode, obj.aadharNumber, obj.panNumber,
@@ -1878,6 +1926,7 @@ function submitStaffEmail(){
   const bodyLines = [
     'STAFF DATA BANK SUBMISSION','Mount Litera Zee School, Jhansi','',
     'Full Name: ' + (obj.fullName || ''), 'Designation: ' + (obj.designation || ''),
+    'Gender: ' + (obj.gender || ''),
     "Father's/Husband's Name: " + (obj.parentName || ''), 'Relation: ' + (obj.parentRelation || ''),
     'Date of Birth: ' + (obj.dob || ''),
     'Contact Number: ' + (obj.contactNumber || ''), "Father's/Husband's Number: " + (obj.parentContactNumber || ''),
@@ -1942,7 +1991,7 @@ function mapRow(row, tab){
     };
   } else {
     return {
-      _key: row.id, fullName: row.full_name, designation: row.designation,
+      _key: row.id, fullName: row.full_name, designation: row.designation, gender: row.gender,
       parentName: row.parent_name, parentRelation: row.parent_relation, dob: row.dob, contactNumber: row.contact_number,
       parentContactNumber: row.parent_contact_number, emailId: row.email_id,
       currentAddress: row.current_address, fullAddress: row.full_address,
@@ -2048,7 +2097,7 @@ function renderTable(){
     ['subject2','Sub 2'], ['subject3','Sub 3'], ['subject4','Sub 4'],
     ['pwd','PWD'], ['submittedAt','Submitted At']
   ] : [
-    ['fullName','Full Name'], ['designation','Designation'], ['dob','DOB'],
+    ['fullName','Full Name'], ['designation','Designation'], ['gender','Gender'], ['dob','DOB'],
     ['contactNumber','Contact'], ['qualification','Qualification'], ['bed','B.Ed'],
     ['dateOfJoining','Joined'], ['subjectsTaught','Subjects'], ['classTaught','Class'],
     ['totalExperience','Experience'], ['aadharCardFile','Aadhar'], ['panCardFile','PAN'],
@@ -2177,13 +2226,13 @@ function exportAllCSV(){
     filename = `class11_registrations_${new Date().toISOString().slice(0,10)}.csv`;
   } else {
     headers = [
-      'Full Name','Designation',"Father's/Husband's Name",'Relation','Date of Birth','Contact Number',
+      'Full Name','Designation','Gender',"Father's/Husband's Name",'Relation','Date of Birth','Contact Number',
       "Father's/Husband's Number",'Email ID','Current Address','Full Address','Highest Qualification',
       'B.Ed','Date of Joining','Total Experience','Subjects Taught','Class Taught','CBSE Oasis ID',
       'Account Number','IFSC Code','Aadhar Number','PAN Number','Photo File','Aadhar Card File','PAN Card File','Passbook File','Submitted At'
     ];
     keys = [
-      'fullName','designation','parentName','parentRelation','dob','contactNumber','parentContactNumber','emailId',
+      'fullName','designation','gender','parentName','parentRelation','dob','contactNumber','parentContactNumber','emailId',
       'currentAddress','fullAddress','qualification','bed','dateOfJoining','totalExperience',
       'subjectsTaught','classTaught','oasisId','accountNumber','ifscCode','aadharNumber','panNumber',
       'photoFile','aadharCardFile','panCardFile','passbookFile','submittedAt'
