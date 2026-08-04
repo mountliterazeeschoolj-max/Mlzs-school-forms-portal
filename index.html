@@ -74,6 +74,16 @@
   .doc-item .doc-name{font-weight:600;}
   .doc-item .doc-status{font-size:12px;color:var(--muted);}
   .doc-item .doc-status.attached{color:var(--accent);font-weight:600;}
+  .required{color:#b3261e;margin-left:3px;}
+  .field-hint{font-size:11px;color:var(--muted);margin-top:2px;}
+  .relation-choice{display:flex;gap:16px;margin-bottom:6px;}
+  .relation-choice label{display:flex;align-items:center;gap:5px;font-size:13px;font-weight:600;color:var(--ink);text-transform:none;letter-spacing:0;cursor:pointer;}
+  .relation-choice input{width:15px;height:15px;accent-color:var(--accent);}
+  .thankyou{padding:64px 28px 56px;text-align:center;}
+  .thankyou .check{width:76px;height:76px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent-light));color:#fff;font-size:40px;line-height:76px;margin:0 auto 22px;box-shadow:0 6px 16px rgba(22,58,104,0.25);}
+  .thankyou h1{margin:0 0 10px;font-size:24px;color:var(--ink);}
+  .thankyou p{margin:0 0 30px;color:var(--muted);font-size:14px;max-width:420px;margin-left:auto;margin-right:auto;line-height:1.5;}
+  .thankyou .actions{justify-content:center;margin-top:0;}
   @media (max-width:640px){
     .upload-grid{grid-template-columns:1fr;justify-items:center;}
     .row{grid-template-columns:1fr;}
@@ -385,18 +395,22 @@
     <div class="section-title">Personal Details</div>
     <div class="row two">
       <div class="field">
-        <label for="fullName">Full Name</label>
-        <input type="text" id="fullName" name="fullName">
+        <label for="fullName">Full Name<span class="required">*</span></label>
+        <input type="text" id="fullName" name="fullName" placeholder="As per official records">
       </div>
       <div class="field">
-        <label for="designation">Designation</label>
-        <input type="text" id="designation" name="designation">
+        <label for="designation">Designation<span class="required">*</span></label>
+        <input type="text" id="designation" name="designation" placeholder="e.g. PGT English, Accountant">
       </div>
     </div>
     <div class="row two">
       <div class="field">
-        <label for="parentName">Father's Name / Husband's Name</label>
-        <input type="text" id="parentName" name="parentName">
+        <label>Father's Name / Husband's Name</label>
+        <div class="relation-choice">
+          <label><input type="radio" name="parentRelation" value="Father"> Father</label>
+          <label><input type="radio" name="parentRelation" value="Husband"> Husband</label>
+        </div>
+        <input type="text" id="parentName" name="parentName" placeholder="Enter name">
       </div>
       <div class="field">
         <label for="staffDob">Date of Birth</label>
@@ -407,8 +421,8 @@
     <div class="section-title">Contact Details</div>
     <div class="row two">
       <div class="field">
-        <label for="contactNumber">Contact Number</label>
-        <input type="tel" id="contactNumber" name="contactNumber">
+        <label for="contactNumber">Contact Number<span class="required">*</span></label>
+        <input type="tel" id="contactNumber" name="contactNumber" placeholder="10-digit mobile number">
       </div>
       <div class="field">
         <label for="parentContactNumber">Father's/Husband's Number</label>
@@ -536,6 +550,19 @@
     </div>
     <div class="status" id="stfStatusMsg" role="status" aria-live="polite"></div>
   </form>
+</div>
+
+<!-- ================= STAFF THANK YOU VIEW ================= -->
+<div class="sheet" id="staffThankYouView" style="display:none;">
+  <div class="thankyou">
+    <div class="check">&#10003;</div>
+    <h1>Thank you!</h1>
+    <p>Your Staff Data Bank information has been submitted successfully to Mount Litera Zee School, Jhansi. The HR office will reach out if anything further is needed.</p>
+    <div class="actions">
+      <button type="button" class="btn-secondary" onclick="showView('landingView')">Back to Forms Portal</button>
+      <button type="button" class="btn-primary" onclick="submitAnotherStaff()">Submit Another Response</button>
+    </div>
+  </div>
 </div>
 
 
@@ -927,7 +954,7 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_
 
 /* ============ VIEW SWITCHING ============ */
 function showView(id){
-  ['landingView','studentFormView','class11FormView','staffFormView','staffGateScreen','gateScreen','mainPanel','adminResetRequestScreen','adminResetConfirmScreen','adminChangePasswordScreen','staffChangePasscodeScreen'].forEach(v => {
+  ['landingView','studentFormView','class11FormView','staffFormView','staffThankYouView','staffGateScreen','gateScreen','mainPanel','adminResetRequestScreen','adminResetConfirmScreen','adminChangePasswordScreen','staffChangePasscodeScreen'].forEach(v => {
     document.getElementById(v).style.display = (v === id) ? 'block' : 'none';
   });
   if(id === 'studentFormView') maybeShowDraftBanner('draft_student_form', 'stuDraftBanner');
@@ -1774,7 +1801,7 @@ async function submitStaffData(){
     ]);
     const record = {
       full_name: obj.fullName || '', designation: obj.designation || '',
-      parent_name: obj.parentName || '', dob: obj.dob || '',
+      parent_name: obj.parentName || '', parent_relation: obj.parentRelation || '', dob: obj.dob || '',
       contact_number: obj.contactNumber || '', parent_contact_number: obj.parentContactNumber || '',
       email_id: obj.emailId || '', current_address: obj.currentAddress || '', full_address: obj.fullAddress || '',
       qualification: obj.qualification || '', bed: obj.bed || '',
@@ -1784,15 +1811,25 @@ async function submitStaffData(){
       aadhar_number: obj.aadharNumber || '', pan_number: obj.panNumber || '',
       photo_path: photoPath, aadhar_card_path: aadharCardPath, pan_card_path: panCardPath, passbook_path: passbookPath
     };
-    const { error } = await supabaseClient.from('staff_records').insert([record]);
+    let { error } = await supabaseClient.from('staff_records').insert([record]);
+    if(error && /parent_relation/i.test(error.message || '')){
+      /* Older Supabase tables may not yet have a parent_relation column — retry without it
+         so submissions still succeed. Add a "parent_relation" text column to staff_records
+         in Supabase to start storing this going forward. */
+      delete record.parent_relation;
+      ({ error } = await supabaseClient.from('staff_records').insert([record]));
+    }
     if(error) throw error;
 
-    showStfStatus('Submitted successfully.');
     document.getElementById('staffForm').reset();
     clearDraft('draft_staff_form');
     stfFiles.photo = null; stfFiles.aadharCard = null; stfFiles.panCard = null; stfFiles.passbook = null;
     document.getElementById('stfPhotoPreview').innerHTML = 'Passport size photo';
     document.querySelectorAll('#staffFormView .doc-status').forEach(el => { el.textContent = 'Not attached'; el.classList.remove('attached'); });
+    document.getElementById('stfStatusMsg').textContent = '';
+    document.getElementById('stfStatusMsg').classList.remove('visible');
+    showView('staffThankYouView');
+    window.scrollTo({top:0, behavior:'smooth'});
   } catch(err){
     console.error(err);
     showStfStatus('Could not submit online (' + errMsg(err) + '). Please use Download as Excel or Submit via Email instead.');
@@ -1801,16 +1838,20 @@ async function submitStaffData(){
   }
 }
 
+function submitAnotherStaff(){
+  showView('staffFormView');
+}
+
 function downloadStaffCSV(){
   const obj = collectStaffData();
   const headers = [
-    'Full Name','Designation',"Father's/Husband's Name",'Date of Birth','Contact Number',
+    'Full Name','Designation',"Father's/Husband's Name",'Relation','Date of Birth','Contact Number',
     "Father's/Husband's Number",'Email ID','Current Address','Full Address','Highest Qualification',
     'B.Ed','Date of Joining','Total Experience','Subjects Taught','Class Taught','CBSE Oasis ID',
     'Account Number','IFSC Code','Aadhar Number','PAN Number','Photo File','Aadhar Card File','PAN Card File','Passbook File'
   ];
   const row = [
-    obj.fullName, obj.designation, obj.parentName, obj.dob, obj.contactNumber,
+    obj.fullName, obj.designation, obj.parentName, obj.parentRelation, obj.dob, obj.contactNumber,
     obj.parentContactNumber, obj.emailId, obj.currentAddress, obj.fullAddress, obj.qualification,
     obj.bed, obj.dateOfJoining, obj.totalExperience, obj.subjectsTaught, obj.classTaught, obj.oasisId,
     obj.accountNumber, obj.ifscCode, obj.aadharNumber, obj.panNumber,
@@ -1837,7 +1878,8 @@ function submitStaffEmail(){
   const bodyLines = [
     'STAFF DATA BANK SUBMISSION','Mount Litera Zee School, Jhansi','',
     'Full Name: ' + (obj.fullName || ''), 'Designation: ' + (obj.designation || ''),
-    "Father's/Husband's Name: " + (obj.parentName || ''), 'Date of Birth: ' + (obj.dob || ''),
+    "Father's/Husband's Name: " + (obj.parentName || ''), 'Relation: ' + (obj.parentRelation || ''),
+    'Date of Birth: ' + (obj.dob || ''),
     'Contact Number: ' + (obj.contactNumber || ''), "Father's/Husband's Number: " + (obj.parentContactNumber || ''),
     'Email ID: ' + (obj.emailId || ''), 'Current Address: ' + (obj.currentAddress || ''),
     'Full Address: ' + (obj.fullAddress || ''), 'Highest Qualification: ' + (obj.qualification || ''),
@@ -1901,7 +1943,7 @@ function mapRow(row, tab){
   } else {
     return {
       _key: row.id, fullName: row.full_name, designation: row.designation,
-      parentName: row.parent_name, dob: row.dob, contactNumber: row.contact_number,
+      parentName: row.parent_name, parentRelation: row.parent_relation, dob: row.dob, contactNumber: row.contact_number,
       parentContactNumber: row.parent_contact_number, emailId: row.email_id,
       currentAddress: row.current_address, fullAddress: row.full_address,
       qualification: row.qualification, bed: row.bed, dateOfJoining: row.date_of_joining,
@@ -2135,13 +2177,13 @@ function exportAllCSV(){
     filename = `class11_registrations_${new Date().toISOString().slice(0,10)}.csv`;
   } else {
     headers = [
-      'Full Name','Designation',"Father's/Husband's Name",'Date of Birth','Contact Number',
+      'Full Name','Designation',"Father's/Husband's Name",'Relation','Date of Birth','Contact Number',
       "Father's/Husband's Number",'Email ID','Current Address','Full Address','Highest Qualification',
       'B.Ed','Date of Joining','Total Experience','Subjects Taught','Class Taught','CBSE Oasis ID',
       'Account Number','IFSC Code','Aadhar Number','PAN Number','Photo File','Aadhar Card File','PAN Card File','Passbook File','Submitted At'
     ];
     keys = [
-      'fullName','designation','parentName','dob','contactNumber','parentContactNumber','emailId',
+      'fullName','designation','parentName','parentRelation','dob','contactNumber','parentContactNumber','emailId',
       'currentAddress','fullAddress','qualification','bed','dateOfJoining','totalExperience',
       'subjectsTaught','classTaught','oasisId','accountNumber','ifscCode','aadharNumber','panNumber',
       'photoFile','aadharCardFile','panCardFile','passbookFile','submittedAt'
