@@ -80,10 +80,45 @@
   .relation-choice label{display:flex;align-items:center;gap:5px;font-size:13px;font-weight:600;color:var(--ink);text-transform:none;letter-spacing:0;cursor:pointer;}
   .relation-choice input{width:15px;height:15px;accent-color:var(--accent);}
   .thankyou{padding:64px 28px 56px;text-align:center;}
-  .thankyou .check{width:76px;height:76px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent-light));color:#fff;font-size:40px;line-height:76px;margin:0 auto 22px;box-shadow:0 6px 16px rgba(22,58,104,0.25);}
-  .thankyou h1{margin:0 0 10px;font-size:24px;color:var(--ink);}
-  .thankyou p{margin:0 0 30px;color:var(--muted);font-size:14px;max-width:420px;margin-left:auto;margin-right:auto;line-height:1.5;}
-  .thankyou .actions{justify-content:center;margin-top:0;}
+  .thankyou .check{width:76px;height:76px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent-light));color:#fff;font-size:40px;line-height:76px;margin:0 auto 22px;box-shadow:0 6px 16px rgba(22,58,104,0.25);animation:popIn 0.5s cubic-bezier(.26,1.36,.4,1);}
+  .thankyou h1{margin:0 0 10px;font-size:26px;color:var(--ink);}
+  .thankyou p{margin:0 0 8px;color:var(--muted);font-size:14px;max-width:420px;margin-left:auto;margin-right:auto;line-height:1.5;}
+  .thankyou .actions{justify-content:center;margin-top:30px;}
+  @keyframes popIn{0%{transform:scale(0);opacity:0;}60%{transform:scale(1.12);opacity:1;}100%{transform:scale(1);}}
+  @keyframes fadeInUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+
+  /* ---- Oasis ID lookup card (staff Thank You page) ---- */
+  .oasis-card{
+    margin:26px auto 0;max-width:460px;text-align:left;border-radius:12px;
+    border:1px solid #cfe0ee;background:linear-gradient(160deg,#eef5fb,#fbfdff);
+    padding:20px 22px;display:flex;gap:14px;align-items:flex-start;
+    box-shadow:0 8px 22px rgba(22,58,104,0.1);animation:fadeInUp 0.5s ease;
+  }
+  .oasis-card.not-found{background:linear-gradient(160deg,#fdf4e9,#fffaf4);border-color:#ecd2a4;}
+  .oasis-card .oasis-icon{
+    flex-shrink:0;width:42px;height:42px;border-radius:50%;font-size:19px;
+    background:linear-gradient(135deg,var(--accent),var(--accent-light));color:#fff;
+    display:flex;align-items:center;justify-content:center;box-shadow:0 4px 10px rgba(22,58,104,0.25);
+  }
+  .oasis-card.not-found .oasis-icon{background:linear-gradient(135deg,#c9922f,#e3b25c);box-shadow:0 4px 10px rgba(180,130,30,0.25);}
+  .oasis-card .oasis-body{flex:1;min-width:0;}
+  .oasis-card .oasis-title{
+    font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.6px;
+    color:var(--accent);margin-bottom:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  }
+  .oasis-card.not-found .oasis-title{color:#a8721c;}
+  .oasis-card .confidence-pill{
+    font-size:9.5px;font-weight:700;letter-spacing:0.3px;text-transform:uppercase;
+    background:var(--accent);color:#fff;border-radius:20px;padding:2px 9px;
+  }
+  .oasis-card .oasis-name{font-size:13.5px;color:var(--ink);margin-bottom:12px;line-height:1.5;}
+  .oasis-card .oasis-id-badge{
+    display:inline-flex;align-items:center;gap:10px;background:#fff;
+    border:1.5px solid var(--accent);border-radius:8px;padding:9px 16px;
+  }
+  .oasis-card .oasis-id-badge .lbl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;}
+  .oasis-card .oasis-id-badge .val{font-size:21px;font-weight:800;color:var(--accent);letter-spacing:0.5px;}
+  .oasis-card .oasis-note{margin-top:12px;font-size:11.5px;color:var(--muted);line-height:1.5;}
   @media (max-width:640px){
     .upload-grid{grid-template-columns:1fr;justify-items:center;}
     .row{grid-template-columns:1fr;}
@@ -101,6 +136,37 @@
     .admin-link{display:none;}
     .back-nav{display:none;}
   }
+
+  /* ---- Watermark (subtle repeated school name behind page content) ---- */
+  .sheet, .wrap, .gate{ position:relative; z-index:0; }
+  .sheet::before, .wrap::before, .gate::before{
+    content:"";
+    position:absolute; inset:0;
+    z-index:-1;
+    pointer-events:none;
+    background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="340" height="170"><text x="0" y="95" font-family="Arial, sans-serif" font-size="17" letter-spacing="1" fill="rgba(22,58,104,0.05)" transform="rotate(-28 170 85)">MOUNT LITERA ZEE SCHOOL</text></svg>');
+    background-repeat:repeat;
+  }
+  @media print{
+    .sheet::before, .wrap::before, .gate::before{ display:none; }
+  }
+
+  /* ---- View transitions ---- */
+  .view-enter{ animation: viewFadeIn 0.4s cubic-bezier(.22,.68,.31,1); }
+  @keyframes viewFadeIn{
+    from{ opacity:0; transform:translateY(10px); }
+    to{ opacity:1; transform:translateY(0); }
+  }
+  .tab-content-swap{ animation: tabFadeIn 0.3s ease; }
+  @keyframes tabFadeIn{
+    from{ opacity:0; }
+    to{ opacity:1; }
+  }
+  a, button, .card, .tab-btn, .subject-item, .choice, .upload-label, input, select, textarea{
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease, opacity 0.15s ease;
+  }
+  .card:hover{ transform:translateY(-2px); }
+  .doc-status{ transition: color 0.2s ease; }
 
   /* ---- Landing ---- */
   .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;padding:24px 28px 32px;}
@@ -140,7 +206,7 @@
   tr:hover td{background:#fbf8f5;}
   .empty, .loading{text-align:center;padding:50px 20px;color:var(--muted);font-size:14px;}
   .badge{display:inline-block;padding:2px 8px;border-radius:10px;background:var(--field);font-size:11px;color:var(--muted);}
-  .gate{max-width:360px;margin:80px auto;background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:28px;text-align:center;}
+  .gate{max-width:360px;margin:80px auto;background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:28px;text-align:center;overflow:hidden;}
   .gate h2{font-size:16px;margin-bottom:14px;}
   .gate input{width:100%;margin-bottom:12px;}
   .gate button{width:100%;}
@@ -609,6 +675,7 @@
     <div class="check">&#10003;</div>
     <h1>Thank you!</h1>
     <p>Your Staff Data Bank information has been submitted successfully to Mount Litera Zee School, Jhansi. The HR office will reach out if anything further is needed.</p>
+    <div id="stfOasisMatch" style="display:none;"></div>
     <div class="actions">
       <button type="button" class="btn-secondary" onclick="showView('landingView')">Back to Forms Portal</button>
       <button type="button" class="btn-primary" onclick="submitAnotherStaff()">Submit Another Response</button>
@@ -1042,7 +1109,17 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_
 /* ============ VIEW SWITCHING ============ */
 function showView(id){
   ['landingView','studentFormView','class11FormView','staffFormView','staffThankYouView','staffGateScreen','gateScreen','mainPanel','adminResetRequestScreen','adminResetConfirmScreen','adminChangePasswordScreen','staffChangePasscodeScreen'].forEach(v => {
-    document.getElementById(v).style.display = (v === id) ? 'block' : 'none';
+    const el = document.getElementById(v);
+    if(v === id){
+      el.style.display = 'block';
+      /* Restart the fade/slide-in animation every time this view is shown. */
+      el.classList.remove('view-enter');
+      void el.offsetWidth;
+      el.classList.add('view-enter');
+    } else {
+      el.style.display = 'none';
+      el.classList.remove('view-enter');
+    }
   });
   if(id === 'studentFormView') maybeShowDraftBanner('draft_student_form', 'stuDraftBanner');
   if(id === 'class11FormView') maybeShowDraftBanner('draft_class11_form', 'c11DraftBanner');
@@ -1377,6 +1454,12 @@ function isValidMobile(str){
 
 function isValidEmail(str){
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((str || '').trim());
+}
+
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str == null ? '' : String(str);
+  return div.innerHTML;
 }
 
 /* Returns an error string ('' if OK) checking a file isn't over the size limit. */
@@ -1892,6 +1975,70 @@ async function handleStfDoc(event, key){
 
 const STAFF_EMAIL = "zeeschooljhansi@gmail.com";
 
+/* ---- Teacher Data Bank (from CBSE Oasis records) — used to auto-suggest an
+   Oasis ID on the staff Thank You page by approximately matching the name
+   just submitted against this list. ---- */
+const TEACHER_DATA_BANK = [{"oasisId":3345628,"name":"BHARAT SINGH SISODIYA"},{"oasisId":3341927,"name":"RITU PATHAK"},{"oasisId":3328356,"name":"RAJNI RAJPUT"},{"oasisId":3319771,"name":"NUPUR BHATNAGAR"},{"oasisId":3315782,"name":"AYUSHI SHRIVASTAVA"},{"oasisId":3314053,"name":"RICHA KAASHYAP"},{"oasisId":3314003,"name":"CHANPREET KAUR"},{"oasisId":3313855,"name":"POOJA MISHRA"},{"oasisId":3263627,"name":"SONALI DAILWAR"},{"oasisId":3263623,"name":"AMISHA SAXENA"},{"oasisId":3249633,"name":"AKSHITA RATHORE"},{"oasisId":3249308,"name":"ASHISH SHUKLA"},{"oasisId":3130013,"name":"SANSKRITI KHETARPAL"},{"oasisId":3130011,"name":"NISHA GAUR"},{"oasisId":3129590,"name":"SHRUTI NIGAM"},{"oasisId":3129584,"name":"SHUBHANGI VERMA"},{"oasisId":3129582,"name":"SPARDHA DUBEY"},{"oasisId":3129578,"name":"SUSHMA KHARE"},{"oasisId":3129576,"name":"RAHUL KUMAR GUPTA"},{"oasisId":3129575,"name":"UDAY SEN"},{"oasisId":3129572,"name":"ATIF EDREES KHAN"},{"oasisId":3129571,"name":"ANKUSH NAMDEV"},{"oasisId":3129570,"name":"SAPNA SANKHWAR"},{"oasisId":3123267,"name":"Priyanka Mishra"},{"oasisId":3123213,"name":"RIZWAN BEG"},{"oasisId":3123162,"name":"Ishika Saxena"},{"oasisId":3122682,"name":"kashif"},{"oasisId":3122669,"name":"ABHISHEK MISHRA"},{"oasisId":3007059,"name":"ANUPMA SYLVESTER"},{"oasisId":2997032,"name":"Ghanshyam Singh"},{"oasisId":2974744,"name":"AKANKSHA CHAURASIA"},{"oasisId":2973138,"name":"ANUSHKA SHARMA"},{"oasisId":2953147,"name":"MANSHI SAXENA"},{"oasisId":2950982,"name":"YASH SINGH"},{"oasisId":2938657,"name":"MOHAMMAD HASIM"},{"oasisId":2910937,"name":"HARGOVIND SINGH"},{"oasisId":2903875,"name":"SAGAR VERMA"},{"oasisId":2896016,"name":"Gautam"},{"oasisId":2807278,"name":"SURENDRA KUMAR"},{"oasisId":2792434,"name":"NEELAM SINGH BHADORIYA"},{"oasisId":2783456,"name":"MONA SUNEJA"},{"oasisId":2763829,"name":"ANWAR KAZMI"},{"oasisId":2651963,"name":"SANJEEV KUMAR SRIVASTAVA"},{"oasisId":2649368,"name":"KANCHAN ARORA"},{"oasisId":2644621,"name":"JITENDRA KOSTA"},{"oasisId":2644481,"name":"POONAM DIVGAIYAN"},{"oasisId":2630392,"name":"AMEEN KHAN"},{"oasisId":2526082,"name":"KAVITA NARYANI"},{"oasisId":2524612,"name":"PRACHI VERMA"},{"oasisId":2524577,"name":"NEHA KHARE"},{"oasisId":2524518,"name":"RADHA KRISHAN KHATTRI"},{"oasisId":2522034,"name":"SHIVANGI SIROTHIA"},{"oasisId":2521998,"name":"RAJAT SAHNEY"},{"oasisId":2390627,"name":"JAMIL ANSARI"},{"oasisId":2389634,"name":"VINITA DIXIT"},{"oasisId":2345053,"name":"MANOJ KUMAR"},{"oasisId":2271492,"name":"AKANSHA CHATURVEDI"},{"oasisId":2271462,"name":"PARAS VERMA"},{"oasisId":2271310,"name":"POOJA SAXENA"},{"oasisId":2271296,"name":"RAJANI YADAV DUBEY"},{"oasisId":2271281,"name":"RAGINI SHRIVASTAVA"},{"oasisId":2270566,"name":"AJAY KUMAR PATHAK"},{"oasisId":2270495,"name":"SANJAY GUPTA"},{"oasisId":2270226,"name":"RABIYA SHEIKH"},{"oasisId":2270092,"name":"BRINDA DALMOTRA"},{"oasisId":2210816,"name":"SADHANA MISHRA"},{"oasisId":2100673,"name":"DHARMENDRA DEV SINGH"},{"oasisId":2043033,"name":"Saba Siddiqui"},{"oasisId":2042295,"name":"Shivani Saxena"},{"oasisId":2042277,"name":"Deeksha Tripathi"},{"oasisId":2041052,"name":"Shikha Shivani"},{"oasisId":2041027,"name":"Gaurav Gupta"},{"oasisId":2040912,"name":"Vivek Sharma"},{"oasisId":2040839,"name":"NAVEEN SHARMA"},{"oasisId":1956273,"name":"Aman Hayaran"},{"oasisId":1796209,"name":"SAURABH KUMAR JHA"},{"oasisId":1796149,"name":"POONAM SHARMA"},{"oasisId":1738431,"name":"KIRTI NIGAM"},{"oasisId":1738406,"name":"BRIJENDRA PRATAP SINGH CHAUHAN"},{"oasisId":1738323,"name":"POOJA BAHUGUNA"},{"oasisId":1738296,"name":"SANDHYA JAISWAL"},{"oasisId":1738280,"name":"GEETA SAXENA"},{"oasisId":1737787,"name":"ZAREEN ZEHRA"},{"oasisId":1737730,"name":"ANEETA"},{"oasisId":1737588,"name":"ROHIT KESARIYA"},{"oasisId":1693722,"name":"PRAVED KUMAR PATHAK"},{"oasisId":1295830,"name":"Yogmaya Mishra"},{"oasisId":1295746,"name":"Divya Verma"},{"oasisId":1294234,"name":"deepak Bachwani"},{"oasisId":623984,"name":"VIKESH CHAURASIA"},{"oasisId":623980,"name":"SHWETA TIWARI"},{"oasisId":623970,"name":"SAVITRI SRIVASTAVA"},{"oasisId":623969,"name":"SAURABH AWASTHI"},{"oasisId":623907,"name":"PRATIK BACHWANI"},{"oasisId":623043,"name":"ARCHANA STUART"},{"oasisId":623042,"name":"ANKITA SRIVASTAVA"},{"oasisId":623040,"name":"AMARJIT SINGH NAGIL"},{"oasisId":623037,"name":"ABHISHEK SHARMA"},{"oasisId":539488,"name":"WASEEM HUSSAIN"}]
+;
+
+/* Uppercases, strips punctuation/titles, and collapses whitespace so names
+   compare fairly regardless of spacing, case, or salutations. */
+function normalizeStaffName(s){
+  return (s || '').toUpperCase()
+    .replace(/[^A-Z\s]/g, ' ')
+    .replace(/\b(MR|MRS|MS|MISS|DR|SHRI|SMT)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/* Classic edit-distance, used to score how close two normalized names are. */
+function levenshteinDistance(a, b){
+  const m = a.length, n = b.length;
+  if(m === 0) return n;
+  if(n === 0) return m;
+  const dp = new Array(n + 1);
+  for(let j = 0; j <= n; j++) dp[j] = j;
+  for(let i = 1; i <= m; i++){
+    let prev = dp[0];
+    dp[0] = i;
+    for(let j = 1; j <= n; j++){
+      const temp = dp[j];
+      dp[j] = a[i - 1] === b[j - 1] ? prev : 1 + Math.min(prev, dp[j], dp[j - 1]);
+      prev = temp;
+    }
+  }
+  return dp[n];
+}
+
+/* Similarity score 0-1 between two names. Takes the better of a direct
+   comparison and a word-sorted comparison, so "Singh Bharat" still matches
+   "Bharat Singh" even with the name parts in a different order. */
+function staffNameSimilarity(a, b){
+  const na = normalizeStaffName(a), nb = normalizeStaffName(b);
+  if(!na || !nb) return 0;
+  const directDist = levenshteinDistance(na, nb);
+  const directRatio = 1 - directDist / Math.max(na.length, nb.length, 1);
+  const sortWords = s => s.split(' ').filter(Boolean).sort().join(' ');
+  const ta = sortWords(na), tb = sortWords(nb);
+  const sortedDist = levenshteinDistance(ta, tb);
+  const sortedRatio = 1 - sortedDist / Math.max(ta.length, tb.length, 1);
+  return Math.max(directRatio, sortedRatio);
+}
+
+/* Finds the closest name match in the Teacher Data Bank for a submitted
+   staff name. Returns null if nothing crosses the similarity threshold. */
+function findOasisIdMatch(fullName){
+  if(!fullName || !fullName.trim()) return null;
+  let best = null, bestScore = 0;
+  TEACHER_DATA_BANK.forEach(t => {
+    const score = staffNameSimilarity(fullName, t.name);
+    if(score > bestScore){ bestScore = score; best = t; }
+  });
+  if(best && bestScore >= 0.55) return { name: best.name, oasisId: best.oasisId, score: bestScore };
+  return null;
+}
+
+
 function collectStaffData(){
   const data = new FormData(document.getElementById('staffForm'));
   const obj = {};
@@ -1973,6 +2120,7 @@ async function submitStaffData(){
     document.getElementById('stfStatusMsg').textContent = '';
     document.getElementById('stfStatusMsg').classList.remove('visible');
     showView('staffThankYouView');
+    showOasisMatch(obj.fullName);
     window.scrollTo({top:0, behavior:'smooth'});
   } catch(err){
     console.error(err);
@@ -1982,7 +2130,41 @@ async function submitStaffData(){
   }
 }
 
+/* Looks up the closest-matching Oasis ID for the just-submitted staff name
+   and displays it on the Thank You view, with a thank-you note either way. */
+function showOasisMatch(fullName){
+  const el = document.getElementById('stfOasisMatch');
+  const match = findOasisIdMatch(fullName);
+  if(match){
+    let confidence = 'Possible match';
+    if(match.score >= 0.92) confidence = 'Strong match';
+    else if(match.score >= 0.72) confidence = 'Likely match';
+    el.innerHTML =
+      '<div class="oasis-card">' +
+        '<div class="oasis-icon">&#127891;</div>' +
+        '<div class="oasis-body">' +
+          '<div class="oasis-title">Teacher Data Bank Lookup <span class="confidence-pill">' + confidence + '</span></div>' +
+          '<div class="oasis-name">Matched <strong>' + escapeHtml(fullName) + '</strong> against record for <strong>' + escapeHtml(match.name) + '</strong></div>' +
+          '<div class="oasis-id-badge"><span class="lbl">Oasis&nbsp;ID</span><span class="val">' + escapeHtml(String(match.oasisId)) + '</span></div>' +
+          '<div class="oasis-note">Please verify this ID is correct with the HR office before use.</div>' +
+        '</div>' +
+      '</div>';
+  } else {
+    el.innerHTML =
+      '<div class="oasis-card not-found">' +
+        '<div class="oasis-icon">?</div>' +
+        '<div class="oasis-body">' +
+          '<div class="oasis-title">Teacher Data Bank Lookup</div>' +
+          '<div class="oasis-name">We couldn\'t find a matching Oasis ID for <strong>' + escapeHtml(fullName) + '</strong> in our records yet.</div>' +
+          '<div class="oasis-note">The HR office will help locate or assign one if applicable.</div>' +
+        '</div>' +
+      '</div>';
+  }
+  el.style.display = 'block';
+}
+
 function submitAnotherStaff(){
+  document.getElementById('stfOasisMatch').style.display = 'none';
   showView('staffFormView');
 }
 
@@ -2224,7 +2406,11 @@ function renderTable(){
     html += '</tr>';
   });
   html += '</tbody></table>';
-  document.getElementById('tableArea').innerHTML = html;
+  const tableAreaEl = document.getElementById('tableArea');
+  tableAreaEl.innerHTML = html;
+  tableAreaEl.classList.remove('tab-content-swap');
+  void tableAreaEl.offsetWidth;
+  tableAreaEl.classList.add('tab-content-swap');
   renderPageControls(rows.length, totalPages);
 }
 
