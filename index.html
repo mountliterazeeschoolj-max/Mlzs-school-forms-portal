@@ -430,18 +430,32 @@
           <span class="doc-status" id="stu-status-birthCert">Not attached</span>
         </div>
         <div class="doc-item">
-          <span class="doc-name">Student's Aadhar Card</span>
+          <span class="doc-name">Student's Aadhar Card (Front)</span>
           <label class="upload-label">Attach
-            <input type="file" accept="image/*,application/pdf" onchange="handleStuDoc(event,'studentAadhar')">
+            <input type="file" accept="image/*,application/pdf" onchange="handleStuDoc(event,'studentAadharFront')">
           </label>
-          <span class="doc-status" id="stu-status-studentAadhar">Not attached</span>
+          <span class="doc-status" id="stu-status-studentAadharFront">Not attached</span>
         </div>
         <div class="doc-item">
-          <span class="doc-name">Parents' Aadhar Card(s)</span>
+          <span class="doc-name">Student's Aadhar Card (Back)</span>
           <label class="upload-label">Attach
-            <input type="file" accept="image/*,application/pdf" multiple onchange="handleStuDoc(event,'parentAadhar')">
+            <input type="file" accept="image/*,application/pdf" onchange="handleStuDoc(event,'studentAadharBack')">
           </label>
-          <span class="doc-status" id="stu-status-parentAadhar">Not attached</span>
+          <span class="doc-status" id="stu-status-studentAadharBack">Not attached</span>
+        </div>
+        <div class="doc-item">
+          <span class="doc-name">Parents' Aadhar Card(s) (Front)</span>
+          <label class="upload-label">Attach
+            <input type="file" accept="image/*,application/pdf" multiple onchange="handleStuDoc(event,'parentAadharFront')">
+          </label>
+          <span class="doc-status" id="stu-status-parentAadharFront">Not attached</span>
+        </div>
+        <div class="doc-item">
+          <span class="doc-name">Parents' Aadhar Card(s) (Back)</span>
+          <label class="upload-label">Attach
+            <input type="file" accept="image/*,application/pdf" multiple onchange="handleStuDoc(event,'parentAadharBack')">
+          </label>
+          <span class="doc-status" id="stu-status-parentAadharBack">Not attached</span>
         </div>
         <div class="doc-item" id="stuDisabilityDocRow" style="display:none;">
           <span class="doc-name">Disability Certificate</span>
@@ -471,7 +485,7 @@
     </div>
 
     <div class="note">
-      <strong>Note:</strong> A photocopy of the student's Birth Certificate, Aadhar Card, and Parents' Aadhar Cards must be stapled to this form.
+      <strong>Note:</strong> A photocopy of the student's Birth Certificate, Aadhar Card (front & back), and Parents' Aadhar Cards (front & back) must be stapled to this form.
     </div>
 
     <div class="actions">
@@ -664,11 +678,18 @@
       </div>
       <div class="doc-list">
         <div class="doc-item">
-          <span class="doc-name">Aadhar Card</span>
+          <span class="doc-name">Aadhar Card (Front)</span>
           <label class="upload-label">Attach
-            <input type="file" accept="image/*,application/pdf" onchange="handleStfDoc(event,'aadharCard')">
+            <input type="file" accept="image/*,application/pdf" onchange="handleStfDoc(event,'aadharCardFront')">
           </label>
-          <span class="doc-status" id="stf-status-aadharCard">Not attached</span>
+          <span class="doc-status" id="stf-status-aadharCardFront">Not attached</span>
+        </div>
+        <div class="doc-item">
+          <span class="doc-name">Aadhar Card (Back)</span>
+          <label class="upload-label">Attach
+            <input type="file" accept="image/*,application/pdf" onchange="handleStfDoc(event,'aadharCardBack')">
+          </label>
+          <span class="doc-status" id="stf-status-aadharCardBack">Not attached</span>
         </div>
         <div class="doc-item">
           <span class="doc-name">PAN Card</span>
@@ -857,11 +878,18 @@
           <span class="doc-status" id="c11-status-transferCert">Not attached</span>
         </div>
         <div class="doc-item">
-          <span class="doc-name">Candidate's Aadhar Card</span>
+          <span class="doc-name">Candidate's Aadhar Card (Front)</span>
           <label class="upload-label">Attach
-            <input type="file" accept="image/*,application/pdf" onchange="handleC11Doc(event,'aadharCard')">
+            <input type="file" accept="image/*,application/pdf" onchange="handleC11Doc(event,'aadharCardFront')">
           </label>
-          <span class="doc-status" id="c11-status-aadharCard">Not attached</span>
+          <span class="doc-status" id="c11-status-aadharCardFront">Not attached</span>
+        </div>
+        <div class="doc-item">
+          <span class="doc-name">Candidate's Aadhar Card (Back)</span>
+          <label class="upload-label">Attach
+            <input type="file" accept="image/*,application/pdf" onchange="handleC11Doc(event,'aadharCardBack')">
+          </label>
+          <span class="doc-status" id="c11-status-aadharCardBack">Not attached</span>
         </div>
       </div>
     </div>
@@ -1623,7 +1651,7 @@ function toggleDisability(show){
   }
 }
 
-const stuFiles = { photo: null, birthCert: null, studentAadhar: null, parentAadhar: [], disabilityCert: null };
+const stuFiles = { photo: null, birthCert: null, studentAadharFront: null, studentAadharBack: null, parentAadharFront: [], parentAadharBack: [], disabilityCert: null };
 
 async function handleStuPhoto(event){
   const file = event.target.files[0];
@@ -1641,8 +1669,8 @@ async function handleStuDoc(event, key){
   const files = Array.from(event.target.files || []);
   if(files.length === 0) return;
   const statusEl = document.getElementById('stu-status-' + key);
-  if(key === 'parentAadhar'){
-    stuFiles.parentAadhar = files;
+  if(key === 'parentAadharFront' || key === 'parentAadharBack'){
+    stuFiles[key] = files;
     statusEl.textContent = files.length + ' file(s) attached';
   } else {
     stuFiles[key] = files[0];
@@ -1684,7 +1712,7 @@ async function submitStudentRegistration(){
   if(!obj.mobile1) errors.push('Mobile 1 is required.');
   else if(!isValidMobile(obj.mobile1)) errors.push('Mobile 1 must be a valid 10-digit number.');
   if(obj.mobile2 && !isValidMobile(obj.mobile2)) errors.push('Mobile 2 must be a valid 10-digit number.');
-  [stuFiles.photo, stuFiles.birthCert, stuFiles.studentAadhar, stuFiles.disabilityCert, ...stuFiles.parentAadhar].forEach(f => {
+  [stuFiles.photo, stuFiles.birthCert, stuFiles.studentAadharFront, stuFiles.studentAadharBack, stuFiles.disabilityCert, ...stuFiles.parentAadharFront, ...stuFiles.parentAadharBack].forEach(f => {
     const sizeErr = checkFileSize(f);
     if(sizeErr) errors.push(sizeErr);
   });
@@ -1703,14 +1731,17 @@ async function submitStudentRegistration(){
   showStuStatus('Submitting... please wait, this may take a moment while documents upload.');
   const folder = 'student/' + Date.now() + '-' + Math.random().toString(36).slice(2,8);
   try{
-    const [photoPath, birthCertPath, studentAadharPath, disabilityCertPath] = await Promise.all([
+    const [photoPath, birthCertPath, studentAadharFrontPath, studentAadharBackPath, disabilityCertPath] = await Promise.all([
       uploadFile(stuFiles.photo, folder),
       uploadFile(stuFiles.birthCert, folder),
-      uploadFile(stuFiles.studentAadhar, folder),
+      uploadFile(stuFiles.studentAadharFront, folder),
+      uploadFile(stuFiles.studentAadharBack, folder),
       uploadFile(stuFiles.disabilityCert, folder)
     ]);
-    const parentAadharPaths = [];
-    for(const f of stuFiles.parentAadhar){ parentAadharPaths.push(await uploadFile(f, folder)); }
+    const parentAadharFrontPaths = [];
+    for(const f of stuFiles.parentAadharFront){ parentAadharFrontPaths.push(await uploadFile(f, folder)); }
+    const parentAadharBackPaths = [];
+    for(const f of stuFiles.parentAadharBack){ parentAadharBackPaths.push(await uploadFile(f, folder)); }
 
     const record = {
       adm_no: obj.admNo || '', adm_date: obj.admDate || '', section: obj.section || '',
@@ -1720,17 +1751,31 @@ async function submitStudentRegistration(){
       only_child: obj.onlyChild || '', disabled: obj.disabled || '', disability_pct: obj.disabilityPct || '',
       income: obj.income || '', address: obj.address || '', mobile1: obj.mobile1 || '', mobile2: obj.mobile2 || '',
       subjects: Array.isArray(obj.subjects) ? obj.subjects.join('; ') : (obj.subjects || ''),
-      photo_path: photoPath, birth_cert_path: birthCertPath, student_aadhar_path: studentAadharPath,
-      parent_aadhar_paths: parentAadharPaths.filter(Boolean).join('; '), disability_cert_path: disabilityCertPath
+      photo_path: photoPath, birth_cert_path: birthCertPath,
+      student_aadhar_front_path: studentAadharFrontPath, student_aadhar_back_path: studentAadharBackPath,
+      parent_aadhar_front_paths: parentAadharFrontPaths.filter(Boolean).join('; '),
+      parent_aadhar_back_paths: parentAadharBackPaths.filter(Boolean).join('; '),
+      disability_cert_path: disabilityCertPath
     };
-    const { error } = await supabaseClient.from('student_registrations').insert([record]);
+    let { error } = await supabaseClient.from('student_registrations').insert([record]);
+    for(let attempts = 0; error && attempts < 6; attempts++){
+      const m = /column "?(\w+)"? .*does not exist/i.exec(error.message || '');
+      if(!m || !(m[1] in record)) break;
+      /* The student_registrations table is missing a column this form now sends
+         (e.g. the new Aadhar front/back columns). Retrying without it so the
+         submission still goes through — add that column in Supabase to start
+         storing it going forward. */
+      delete record[m[1]];
+      ({ error } = await supabaseClient.from('student_registrations').insert([record]));
+    }
     if(error) throw error;
 
     showStuStatus('Registration submitted successfully.');
     document.getElementById('regForm').reset();
     clearDraft('draft_student_form');
-    stuFiles.photo = null; stuFiles.birthCert = null; stuFiles.studentAadhar = null;
-    stuFiles.parentAadhar = []; stuFiles.disabilityCert = null;
+    stuFiles.photo = null; stuFiles.birthCert = null;
+    stuFiles.studentAadharFront = null; stuFiles.studentAadharBack = null;
+    stuFiles.parentAadharFront = []; stuFiles.parentAadharBack = []; stuFiles.disabilityCert = null;
     document.getElementById('stuPhotoPreview').innerHTML = 'Passport size photo';
     document.querySelectorAll('#studentFormView .doc-status').forEach(el => { el.textContent = 'Not attached'; el.classList.remove('attached'); });
     document.getElementById('stuDisabilityDocRow').style.display = 'none';
@@ -1749,7 +1794,8 @@ function downloadStudentCSV(){
     'Adm No','Date of Adm','Class & Section','Candidate Name','Date of Birth',
     "Mother's Name","Father's Name",'APAAR ID','Gender','Caste','Only Child',
     'Disabled','Disability %','Annual Income','Address','Mobile 1','Mobile 2',
-    'Subjects','Photo File','Birth Cert File',"Student Aadhar File","Parent Aadhar File(s)",'Disability Cert File'
+    'Subjects','Photo File','Birth Cert File',"Student Aadhar Front File","Student Aadhar Back File",
+    "Parent Aadhar Front File(s)","Parent Aadhar Back File(s)",'Disability Cert File'
   ];
   const subjects = Array.isArray(obj.subjects) ? obj.subjects.join('; ') : (obj.subjects || '');
   const row = [
@@ -1757,8 +1803,10 @@ function downloadStudentCSV(){
     obj.motherName, obj.fatherName, obj.apaarId, obj.gender, obj.caste, obj.onlyChild,
     obj.disabled, obj.disabilityPct, obj.income, obj.address, obj.mobile1, obj.mobile2, subjects,
     stuFiles.photo ? stuFiles.photo.name : '', stuFiles.birthCert ? stuFiles.birthCert.name : '',
-    stuFiles.studentAadhar ? stuFiles.studentAadhar.name : '',
-    stuFiles.parentAadhar.length ? stuFiles.parentAadhar.map(f=>f.name).join('; ') : '',
+    stuFiles.studentAadharFront ? stuFiles.studentAadharFront.name : '',
+    stuFiles.studentAadharBack ? stuFiles.studentAadharBack.name : '',
+    stuFiles.parentAadharFront.length ? stuFiles.parentAadharFront.map(f=>f.name).join('; ') : '',
+    stuFiles.parentAadharBack.length ? stuFiles.parentAadharBack.map(f=>f.name).join('; ') : '',
     stuFiles.disabilityCert ? stuFiles.disabilityCert.name : ''
   ];
   const csv = headers.map(csvEscape).join(',') + '\n' + row.map(csvEscape).join(',');
@@ -1776,8 +1824,10 @@ function submitStudentEmail(){
   const parts = [];
   parts.push('Photo: ' + (stuFiles.photo ? stuFiles.photo.name : 'not attached'));
   parts.push('Birth Certificate: ' + (stuFiles.birthCert ? stuFiles.birthCert.name : 'not attached'));
-  parts.push("Student's Aadhar: " + (stuFiles.studentAadhar ? stuFiles.studentAadhar.name : 'not attached'));
-  parts.push("Parents' Aadhar: " + (stuFiles.parentAadhar.length ? stuFiles.parentAadhar.map(f=>f.name).join(', ') : 'not attached'));
+  parts.push("Student's Aadhar (Front): " + (stuFiles.studentAadharFront ? stuFiles.studentAadharFront.name : 'not attached'));
+  parts.push("Student's Aadhar (Back): " + (stuFiles.studentAadharBack ? stuFiles.studentAadharBack.name : 'not attached'));
+  parts.push("Parents' Aadhar (Front): " + (stuFiles.parentAadharFront.length ? stuFiles.parentAadharFront.map(f=>f.name).join(', ') : 'not attached'));
+  parts.push("Parents' Aadhar (Back): " + (stuFiles.parentAadharBack.length ? stuFiles.parentAadharBack.map(f=>f.name).join(', ') : 'not attached'));
   if(stuFiles.disabilityCert) parts.push('Disability Certificate: ' + stuFiles.disabilityCert.name);
 
   const bodyLines = [
@@ -1798,7 +1848,7 @@ function submitStudentEmail(){
 }
 
 /* ============ CLASS XI FORM LOGIC ============ */
-const c11Files = { pwdCert: null, photo: null, class10Marksheet: null, transferCert: null, aadharCard: null };
+const c11Files = { pwdCert: null, photo: null, class10Marksheet: null, transferCert: null, aadharCardFront: null, aadharCardBack: null };
 
 function toggleC11Pwd(show){
   document.getElementById('c11PwdDocRow').style.display = show ? 'flex' : 'none';
@@ -1863,7 +1913,7 @@ async function submitClass11Registration(){
   if(obj.email && !isValidEmail(obj.email)) errors.push('Email address looks invalid.');
   const pwdSizeErr = checkFileSize(c11Files.pwdCert);
   if(pwdSizeErr) errors.push(pwdSizeErr);
-  [c11Files.photo, c11Files.class10Marksheet, c11Files.transferCert, c11Files.aadharCard].forEach(f => {
+  [c11Files.photo, c11Files.class10Marksheet, c11Files.transferCert, c11Files.aadharCardFront, c11Files.aadharCardBack].forEach(f => {
     const sizeErr = checkFileSize(f);
     if(sizeErr) errors.push(sizeErr);
   });
@@ -1882,12 +1932,13 @@ async function submitClass11Registration(){
   showC11Status('Submitting... please wait, this may take a moment while documents upload.');
   const folder = 'class11/' + Date.now() + '-' + Math.random().toString(36).slice(2,8);
   try{
-    const [pwdCertPath, photoPath, class10MarksheetPath, transferCertPath, aadharCardPath] = await Promise.all([
+    const [pwdCertPath, photoPath, class10MarksheetPath, transferCertPath, aadharCardFrontPath, aadharCardBackPath] = await Promise.all([
       uploadFile(c11Files.pwdCert, folder),
       uploadFile(c11Files.photo, folder),
       uploadFile(c11Files.class10Marksheet, folder),
       uploadFile(c11Files.transferCert, folder),
-      uploadFile(c11Files.aadharCard, folder)
+      uploadFile(c11Files.aadharCardFront, folder),
+      uploadFile(c11Files.aadharCardBack, folder)
     ]);
     const record = {
       adm_no: obj.admNo || '', adm_date: obj.admDate || '', section: obj.section || '',
@@ -1895,7 +1946,7 @@ async function submitClass11Registration(){
       gender: obj.gender || '', category: obj.category || '', address: obj.address || '',
       minority: obj.minority || '', only_child: obj.onlyChild || '', pwd: obj.pwd || '',
       pwd_cert_path: pwdCertPath, photo_path: photoPath, class10_marksheet_path: class10MarksheetPath,
-      transfer_cert_path: transferCertPath, aadhar_card_path: aadharCardPath,
+      transfer_cert_path: transferCertPath, aadhar_card_front_path: aadharCardFrontPath, aadhar_card_back_path: aadharCardBackPath,
       mobile: obj.mobile || '', email: obj.email || '', stream: obj.stream || '',
       subject2: obj.subject2 || '', subject3: obj.subject3 || '', subject4: obj.subject4 || '',
       subject5: obj.subject5 || '', subject6: obj.subject6 || '', income: obj.income || '',
@@ -1914,7 +1965,7 @@ async function submitClass11Registration(){
     document.getElementById('class11Form').reset();
     clearDraft('draft_class11_form');
     c11Files.pwdCert = null; c11Files.photo = null; c11Files.class10Marksheet = null;
-    c11Files.transferCert = null; c11Files.aadharCard = null;
+    c11Files.transferCert = null; c11Files.aadharCardFront = null; c11Files.aadharCardBack = null;
     document.getElementById('c11PhotoPreview').innerHTML = 'Passport size photo';
     document.querySelectorAll('#class11FormView .doc-status').forEach(el => { el.textContent = 'Not attached'; el.classList.remove('attached'); });
     document.getElementById('c11PwdDocRow').style.display = 'none';
@@ -1931,7 +1982,8 @@ function downloadClass11CSV(){
   const headers = [
     'Adm No','Date of Adm','Class','Candidate Name',"Mother's Name","Father's/Guardian's Name",
     'Gender','Category','Address','Minority Section','Only Child','PWD','PWD Certificate File',
-    'Photo File','Class X Marksheet File','Transfer Certificate File',"Candidate's Aadhar Card File",
+    'Photo File','Class X Marksheet File','Transfer Certificate File',
+    "Candidate's Aadhar Card Front File","Candidate's Aadhar Card Back File",
     'Mobile','Email','Subject Stream','Subject 2','Subject 3','Subject 4','Subject 5','Subject 6',
     'Annual Income','Roll No','Board','Year'
   ];
@@ -1942,7 +1994,8 @@ function downloadClass11CSV(){
     c11Files.photo ? c11Files.photo.name : '',
     c11Files.class10Marksheet ? c11Files.class10Marksheet.name : '',
     c11Files.transferCert ? c11Files.transferCert.name : '',
-    c11Files.aadharCard ? c11Files.aadharCard.name : '',
+    c11Files.aadharCardFront ? c11Files.aadharCardFront.name : '',
+    c11Files.aadharCardBack ? c11Files.aadharCardBack.name : '',
     obj.mobile, obj.email, obj.stream, obj.subject2, obj.subject3, obj.subject4, obj.subject5, obj.subject6,
     obj.income, obj.rollNo, obj.board, obj.year
   ];
@@ -1968,7 +2021,8 @@ function submitClass11Email(){
     'Photo: ' + (c11Files.photo ? c11Files.photo.name : 'not attached'),
     'Class X Marksheet: ' + (c11Files.class10Marksheet ? c11Files.class10Marksheet.name : 'not attached'),
     'Transfer Certificate: ' + (c11Files.transferCert ? c11Files.transferCert.name : 'not attached'),
-    "Candidate's Aadhar Card: " + (c11Files.aadharCard ? c11Files.aadharCard.name : 'not attached'),
+    "Candidate's Aadhar Card (Front): " + (c11Files.aadharCardFront ? c11Files.aadharCardFront.name : 'not attached'),
+    "Candidate's Aadhar Card (Back): " + (c11Files.aadharCardBack ? c11Files.aadharCardBack.name : 'not attached'),
     'Mobile: ' + (obj.mobile || ''), 'Email: ' + (obj.email || ''), 'Subject Stream: ' + (obj.stream || ''),
     'Subject 1: 301 - English Core',
     'Subject 2: ' + (obj.subject2 || ''), 'Subject 3: ' + (obj.subject3 || ''),
@@ -1983,7 +2037,7 @@ function submitClass11Email(){
 }
 
 /* ============ STAFF FORM LOGIC ============ */
-const stfFiles = { photo: null, aadharCard: null, panCard: null, passbook: null };
+const stfFiles = { photo: null, aadharCardFront: null, aadharCardBack: null, panCard: null, passbook: null };
 
 async function handleStfPhoto(event){
   const file = event.target.files[0];
@@ -2103,7 +2157,7 @@ async function submitStaffData(){
   if(obj.parentContactNumber && !isValidMobile(obj.parentContactNumber)) errors.push("Father's/Husband's Number must be a valid 10-digit number.");
   if(obj.dob && !isValidDate(obj.dob)) errors.push('Date of Birth is not a valid date (use DD/MM/YYYY, not in the future).');
   if(obj.emailId && !isValidEmail(obj.emailId)) errors.push('Email ID looks invalid.');
-  [stfFiles.photo, stfFiles.aadharCard, stfFiles.panCard, stfFiles.passbook].forEach(f => {
+  [stfFiles.photo, stfFiles.aadharCardFront, stfFiles.aadharCardBack, stfFiles.panCard, stfFiles.passbook].forEach(f => {
     const sizeErr = checkFileSize(f);
     if(sizeErr) errors.push(sizeErr);
   });
@@ -2115,9 +2169,10 @@ async function submitStaffData(){
   showStfStatus('Submitting... please wait, this may take a moment while documents upload.');
   const folder = 'staff/' + Date.now() + '-' + Math.random().toString(36).slice(2,8);
   try{
-    const [photoPath, aadharCardPath, panCardPath, passbookPath] = await Promise.all([
+    const [photoPath, aadharCardFrontPath, aadharCardBackPath, panCardPath, passbookPath] = await Promise.all([
       uploadFile(stfFiles.photo, folder),
-      uploadFile(stfFiles.aadharCard, folder),
+      uploadFile(stfFiles.aadharCardFront, folder),
+      uploadFile(stfFiles.aadharCardBack, folder),
       uploadFile(stfFiles.panCard, folder),
       uploadFile(stfFiles.passbook, folder)
     ]);
@@ -2131,7 +2186,8 @@ async function submitStaffData(){
       subjects_taught: obj.subjectsTaught || '', class_taught: obj.classTaught || '',
       oasis_id: obj.oasisId || '', account_number: obj.accountNumber || '', ifsc_code: obj.ifscCode || '',
       aadhar_number: obj.aadharNumber || '', pan_number: obj.panNumber || '',
-      photo_path: photoPath, aadhar_card_path: aadharCardPath, pan_card_path: panCardPath, passbook_path: passbookPath
+      photo_path: photoPath, aadhar_card_front_path: aadharCardFrontPath, aadhar_card_back_path: aadharCardBackPath,
+      pan_card_path: panCardPath, passbook_path: passbookPath
     };
     let { error } = await supabaseClient.from('staff_records').insert([record]);
     for(let attempts = 0; error && attempts < 6; attempts++){
@@ -2147,7 +2203,8 @@ async function submitStaffData(){
 
     document.getElementById('staffForm').reset();
     clearDraft('draft_staff_form');
-    stfFiles.photo = null; stfFiles.aadharCard = null; stfFiles.panCard = null; stfFiles.passbook = null;
+    stfFiles.photo = null; stfFiles.aadharCardFront = null; stfFiles.aadharCardBack = null;
+    stfFiles.panCard = null; stfFiles.passbook = null;
     document.getElementById('stfPhotoPreview').innerHTML = 'Passport size photo';
     document.querySelectorAll('#staffFormView .doc-status').forEach(el => { el.textContent = 'Not attached'; el.classList.remove('attached'); });
     document.getElementById('stfStatusMsg').textContent = '';
@@ -2272,14 +2329,16 @@ function downloadStaffCSV(){
     'Full Name','Designation','Gender',"Father's/Husband's Name",'Relation','Date of Birth','Contact Number',
     "Father's/Husband's Number",'Email ID','Current Address','Full Address','Highest Qualification',
     'B.Ed','Date of Joining','Total Experience','Subjects Taught','Class Taught','CBSE Oasis ID',
-    'Account Number','IFSC Code','Aadhar Number','PAN Number','Photo File','Aadhar Card File','PAN Card File','Passbook File'
+    'Account Number','IFSC Code','Aadhar Number','PAN Number','Photo File','Aadhar Card Front File','Aadhar Card Back File','PAN Card File','Passbook File'
   ];
   const row = [
     obj.fullName, obj.designation, obj.gender, obj.parentName, obj.parentRelation, obj.dob, obj.contactNumber,
     obj.parentContactNumber, obj.emailId, obj.currentAddress, obj.fullAddress, obj.qualification,
     obj.bed, obj.dateOfJoining, obj.totalExperience, obj.subjectsTaught, obj.classTaught, obj.oasisId,
     obj.accountNumber, obj.ifscCode, obj.aadharNumber, obj.panNumber,
-    stfFiles.photo ? stfFiles.photo.name : '', stfFiles.aadharCard ? stfFiles.aadharCard.name : '',
+    stfFiles.photo ? stfFiles.photo.name : '',
+    stfFiles.aadharCardFront ? stfFiles.aadharCardFront.name : '',
+    stfFiles.aadharCardBack ? stfFiles.aadharCardBack.name : '',
     stfFiles.panCard ? stfFiles.panCard.name : '', stfFiles.passbook ? stfFiles.passbook.name : ''
   ];
   const csv = headers.map(csvEscape).join(',') + '\n' + row.map(csvEscape).join(',');
@@ -2297,7 +2356,8 @@ function submitStaffEmail(){
   const oasisIdLine = obj.oasisId || (autoMatch ? autoMatch.oasisId + ' (auto-matched from Teacher Data Bank — please verify with HR)' : '');
   const parts = [];
   parts.push('Photo: ' + (stfFiles.photo ? stfFiles.photo.name : 'not attached'));
-  parts.push('Aadhar Card: ' + (stfFiles.aadharCard ? stfFiles.aadharCard.name : 'not attached'));
+  parts.push('Aadhar Card (Front): ' + (stfFiles.aadharCardFront ? stfFiles.aadharCardFront.name : 'not attached'));
+  parts.push('Aadhar Card (Back): ' + (stfFiles.aadharCardBack ? stfFiles.aadharCardBack.name : 'not attached'));
   parts.push('PAN Card: ' + (stfFiles.panCard ? stfFiles.panCard.name : 'not attached'));
   parts.push('Bank Passbook Photo: ' + (stfFiles.passbook ? stfFiles.passbook.name : 'not attached'));
 
@@ -2353,8 +2413,10 @@ function mapRow(row, tab){
       apaarId: row.apaar_id, gender: row.gender, caste: row.caste, onlyChild: row.only_child,
       disabled: row.disabled, disabilityPct: row.disability_pct, income: row.income, address: row.address,
       mobile1: row.mobile1, mobile2: row.mobile2, subjects: row.subjects,
-      photoFile: row.photo_path, birthCertFile: row.birth_cert_path, studentAadharFile: row.student_aadhar_path,
-      parentAadharFiles: row.parent_aadhar_paths, disabilityCertFile: row.disability_cert_path,
+      photoFile: row.photo_path, birthCertFile: row.birth_cert_path,
+      studentAadharFrontFile: row.student_aadhar_front_path, studentAadharBackFile: row.student_aadhar_back_path,
+      parentAadharFrontFiles: row.parent_aadhar_front_paths, parentAadharBackFiles: row.parent_aadhar_back_paths,
+      disabilityCertFile: row.disability_cert_path,
       submittedAt: row.submitted_at
     };
   } else if(tab === 'class11'){
@@ -2364,7 +2426,8 @@ function mapRow(row, tab){
       gender: row.gender, category: row.category, address: row.address, minority: row.minority,
       onlyChild: row.only_child, pwd: row.pwd, pwdCertFile: row.pwd_cert_path,
       photoFile: row.photo_path, class10MarksheetFile: row.class10_marksheet_path,
-      transferCertFile: row.transfer_cert_path, aadharCardFile: row.aadhar_card_path,
+      transferCertFile: row.transfer_cert_path,
+      aadharCardFrontFile: row.aadhar_card_front_path, aadharCardBackFile: row.aadhar_card_back_path,
       mobile: row.mobile, email: row.email, stream: row.stream,
       subject2: row.subject2, subject3: row.subject3, subject4: row.subject4, subject5: row.subject5, subject6: row.subject6,
       income: row.income, rollNo: row.roll_no, board: row.board, year: row.year, submittedAt: row.submitted_at
@@ -2379,7 +2442,8 @@ function mapRow(row, tab){
       totalExperience: row.total_experience, subjectsTaught: row.subjects_taught, classTaught: row.class_taught,
       oasisId: row.oasis_id, accountNumber: row.account_number, ifscCode: row.ifsc_code,
       aadharNumber: row.aadhar_number, panNumber: row.pan_number,
-      photoFile: row.photo_path, aadharCardFile: row.aadhar_card_path, panCardFile: row.pan_card_path,
+      photoFile: row.photo_path, aadharCardFrontFile: row.aadhar_card_front_path, aadharCardBackFile: row.aadhar_card_back_path,
+      panCardFile: row.pan_card_path,
       passbookFile: row.passbook_path, submittedAt: row.submitted_at
     };
   }
@@ -2405,7 +2469,7 @@ function renderStats(){
   if(currentTab === 'students'){
     const male = allRecords.filter(r => r.gender === 'Male').length;
     const female = allRecords.filter(r => r.gender === 'Female').length;
-    const missingDocs = allRecords.filter(r => !r.birthCertFile || !r.studentAadharFile).length;
+    const missingDocs = allRecords.filter(r => !r.birthCertFile || !r.studentAadharFrontFile || !r.studentAadharBackFile).length;
     document.getElementById('statsRow').innerHTML = `
       <div class="stat-card"><div class="num">${total}</div><div class="label">Total Registrations</div></div>
       <div class="stat-card"><div class="num">${male}</div><div class="label">Male</div></div>
@@ -2424,7 +2488,7 @@ function renderStats(){
     `;
   } else {
     const bedYes = allRecords.filter(r => r.bed === 'Yes').length;
-    const missingDocs = allRecords.filter(r => !r.aadharCardFile || !r.photoFile).length;
+    const missingDocs = allRecords.filter(r => !r.aadharCardFrontFile || !r.aadharCardBackFile || !r.photoFile).length;
     document.getElementById('statsRow').innerHTML = `
       <div class="stat-card"><div class="num">${total}</div><div class="label">Total Staff Records</div></div>
       <div class="stat-card"><div class="num">${bedYes}</div><div class="label">B.Ed Qualified</div></div>
@@ -2469,18 +2533,18 @@ function renderTable(){
     ['admNo','Adm No'], ['candidateName','Candidate Name'], ['dob','DOB'],
     ['gender','Gender'], ['caste','Caste'], ['section','Section'],
     ['mobile1','Mobile 1'], ['subjects','Subjects'],
-    ['birthCertFile','Birth Cert'], ['studentAadharFile','Student Aadhar'],
+    ['birthCertFile','Birth Cert'], ['studentAadharFrontFile','Student Aadhar (F)'], ['studentAadharBackFile','Student Aadhar (B)'],
     ['submittedAt','Submitted At']
   ] : currentTab === 'class11' ? [
     ['admNo','Adm No'], ['candidateName','Candidate Name'], ['gender','Gender'],
     ['category','Category'], ['stream','Stream'], ['mobile','Mobile'],
     ['subject2','Sub 2'], ['subject3','Sub 3'], ['subject4','Sub 4'],
-    ['pwd','PWD'], ['submittedAt','Submitted At']
+    ['pwd','PWD'], ['aadharCardFrontFile','Aadhar (F)'], ['aadharCardBackFile','Aadhar (B)'], ['submittedAt','Submitted At']
   ] : [
     ['fullName','Full Name'], ['designation','Designation'], ['gender','Gender'], ['dob','DOB'],
     ['contactNumber','Contact'], ['qualification','Qualification'], ['bed','B.Ed'],
     ['dateOfJoining','Joined'], ['subjectsTaught','Subjects'], ['classTaught','Class'],
-    ['totalExperience','Experience'], ['aadharCardFile','Aadhar'], ['panCardFile','PAN'],
+    ['totalExperience','Experience'], ['aadharCardFrontFile','Aadhar (F)'], ['aadharCardBackFile','Aadhar (B)'], ['panCardFile','PAN'],
     ['submittedAt','Submitted At']
   ];
 
@@ -2490,7 +2554,7 @@ function renderTable(){
   });
   html += '<th></th></tr></thead><tbody>';
 
-  const fileKeys = currentTab === 'students' ? ['birthCertFile','studentAadharFile'] : currentTab === 'class11' ? ['pwdCertFile'] : ['aadharCardFile','panCardFile'];
+  const fileKeys = currentTab === 'students' ? ['birthCertFile','studentAadharFrontFile','studentAadharBackFile'] : currentTab === 'class11' ? ['pwdCertFile','aadharCardFrontFile','aadharCardBackFile'] : ['aadharCardFrontFile','aadharCardBackFile','panCardFile'];
 
   pageRows.forEach(r => {
     html += '<tr>';
@@ -2584,28 +2648,31 @@ function exportAllCSV(){
       'Adm No','Date of Adm','Class & Section','Candidate Name','Date of Birth',
       "Mother's Name","Father's Name",'APAAR ID','Gender','Caste','Only Child',
       'Disabled','Disability %','Annual Income','Address','Mobile 1','Mobile 2',
-      'Subjects','Photo File','Birth Cert File','Student Aadhar File','Parent Aadhar File(s)',
+      'Subjects','Photo File','Birth Cert File','Student Aadhar Front File','Student Aadhar Back File',
+      'Parent Aadhar Front File(s)','Parent Aadhar Back File(s)',
       'Disability Cert File','Submitted At'
     ];
     keys = [
       'admNo','admDate','section','candidateName','dob','motherName','fatherName',
       'apaarId','gender','caste','onlyChild','disabled','disabilityPct','income',
       'address','mobile1','mobile2','subjects','photoFile','birthCertFile',
-      'studentAadharFile','parentAadharFiles','disabilityCertFile','submittedAt'
+      'studentAadharFrontFile','studentAadharBackFile','parentAadharFrontFiles','parentAadharBackFiles',
+      'disabilityCertFile','submittedAt'
     ];
     filename = `class9_registrations_${new Date().toISOString().slice(0,10)}.csv`;
   } else if(currentTab === 'class11'){
     headers = [
       'Adm No','Date of Adm','Class','Candidate Name',"Mother's Name","Father's/Guardian's Name",
       'Gender','Category','Address','Minority Section','Only Child','PWD','PWD Certificate File',
-      'Photo File','Class X Marksheet File','Transfer Certificate File',"Candidate's Aadhar Card File",
+      'Photo File','Class X Marksheet File','Transfer Certificate File',
+      "Candidate's Aadhar Card Front File","Candidate's Aadhar Card Back File",
       'Mobile','Email','Subject Stream','Subject 2','Subject 3','Subject 4','Subject 5','Subject 6',
       'Annual Income','Roll No','Board','Year','Submitted At'
     ];
     keys = [
       'admNo','admDate','section','candidateName','motherName','fatherName',
       'gender','category','address','minority','onlyChild','pwd','pwdCertFile',
-      'photoFile','class10MarksheetFile','transferCertFile','aadharCardFile',
+      'photoFile','class10MarksheetFile','transferCertFile','aadharCardFrontFile','aadharCardBackFile',
       'mobile','email','stream','subject2','subject3','subject4','subject5','subject6',
       'income','rollNo','board','year','submittedAt'
     ];
@@ -2615,13 +2682,13 @@ function exportAllCSV(){
       'Full Name','Designation','Gender',"Father's/Husband's Name",'Relation','Date of Birth','Contact Number',
       "Father's/Husband's Number",'Email ID','Current Address','Full Address','Highest Qualification',
       'B.Ed','Date of Joining','Total Experience','Subjects Taught','Class Taught','CBSE Oasis ID',
-      'Account Number','IFSC Code','Aadhar Number','PAN Number','Photo File','Aadhar Card File','PAN Card File','Passbook File','Submitted At'
+      'Account Number','IFSC Code','Aadhar Number','PAN Number','Photo File','Aadhar Card Front File','Aadhar Card Back File','PAN Card File','Passbook File','Submitted At'
     ];
     keys = [
       'fullName','designation','gender','parentName','parentRelation','dob','contactNumber','parentContactNumber','emailId',
       'currentAddress','fullAddress','qualification','bed','dateOfJoining','totalExperience',
       'subjectsTaught','classTaught','oasisId','accountNumber','ifscCode','aadharNumber','panNumber',
-      'photoFile','aadharCardFile','panCardFile','passbookFile','submittedAt'
+      'photoFile','aadharCardFrontFile','aadharCardBackFile','panCardFile','passbookFile','submittedAt'
     ];
     filename = `staff_databank_${new Date().toISOString().slice(0,10)}.csv`;
   }
