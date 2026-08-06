@@ -2323,6 +2323,66 @@ function emailOasisId(){
   window.location.href = mailtoUrl;
 }
 
+/* ---- Admin panel: resend the Oasis ID / confirmation email to a staff
+   member already saved in Supabase, without asking them to fill the form
+   again. Reuses the same send-oasis-email edge function as the automatic
+   post-submission email, but sends it straight from the stored record and
+   marks it as a resend + includes the rest of the filled form as formData
+   so the email can show the complete details on file, not just the Oasis ID. */
+async function resendStaffMail(record){
+  if(!record.emailId){
+    alert('This record has no email address on file, so a resend email cannot be sent.');
+    return;
+  }
+  if(!confirm('Resend the confirmation email (with Oasis ID + submitted details) to ' + (record.fullName || 'this staff member') + ' at ' + record.emailId + '?')) return;
+  try{
+    const res = await fetch(SUPABASE_URL + '/functions/v1/send-oasis-email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+        'apikey': SUPABASE_ANON_KEY
+      },
+      body: JSON.stringify({
+        fullName: record.fullName || '',
+        emailId: record.emailId,
+        oasisId: record.oasisId || '',
+        matchedName: record.fullName || '',
+        confidence: 'Confirmed (on file)',
+        resend: true,
+        formData: {
+          designation: record.designation || '',
+          gender: record.gender || '',
+          dob: record.dob || '',
+          contactNumber: record.contactNumber || '',
+          currentAddress: record.currentAddress || '',
+          fullAddress: record.fullAddress || '',
+          qualification: record.qualification || '',
+          bed: record.bed || '',
+          dateOfJoining: record.dateOfJoining || '',
+          totalExperience: record.totalExperience || '',
+          subjectsTaught: record.subjectsTaught || '',
+          classTaught: record.classTaught || '',
+          accountNumber: record.accountNumber || '',
+          ifscCode: record.ifscCode || '',
+          aadharNumber: record.aadharNumber || '',
+          panNumber: record.panNumber || ''
+        }
+      })
+    });
+    if(!res.ok){
+      const t = await res.text();
+      console.error('Resend failed:', t);
+      alert('Could not resend the email: ' + t);
+      return;
+    }
+    alert('Email resent to ' + record.emailId + '.');
+  } catch(err){
+    console.error('Could not reach send-oasis-email function', err);
+    alert('Could not resend the email: ' + errMsg(err));
+  }
+}
+
 function downloadStaffCSV(){
   const obj = collectStaffData();
   const headers = [
@@ -2566,7 +2626,12 @@ function renderTable(){
       }
       html += `<td>${val}</td>`;
     });
-    html += `<td><button class="tab-btn" onclick='printRecord(${JSON.stringify(r)})'>Print</button> <button class="del-btn" onclick="deleteRecord('${r._key}')">Delete</button></td>`;
+    let actionBtns = `<button class="tab-btn" onclick='printRecord(${JSON.stringify(r)})'>Print</button>`;
+    if(currentTab === 'staff'){
+      actionBtns += ` <button class="tab-btn" onclick='resendStaffMail(${JSON.stringify(r)})'>Resend Mail</button>`;
+    }
+    actionBtns += ` <button class="del-btn" onclick="deleteRecord('${r._key}')">Delete</button>`;
+    html += `<td>${actionBtns}</td>`;
     html += '</tr>';
   });
   html += '</tbody></table>';
