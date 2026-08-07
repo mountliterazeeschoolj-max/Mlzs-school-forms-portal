@@ -288,6 +288,11 @@
       <h3>Staff Data Bank</h3>
       <p>Staff information &amp; document collection</p>
     </div>
+    <div class="card" onclick="openStaffLogin()">
+      <div class="icon">🔐</div>
+      <h3>Staff Login</h3>
+      <p>View &amp; update your own staff record</p>
+    </div>
   </div>
 </div>
 
@@ -1082,6 +1087,231 @@
   <a class="back-link" onclick="showView('staffGateScreen')">← Back to Log In</a>
 </div>
 
+<!-- ================= STAFF SELF-SERVICE LOGIN / REGISTER ================= -->
+<div id="staffLoginScreen" class="gate" style="display:none;">
+  <h2 id="staffLoginHeading">Staff Login</h2>
+  <div class="session" style="margin:-6px 0 14px;">Log in to view and update your own Staff Data Bank record.</div>
+  <input type="text" id="staffLoginEmailInput" placeholder="Email" autocomplete="username">
+  <input type="password" id="staffLoginPasswordInput" placeholder="Password" autocomplete="current-password">
+  <button id="staffLoginBtn" onclick="staffLogin()">Log In</button>
+  <a class="back-link" onclick="toggleStaffAuthMode()" style="margin-top:10px;" id="staffAuthModeToggle">New here? Create an account</a>
+  <a class="back-link" onclick="staffSendPasswordReset()">Forgot password?</a>
+  <div class="note" id="staffLoginNote" style="display:none;"></div>
+  <a class="back-link" onclick="showView('landingView')">← Back to Forms Portal</a>
+</div>
+
+<!-- ================= STAFF EDIT MY DETAILS ================= -->
+<div class="sheet" id="staffEditView" style="display:none;">
+  <div class="back-nav"><a onclick="staffLogout()">← Log Out</a></div>
+  <div class="header">
+    <div class="school-name">Mount Litera Zee School, Jhansi</div>
+    <div class="eyebrow">Staff Self-Service</div>
+    <h1>My Staff Details</h1>
+    <div class="session" id="staffEditWhoami"></div>
+  </div>
+
+  <div id="staffEditNotFound" class="note" style="display:none;">
+    We couldn't find a Staff Data Bank record for this email address. Please fill out the
+    <a onclick="staffLogout(); showView('staffGateScreen');" style="cursor:pointer;font-weight:700;text-decoration:underline;">Staff Data Bank form</a>
+    first using this same email, then log in here again to edit it.
+  </div>
+
+  <form id="staffEditForm" onsubmit="return false;" style="display:none;">
+    <div class="section-title">Personal Details</div>
+    <div class="row two">
+      <div class="field">
+        <label for="seFullName">Full Name<span class="required">*</span></label>
+        <input type="text" id="seFullName" placeholder="As per official records">
+      </div>
+      <div class="field">
+        <label for="seDesignation">Designation<span class="required">*</span></label>
+        <select id="seDesignation">
+          <option value="">Select</option>
+          <option value="PRINCIPAL">PRINCIPAL</option>
+          <option value="VICE-PRINCIPAL">VICE-PRINCIPAL</option>
+          <option value="HM">HM</option>
+          <option value="PGT">PGT</option>
+          <option value="PET">PET</option>
+          <option value="PTI">PTI</option>
+          <option value="TGT">TGT</option>
+          <option value="PRT">PRT</option>
+          <option value="NTT">NTT</option>
+          <option value="SPECIAL EDUCATOR">SPECIAL EDUCATOR</option>
+          <option value="WELLNESS TEACHER (SOCIO-EMOTIONAL COUNSELOR)">WELLNESS TEACHER (SOCIO-EMOTIONAL COUNSELOR)</option>
+          <option value="CAREER COUNSELOR">CAREER COUNSELOR</option>
+          <option value="OTHER">OTHER</option>
+          <option value="GUEST TEACHER">GUEST TEACHER</option>
+        </select>
+      </div>
+    </div>
+    <div class="row two">
+      <div class="field">
+        <label for="seGender">Gender<span class="required">*</span></label>
+        <select id="seGender">
+          <option value="">Select</option>
+          <option value="Male">Male</option>
+          <option value="Female">Female</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="seDob">Date of Birth</label>
+        <input type="text" id="seDob" placeholder="DD/MM/YYYY" inputmode="numeric" maxlength="10" oninput="formatDateInput(this)">
+      </div>
+    </div>
+    <div class="field" style="margin-bottom:14px;">
+      <label>Father's Name / Husband's Name</label>
+      <div class="relation-choice">
+        <label><input type="radio" name="seParentRelation" value="Father"> Father</label>
+        <label><input type="radio" name="seParentRelation" value="Husband"> Husband</label>
+      </div>
+      <input type="text" id="seParentName" placeholder="Enter name">
+    </div>
+
+    <div class="section-title">Contact Details</div>
+    <div class="row two">
+      <div class="field">
+        <label for="seContactNumber">Contact Number<span class="required">*</span></label>
+        <input type="tel" id="seContactNumber" placeholder="10-digit mobile number">
+      </div>
+      <div class="field">
+        <label for="seParentContactNumber">Father's/Husband's Number</label>
+        <input type="tel" id="seParentContactNumber">
+      </div>
+    </div>
+    <div class="note" style="background:none;border:none;padding:0;margin-bottom:14px;">
+      Email: <strong id="seEmailDisplay"></strong> (this is your login email and can't be changed here — contact the school office if it needs to change)
+    </div>
+    <div class="field" style="margin-bottom:14px;">
+      <label for="seCurrentAddress">Current Address</label>
+      <textarea id="seCurrentAddress"></textarea>
+    </div>
+    <div class="field" style="margin-bottom:14px;">
+      <label for="seFullAddress">Full (Permanent) Address</label>
+      <textarea id="seFullAddress"></textarea>
+    </div>
+
+    <div class="section-title">Professional Details</div>
+    <div class="row two">
+      <div class="field">
+        <label for="seQualification">Highest Qualification</label>
+        <input type="text" id="seQualification">
+      </div>
+      <fieldset style="margin:0;">
+        <legend>Professional Qualification (B.Ed)</legend>
+        <div class="choice-group">
+          <label class="choice"><input type="radio" name="seBed" value="Yes"> Yes</label>
+          <label class="choice"><input type="radio" name="seBed" value="No"> No</label>
+        </div>
+      </fieldset>
+    </div>
+    <div class="row two">
+      <div class="field">
+        <label for="seDateOfJoining">Date of Joining (This Institution)</label>
+        <input type="text" id="seDateOfJoining" placeholder="DD/MM/YYYY" inputmode="numeric" maxlength="10" oninput="formatDateInput(this)">
+      </div>
+      <div class="field">
+        <label for="seTotalExperience">Total Experience (In Years)</label>
+        <input type="text" id="seTotalExperience">
+      </div>
+    </div>
+    <div class="row two">
+      <div class="field">
+        <label for="seSubjectsTaught">Subjects Taught</label>
+        <input type="text" id="seSubjectsTaught">
+      </div>
+    </div>
+    <fieldset style="margin:0 0 14px;">
+      <legend>Select Classes Taught</legend>
+      <div class="choice-group">
+        <label class="choice"><input type="checkbox" name="seClassTaught" value="KG-NURSERY"> KG-NURSERY</label>
+        <label class="choice"><input type="checkbox" name="seClassTaught" value="CLASS I"> CLASS I</label>
+        <label class="choice"><input type="checkbox" name="seClassTaught" value="CLASS II"> CLASS II</label>
+        <label class="choice"><input type="checkbox" name="seClassTaught" value="CLASS III"> CLASS III</label>
+        <label class="choice"><input type="checkbox" name="seClassTaught" value="CLASS IV"> CLASS IV</label>
+        <label class="choice"><input type="checkbox" name="seClassTaught" value="CLASS V"> CLASS V</label>
+        <label class="choice"><input type="checkbox" name="seClassTaught" value="CLASS VI"> CLASS VI</label>
+        <label class="choice"><input type="checkbox" name="seClassTaught" value="CLASS VII"> CLASS VII</label>
+        <label class="choice"><input type="checkbox" name="seClassTaught" value="CLASS VIII"> CLASS VIII</label>
+        <label class="choice"><input type="checkbox" name="seClassTaught" value="CLASS IX"> CLASS IX</label>
+        <label class="choice"><input type="checkbox" name="seClassTaught" value="CLASS X"> CLASS X</label>
+        <label class="choice"><input type="checkbox" name="seClassTaught" value="CLASS XI"> CLASS XI</label>
+        <label class="choice"><input type="checkbox" name="seClassTaught" value="CLASS XII"> CLASS XII</label>
+      </div>
+    </fieldset>
+    <div class="note" style="background:none;border:none;padding:0;margin-bottom:14px;">
+      CBSE Oasis ID on file: <strong id="seOasisDisplay">—</strong> (set by the school office — contact HR to correct it)
+    </div>
+
+    <div class="section-title">Bank &amp; Identification Details</div>
+    <div class="row two">
+      <div class="field">
+        <label for="seAccountNumber">Account Number (Canara Bank only)</label>
+        <input type="text" id="seAccountNumber">
+      </div>
+      <div class="field">
+        <label for="seIfscCode">IFSC Code</label>
+        <input type="text" id="seIfscCode">
+      </div>
+    </div>
+    <div class="row two">
+      <div class="field">
+        <label for="seAadharNumber">Aadhar Card Number</label>
+        <input type="text" id="seAadharNumber">
+      </div>
+      <div class="field">
+        <label for="sePanNumber">PAN Card Number</label>
+        <input type="text" id="sePanNumber">
+      </div>
+    </div>
+
+    <div class="section-title">Replace Documents (optional)</div>
+    <div class="upload-grid">
+      <div class="photo-slot">
+        <div class="photo-preview" id="sePhotoPreview">Passport size photo</div>
+        <label class="upload-label">Upload New Photo
+          <input type="file" accept="image/*" onchange="handleSeFile(event,'photo')">
+        </label>
+      </div>
+      <div class="doc-list">
+        <div class="doc-item">
+          <span class="doc-name">Aadhar Card (Front)</span>
+          <label class="upload-label">Replace
+            <input type="file" accept="image/*,application/pdf" onchange="handleSeFile(event,'aadharCardFront')">
+          </label>
+          <span class="doc-status" id="se-status-aadharCardFront">Leave blank to keep existing</span>
+        </div>
+        <div class="doc-item">
+          <span class="doc-name">Aadhar Card (Back)</span>
+          <label class="upload-label">Replace
+            <input type="file" accept="image/*,application/pdf" onchange="handleSeFile(event,'aadharCardBack')">
+          </label>
+          <span class="doc-status" id="se-status-aadharCardBack">Leave blank to keep existing</span>
+        </div>
+        <div class="doc-item">
+          <span class="doc-name">PAN Card</span>
+          <label class="upload-label">Replace
+            <input type="file" accept="image/*,application/pdf" onchange="handleSeFile(event,'panCard')">
+          </label>
+          <span class="doc-status" id="se-status-panCard">Leave blank to keep existing</span>
+        </div>
+        <div class="doc-item">
+          <span class="doc-name">Bank Passbook Photo</span>
+          <label class="upload-label">Replace
+            <input type="file" accept="image/*,application/pdf" onchange="handleSeFile(event,'passbook')">
+          </label>
+          <span class="doc-status" id="se-status-passbook">Leave blank to keep existing</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button type="button" class="btn-primary" id="seSaveBtn" onclick="saveStaffEdit()">Save Changes</button>
+    </div>
+    <div class="status" id="seStatusMsg" role="status" aria-live="polite"></div>
+  </form>
+</div>
+
 <!-- ================= ADMIN GATE VIEW ================= -->
 <div id="gateScreen" class="gate" style="display:none;">
   <h2>Admin Access</h2>
@@ -1169,7 +1399,7 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_
 
 /* ============ VIEW SWITCHING ============ */
 function showView(id){
-  ['landingView','studentFormView','class11FormView','staffFormView','staffThankYouView','staffGateScreen','gateScreen','mainPanel','adminResetRequestScreen','adminResetConfirmScreen','adminChangePasswordScreen','staffChangePasscodeScreen'].forEach(v => {
+  ['landingView','studentFormView','class11FormView','staffFormView','staffThankYouView','staffGateScreen','staffLoginScreen','staffEditView','gateScreen','mainPanel','adminResetRequestScreen','adminResetConfirmScreen','adminChangePasswordScreen','staffChangePasscodeScreen'].forEach(v => {
     const el = document.getElementById(v);
     if(v === id){
       el.style.display = 'block';
@@ -2303,6 +2533,250 @@ function submitAnotherStaff(){
   showView('staffFormView');
 }
 
+/* ============ STAFF SELF-SERVICE LOGIN / EDIT MY DETAILS ============
+   Lets a staff member create their own Supabase Auth account and, once
+   logged in, view and edit only their own staff_records row (matched by
+   email). Row-level access is enforced server-side by Supabase RLS —
+   see the "staff can select own record" / "staff can update own record"
+   policies — this UI is just the front end for that. */
+
+let staffAuthMode = 'login'; // 'login' | 'register'
+let currentStaffRecord = null; // the loaded staff_records row for the logged-in staff member
+const seFiles = { photo: null, aadharCardFront: null, aadharCardBack: null, panCard: null, passbook: null };
+
+function openStaffLogin(){
+  staffAuthMode = 'login';
+  document.getElementById('staffLoginHeading').textContent = 'Staff Login';
+  document.getElementById('staffAuthModeToggle').textContent = 'New here? Create an account';
+  document.getElementById('staffLoginBtn').textContent = 'Log In';
+  document.getElementById('staffLoginNote').style.display = 'none';
+  document.getElementById('staffLoginEmailInput').value = '';
+  document.getElementById('staffLoginPasswordInput').value = '';
+  showView('staffLoginScreen');
+}
+
+function toggleStaffAuthMode(){
+  staffAuthMode = staffAuthMode === 'login' ? 'register' : 'login';
+  const isRegister = staffAuthMode === 'register';
+  document.getElementById('staffLoginHeading').textContent = isRegister ? 'Create Staff Account' : 'Staff Login';
+  document.getElementById('staffAuthModeToggle').textContent = isRegister ? 'Already have an account? Log in' : 'New here? Create an account';
+  document.getElementById('staffLoginBtn').textContent = isRegister ? 'Create Account' : 'Log In';
+  document.getElementById('staffLoginNote').style.display = 'none';
+}
+
+function showStaffLoginNote(msg){
+  const el = document.getElementById('staffLoginNote');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+async function staffLogin(){
+  const email = document.getElementById('staffLoginEmailInput').value.trim();
+  const password = document.getElementById('staffLoginPasswordInput').value;
+  if(!email || !password){ showStaffLoginNote('Please enter your email and password.'); return; }
+  const btn = document.getElementById('staffLoginBtn');
+  btn.disabled = true;
+  try{
+    if(staffAuthMode === 'register'){
+      if(password.length < 8){ showStaffLoginNote('Password must be at least 8 characters.'); return; }
+      const { error } = await supabaseClient.auth.signUp({ email, password });
+      if(error){ showStaffLoginNote('Could not create account: ' + errMsg(error)); return; }
+      showStaffLoginNote('Account created. If email confirmation is required, check your inbox, then log in below.');
+      toggleStaffAuthMode();
+      return;
+    }
+    const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    if(error){ showStaffLoginNote('Could not log in: ' + errMsg(error)); return; }
+    await loadMyStaffRecord();
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function staffSendPasswordReset(){
+  const email = document.getElementById('staffLoginEmailInput').value.trim();
+  if(!email){ showStaffLoginNote('Enter your email above first, then tap "Forgot password?".'); return; }
+  try{
+    const { error } = await supabaseClient.auth.resetPasswordForEmail(email);
+    if(error){ showStaffLoginNote('Could not send reset email: ' + errMsg(error)); return; }
+    showStaffLoginNote('If an account exists for this email, a password reset link has been sent.');
+  } catch(err){
+    showStaffLoginNote('Could not reach the server: ' + errMsg(err));
+  }
+}
+
+function staffLogout(){
+  supabaseClient.auth.signOut();
+  currentStaffRecord = null;
+  showView('landingView');
+}
+
+/* After login, fetches the staff_records row matching the logged-in user's
+   email (RLS restricts this query to their own row regardless) and shows
+   either the edit form or a "no record found" message. */
+async function loadMyStaffRecord(){
+  const { data: userData } = await supabaseClient.auth.getUser();
+  const email = userData && userData.user ? userData.user.email : '';
+  showView('staffEditView');
+  document.getElementById('staffEditWhoami').textContent = email ? ('Logged in as ' + email) : '';
+  document.getElementById('staffEditNotFound').style.display = 'none';
+  document.getElementById('staffEditForm').style.display = 'none';
+  try{
+    const { data, error } = await supabaseClient
+      .from('staff_records')
+      .select('*')
+      .ilike('email_id', email)
+      .order('submitted_at', { ascending: false })
+      .limit(1);
+    if(error){ showStfEditStatus('Could not load your record: ' + errMsg(error)); return; }
+    if(!data || !data.length){
+      document.getElementById('staffEditNotFound').style.display = 'block';
+      return;
+    }
+    currentStaffRecord = data[0];
+    populateStaffEditForm(currentStaffRecord);
+    document.getElementById('staffEditForm').style.display = 'block';
+  } catch(err){
+    showStfEditStatus('Could not load your record: ' + errMsg(err));
+  }
+}
+
+function populateStaffEditForm(r){
+  const set = (id, val) => { const el = document.getElementById(id); if(el) el.value = val || ''; };
+  set('seFullName', r.full_name);
+  set('seDesignation', r.designation);
+  set('seGender', r.gender);
+  set('seDob', r.dob);
+  set('seParentName', r.parent_name);
+  set('seContactNumber', r.contact_number);
+  set('seParentContactNumber', r.parent_contact_number);
+  set('seCurrentAddress', r.current_address);
+  set('seFullAddress', r.full_address);
+  set('seQualification', r.qualification);
+  set('seDateOfJoining', r.date_of_joining);
+  set('seTotalExperience', r.total_experience);
+  set('seSubjectsTaught', r.subjects_taught);
+  set('seAccountNumber', r.account_number);
+  set('seIfscCode', r.ifsc_code);
+  set('seAadharNumber', r.aadhar_number);
+  set('sePanNumber', r.pan_number);
+  document.getElementById('seEmailDisplay').textContent = r.email_id || '';
+  document.getElementById('seOasisDisplay').textContent = r.oasis_id || '—';
+  document.querySelectorAll('input[name="seParentRelation"]').forEach(el => { el.checked = (el.value === r.parent_relation); });
+  document.querySelectorAll('input[name="seBed"]').forEach(el => { el.checked = (el.value === r.bed); });
+  const taught = (r.class_taught || '').split(',').map(s => s.trim());
+  document.querySelectorAll('input[name="seClassTaught"]').forEach(el => { el.checked = taught.includes(el.value); });
+  const photoPreview = document.getElementById('sePhotoPreview');
+  if(photoPreview) photoPreview.innerHTML = r.photo_path ? 'Photo on file' : 'Passport size photo';
+  [['aadharCardFront', r.aadhar_card_front_path], ['aadharCardBack', r.aadhar_card_back_path], ['panCard', r.pan_card_path], ['passbook', r.passbook_path]].forEach(([key, path]) => {
+    const el = document.getElementById('se-status-' + key);
+    if(el) el.textContent = path ? 'On file — choose a file to replace' : 'Not on file yet';
+  });
+}
+
+async function handleSeFile(event, key){
+  const file = event.target.files[0];
+  if(!file) return;
+  const sizeErr = checkFileSize(file);
+  if(sizeErr){ alert(sizeErr); event.target.value = ''; return; }
+  seFiles[key] = file;
+  if(key === 'photo'){
+    const reader = new FileReader();
+    reader.onload = e => { document.getElementById('sePhotoPreview').innerHTML = `<img src="${e.target.result}" alt="Photo preview">`; };
+    reader.readAsDataURL(file);
+  } else {
+    const statusEl = document.getElementById('se-status-' + key);
+    if(statusEl){ statusEl.textContent = 'New file selected: ' + file.name; statusEl.classList.add('attached'); }
+  }
+}
+
+function showStfEditStatus(msg){
+  const el = document.getElementById('seStatusMsg');
+  el.textContent = msg;
+  el.classList.add('visible');
+  el.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+async function saveStaffEdit(){
+  if(!currentStaffRecord){ showStfEditStatus('No record loaded yet.'); return; }
+  const get = id => (document.getElementById(id).value || '').trim();
+  const fullName = get('seFullName');
+  const designation = get('seDesignation');
+  const gender = get('seGender');
+  const contactNumber = get('seContactNumber');
+  const parentContactNumber = get('seParentContactNumber');
+  const dob = get('seDob');
+  const errors = [];
+  if(!fullName) errors.push('Full Name is required.');
+  if(!designation) errors.push('Designation is required.');
+  if(!gender) errors.push('Please select Gender.');
+  if(!contactNumber) errors.push('Contact Number is required.');
+  else if(!isValidMobile(contactNumber)) errors.push('Contact Number must be a valid 10-digit number.');
+  if(parentContactNumber && !isValidMobile(parentContactNumber)) errors.push("Father's/Husband's Number must be a valid 10-digit number.");
+  if(dob && !isValidDate(dob)) errors.push('Date of Birth is not a valid date (use DD/MM/YYYY, not in the future).');
+  if(errors.length){ showValidationErrors('seStatusMsg', errors); return; }
+
+  setSubmitBusy('seSaveBtn', true, 'Saving…', 'Save Changes');
+  showStfEditStatus('Saving… please wait, this may take a moment if you attached new documents.');
+  const folder = 'staff/' + Date.now() + '-' + Math.random().toString(36).slice(2,8);
+  try{
+    const [photoPath, aadharCardFrontPath, aadharCardBackPath, panCardPath, passbookPath] = await Promise.all([
+      uploadFile(seFiles.photo, folder),
+      uploadFile(seFiles.aadharCardFront, folder),
+      uploadFile(seFiles.aadharCardBack, folder),
+      uploadFile(seFiles.panCard, folder),
+      uploadFile(seFiles.passbook, folder)
+    ]);
+    const classTaught = Array.from(document.querySelectorAll('input[name="seClassTaught"]:checked')).map(el => el.value).join(', ');
+    const parentRelationEl = document.querySelector('input[name="seParentRelation"]:checked');
+    const bedEl = document.querySelector('input[name="seBed"]:checked');
+    const update = {
+      full_name: fullName, designation, gender,
+      parent_name: get('seParentName'), parent_relation: parentRelationEl ? parentRelationEl.value : '',
+      dob, contact_number: contactNumber, parent_contact_number: parentContactNumber,
+      current_address: get('seCurrentAddress'), full_address: get('seFullAddress'),
+      qualification: get('seQualification'), bed: bedEl ? bedEl.value : '',
+      date_of_joining: get('seDateOfJoining'), total_experience: get('seTotalExperience'),
+      subjects_taught: get('seSubjectsTaught'), class_taught: classTaught,
+      account_number: get('seAccountNumber'), ifsc_code: get('seIfscCode'),
+      aadhar_number: get('seAadharNumber'), pan_number: get('sePanNumber')
+      /* email_id, oasis_id, id, submitted_at are intentionally omitted — the
+         database also enforces this (only an admin account can change them). */
+    };
+    if(photoPath) update.photo_path = photoPath;
+    if(aadharCardFrontPath) update.aadhar_card_front_path = aadharCardFrontPath;
+    if(aadharCardBackPath) update.aadhar_card_back_path = aadharCardBackPath;
+    if(panCardPath) update.pan_card_path = panCardPath;
+    if(passbookPath) update.passbook_path = passbookPath;
+
+    const { data, error } = await supabaseClient.from('staff_records').update(update).eq('id', currentStaffRecord.id).select();
+    if(error) throw error;
+    if(data && data[0]) currentStaffRecord = data[0];
+    seFiles.photo = null; seFiles.aadharCardFront = null; seFiles.aadharCardBack = null; seFiles.panCard = null; seFiles.passbook = null;
+    populateStaffEditForm(currentStaffRecord);
+    showStfEditStatus('Saved — your details have been updated.');
+  } catch(err){
+    console.error(err);
+    showStfEditStatus('Could not save: ' + errMsg(err));
+  } finally {
+    setSubmitBusy('seSaveBtn', false, 'Saving…', 'Save Changes');
+  }
+}
+
+/* If the person arrives via a Supabase password-recovery link, prompt for a
+   new password right in the staff login screen. */
+supabaseClient.auth.onAuthStateChange((event, session) => {
+  if(event === 'PASSWORD_RECOVERY'){
+    const newPassword = prompt('Enter a new password (min 8 characters):');
+    if(newPassword && newPassword.length >= 8){
+      supabaseClient.auth.updateUser({ password: newPassword }).then(({ error }) => {
+        showView('staffLoginScreen');
+        showStaffLoginNote(error ? ('Could not update password: ' + errMsg(error)) : 'Password updated — you can log in now.');
+      });
+    }
+  }
+});
+
 /* Opens a pre-filled email (addressed to the staff member's own email if they
    gave one on the form) carrying the Oasis ID just matched on the Thank You
    page, so they have a copy for their records. */
@@ -2334,8 +2808,16 @@ async function resendStaffMail(record){
     alert('This record has no email address on file, so a resend email cannot be sent.');
     return;
   }
-  if(!confirm('Resend the confirmation email (with Oasis ID + submitted details) to ' + (record.fullName || 'this staff member') + ' at ' + record.emailId + '?')) return;
+  if(!confirm('Resend the confirmation email (with Oasis ID + the complete filled form) to ' + (record.fullName || 'this staff member') + ' at ' + record.emailId + '?')) return;
   try{
+    /* Send the whole stored record as formData (minus the fields already sent
+       top-level) so the resend email can show the COMPLETE filled form, not
+       just a subset. */
+    const formData = {};
+    Object.keys(record).forEach(k => {
+      if(['_key','fullName','emailId','oasisId'].includes(k)) return;
+      formData[k] = record[k];
+    });
     const res = await fetch(SUPABASE_URL + '/functions/v1/send-oasis-email', {
       method: 'POST',
       headers: {
@@ -2350,24 +2832,7 @@ async function resendStaffMail(record){
         matchedName: record.fullName || '',
         confidence: 'Confirmed (on file)',
         resend: true,
-        formData: {
-          designation: record.designation || '',
-          gender: record.gender || '',
-          dob: record.dob || '',
-          contactNumber: record.contactNumber || '',
-          currentAddress: record.currentAddress || '',
-          fullAddress: record.fullAddress || '',
-          qualification: record.qualification || '',
-          bed: record.bed || '',
-          dateOfJoining: record.dateOfJoining || '',
-          totalExperience: record.totalExperience || '',
-          subjectsTaught: record.subjectsTaught || '',
-          classTaught: record.classTaught || '',
-          accountNumber: record.accountNumber || '',
-          ifscCode: record.ifscCode || '',
-          aadharNumber: record.aadharNumber || '',
-          panNumber: record.panNumber || ''
-        }
+        formData: formData
       })
     });
     if(!res.ok){
