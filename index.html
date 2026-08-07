@@ -1100,6 +1100,19 @@
   <a class="back-link" onclick="showView('landingView')">← Back to Forms Portal</a>
 </div>
 
+<!-- ================= STAFF PASSWORD RESET — ENTER CODE ================= -->
+<div id="staffResetConfirmScreen" class="gate" style="display:none;">
+  <h2>Enter Code</h2>
+  <div class="session" style="margin:-6px 0 14px;">We emailed a 6-digit code to <span id="staffResetEmailDisplay"></span>.</div>
+  <input type="text" id="staffResetOtpInput" placeholder="6-digit code from email" inputmode="numeric" maxlength="6">
+  <input type="password" id="staffResetNewPasswordInput" placeholder="New password" autocomplete="new-password">
+  <input type="password" id="staffResetConfirmPasswordInput" placeholder="Confirm new password" autocomplete="new-password">
+  <button id="staffResetConfirmBtn" onclick="confirmStaffResetOtp()">Reset Password</button>
+  <a class="back-link" onclick="resendStaffResetOtp()" style="margin-top:10px;">Resend code</a>
+  <div class="note" id="staffResetConfirmNote" style="display:none;"></div>
+  <a class="back-link" onclick="showView('staffLoginScreen')">← Back to Log In</a>
+</div>
+
 <!-- ================= STAFF EDIT MY DETAILS ================= -->
 <div class="sheet" id="staffEditView" style="display:none;">
   <div class="back-nav"><a onclick="staffLogout()">← Log Out</a></div>
@@ -1399,7 +1412,7 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_
 
 /* ============ VIEW SWITCHING ============ */
 function showView(id){
-  ['landingView','studentFormView','class11FormView','staffFormView','staffThankYouView','staffGateScreen','staffLoginScreen','staffEditView','gateScreen','mainPanel','adminResetRequestScreen','adminResetConfirmScreen','adminChangePasswordScreen','staffChangePasscodeScreen'].forEach(v => {
+  ['landingView','studentFormView','class11FormView','staffFormView','staffThankYouView','staffGateScreen','staffLoginScreen','staffResetConfirmScreen','staffEditView','gateScreen','mainPanel','adminResetRequestScreen','adminResetConfirmScreen','adminChangePasswordScreen','staffChangePasscodeScreen'].forEach(v => {
     const el = document.getElementById(v);
     if(v === id){
       el.style.display = 'block';
@@ -2593,17 +2606,65 @@ async function staffLogin(){
   }
 }
 
+let staffResetEmailPending = '';
+
 async function staffSendPasswordReset(){
   const email = document.getElementById('staffLoginEmailInput').value.trim();
   if(!email){ showStaffLoginNote('Enter your email above first, then tap "Forgot password?".'); return; }
   try{
     const { error } = await supabaseClient.auth.resetPasswordForEmail(email);
     if(error){ showStaffLoginNote('Could not send reset email: ' + errMsg(error)); return; }
-    showStaffLoginNote('If an account exists for this email, a password reset link has been sent.');
+    staffResetEmailPending = email;
+    document.getElementById('staffResetEmailDisplay').textContent = email;
+    document.getElementById('staffResetOtpInput').value = '';
+    document.getElementById('staffResetNewPasswordInput').value = '';
+    document.getElementById('staffResetConfirmPasswordInput').value = '';
+    document.getElementById('staffResetConfirmNote').style.display = 'none';
+    showView('staffResetConfirmScreen');
   } catch(err){
     showStaffLoginNote('Could not reach the server: ' + errMsg(err));
   }
 }
+
+function resendStaffResetOtp(){
+  if(!staffResetEmailPending){ showView('staffLoginScreen'); return; }
+  document.getElementById('staffLoginEmailInput').value = staffResetEmailPending;
+  staffSendPasswordReset();
+}
+
+async function confirmStaffResetOtp(){
+  const code = document.getElementById('staffResetOtpInput').value.trim();
+  const newPassword = document.getElementById('staffResetNewPasswordInput').value;
+  const confirmPassword = document.getElementById('staffResetConfirmPasswordInput').value;
+  const showNote = msg => {
+    const note = document.getElementById('staffResetConfirmNote');
+    note.textContent = msg;
+    note.style.display = 'block';
+  };
+  if(!staffResetEmailPending){ showView('staffLoginScreen'); return; }
+  if(!code){ showNote('Please enter the 6-digit code from your email.'); return; }
+  if(!newPassword || newPassword.length < 8){ showNote('Password must be at least 8 characters.'); return; }
+  if(newPassword !== confirmPassword){ showNote('Passwords do not match.'); return; }
+  const btn = document.getElementById('staffResetConfirmBtn');
+  btn.disabled = true;
+  try{
+    const { error: verifyError } = await supabaseClient.auth.verifyOtp({ email: staffResetEmailPending, token: code, type: 'recovery' });
+    if(verifyError){ showNote('Incorrect or expired code: ' + errMsg(verifyError)); return; }
+    const { error: updateError } = await supabaseClient.auth.updateUser({ password: newPassword });
+    if(updateError){ showNote('Could not set new password: ' + errMsg(updateError)); return; }
+    staffResetEmailPending = '';
+    await loadMyStaffRecord();
+  } catch(err){
+    showNote('Could not reach the server: ' + errMsg(err));
+  } finally {
+    btn.disabled = false;
+  }
+}
+['staffResetOtpInput','staffResetNewPasswordInput','staffResetConfirmPasswordInput'].forEach(id => {
+  document.getElementById(id).addEventListener('keydown', e => {
+    if(e.key === 'Enter') confirmStaffResetOtp();
+  });
+});
 
 function staffLogout(){
   supabaseClient.auth.signOut();
