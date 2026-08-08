@@ -1098,6 +1098,7 @@
   <button id="staffVerifyOtpBtn" onclick="confirmStaffSignupOtp()">Verify &amp; Continue</button>
   <a class="back-link" onclick="resendStaffSignupOtp()" style="margin-top:10px;">Resend code</a>
   <div class="note" id="staffVerifyOtpNote" style="display:none;"></div>
+  <div class="field-hint" style="margin:6px 0 0;">Not seeing it? Check your spam/junk folder — it can take a minute or two, and codes expire after a while, so use "Resend code" if it's been a bit.</div>
   <a class="back-link" onclick="showView('staffLoginScreen')">← Back to Log In</a>
 </div>
 
@@ -2531,6 +2532,11 @@ async function staffLogin(){
         return;
       }
       openStaffVerifyEmail(email);
+      /* signUp() silently skips sending a fresh email if this address already
+         has an unconfirmed account sitting in Supabase (an anti-enumeration
+         behaviour), so also explicitly call resend() — that's the call
+         Supabase documents as reliably (re-)firing the signup OTP email. */
+      await resendStaffSignupOtp();
       return;
     }
     const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
