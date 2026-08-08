@@ -283,15 +283,10 @@
       <h3>Class XI Registration</h3>
       <p>CBSE Board Registration — Academic Session 2026–27</p>
     </div>
-    <div class="card" onclick="showView('staffGateScreen')">
+    <div class="card" onclick="openStaffLogin()">
       <div class="icon">🧑‍🏫</div>
       <h3>Staff Data Bank</h3>
-      <p>Staff information &amp; document collection</p>
-    </div>
-    <div class="card" onclick="openStaffLogin()">
-      <div class="icon">🔐</div>
-      <h3>Staff Login</h3>
-      <p>View &amp; update your own staff record</p>
+      <p>Log in or register, then fill in &amp; update your staff record</p>
     </div>
   </div>
 </div>
@@ -505,7 +500,10 @@
 
 <!-- ================= STAFF FORM VIEW ================= -->
 <div class="sheet" id="staffFormView" style="display:none;">
-  <div class="back-nav"><a onclick="showView('landingView')">← Back to Forms Portal</a></div>
+  <div class="back-nav" id="stfBackNav"><a onclick="showView('landingView')">← Back to Forms Portal</a></div>
+  <div id="stfFillNote" class="note" style="display:none;">
+    You're logged in — this Staff Data Bank form hasn't been filled in yet for your account. Complete it below; your login email is locked in so you can log back in any time to view or update it.
+  </div>
   <div id="stfDraftBanner" class="note" style="display:none;">
     A previous unfinished draft was found for this form.
     <a onclick="applyDraft('staffForm','draft_staff_form','stfDraftBanner')" style="cursor:pointer;font-weight:700;text-decoration:underline;">Restore it</a>
@@ -737,7 +735,8 @@
     <div class="actions">
       <button type="button" class="btn-secondary" id="stfEmailOasisBtn" style="display:none;" onclick="emailOasisId()">Email Me This Oasis ID</button>
       <button type="button" class="btn-secondary" onclick="showView('landingView')">Back to Forms Portal</button>
-      <button type="button" class="btn-primary" onclick="submitAnotherStaff()">Submit Another Response</button>
+      <button type="button" class="btn-primary" id="stfViewMyDetailsBtn" style="display:none;" onclick="loadMyStaffRecord()">View / Edit My Details</button>
+      <button type="button" class="btn-primary" id="stfSubmitAnotherBtn" onclick="submitAnotherStaff()">Submit Another Response</button>
     </div>
   </div>
 </div>
@@ -1065,28 +1064,6 @@
   </form>
 </div>
 
-<!-- ================= STAFF ACCESS GATE VIEW ================= -->
-<div id="staffGateScreen" class="gate" style="display:none;">
-  <h2>Staff Data Bank Access</h2>
-  <input type="text" id="staffPasscodeInput" placeholder="Enter staff passcode">
-  <button id="staffPasscodeBtn" onclick="checkStaffPasscode()">Enter</button>
-  <a class="back-link" onclick="toggleForgot('staffForgotNote')" style="margin-top:10px;">Forgot passcode?</a>
-  <div class="note" id="staffForgotNote" style="display:none;">Please <a href="mailto:zeeschooljhansi@gmail.com?subject=Staff%20passcode%20reset%20request">email the school office</a> to retrieve the passcode.</div>
-  <a class="back-link" onclick="openStaffChangePasscode()">Change passcode</a>
-  <a class="back-link" onclick="showView('landingView')">← Back to Forms Portal</a>
-</div>
-
-<!-- ================= STAFF CHANGE PASSCODE (uses previous passcode) ================= -->
-<div id="staffChangePasscodeScreen" class="gate" style="display:none;">
-  <h2>Change Staff Passcode</h2>
-  <input type="text" id="staffOldPasscodeInput" placeholder="Current passcode">
-  <input type="text" id="staffNewPasscodeInput" placeholder="New passcode">
-  <input type="text" id="staffConfirmPasscodeInput" placeholder="Confirm new passcode">
-  <button id="staffChangePasscodeBtn" onclick="submitStaffPasscodeChange()">Update Passcode</button>
-  <div class="note" id="staffChangePasscodeNote" style="display:none;"></div>
-  <a class="back-link" onclick="showView('staffGateScreen')">← Back to Log In</a>
-</div>
-
 <!-- ================= STAFF SELF-SERVICE LOGIN / REGISTER ================= -->
 <div id="staffLoginScreen" class="gate" style="display:none;">
   <h2 id="staffLoginHeading">Staff Login</h2>
@@ -1124,9 +1101,9 @@
   </div>
 
   <div id="staffEditNotFound" class="note" style="display:none;">
-    We couldn't find a Staff Data Bank record for this email address. Please fill out the
-    <a onclick="staffLogout(); showView('staffGateScreen');" style="cursor:pointer;font-weight:700;text-decoration:underline;">Staff Data Bank form</a>
-    first using this same email, then log in here again to edit it.
+    We couldn't find a Staff Data Bank record for this email address yet.
+    <a onclick="openStaffFormForFill(currentStaffLoginEmail);" style="cursor:pointer;font-weight:700;text-decoration:underline;">Fill out the Staff Data Bank form</a>
+    now using this same login.
   </div>
 
   <form id="staffEditForm" onsubmit="return false;" style="display:none;">
@@ -1412,7 +1389,7 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_
 
 /* ============ VIEW SWITCHING ============ */
 function showView(id){
-  ['landingView','studentFormView','class11FormView','staffFormView','staffThankYouView','staffGateScreen','staffLoginScreen','staffResetConfirmScreen','staffEditView','gateScreen','mainPanel','adminResetRequestScreen','adminResetConfirmScreen','adminChangePasswordScreen','staffChangePasscodeScreen'].forEach(v => {
+  ['landingView','studentFormView','class11FormView','staffFormView','staffThankYouView','staffLoginScreen','staffResetConfirmScreen','staffEditView','gateScreen','mainPanel','adminResetRequestScreen','adminResetConfirmScreen','adminChangePasswordScreen'].forEach(v => {
     const el = document.getElementById(v);
     if(v === id){
       el.style.display = 'block';
@@ -1430,108 +1407,6 @@ function showView(id){
   if(id === 'staffFormView') maybeShowDraftBanner('draft_staff_form', 'stfDraftBanner');
 }
 function showGate(){ showView('gateScreen'); }
-
-function toggleForgot(id){
-  const el = document.getElementById(id);
-  el.style.display = (el.style.display === 'none') ? 'block' : 'none';
-}
-
-/* The staff submission-form passcode is checked server-side via the verify_staff_passcode
-   Postgres function (see setup notes below) so it is never stored in plain text here.
-   This is a soft, low-stakes gate against casual browsing — it does not protect the
-   submitted data itself; that's handled by Supabase Row Level Security on the tables. */
-async function checkStaffPasscode(){
-  const val = document.getElementById('staffPasscodeInput').value;
-  const btn = document.getElementById('staffPasscodeBtn');
-  if(!val){ alert('Please enter the passcode.'); return; }
-  if(btn) btn.disabled = true;
-  try{
-    const { data, error } = await supabaseClient.rpc('verify_staff_passcode', { code: val });
-    if(error){
-      console.error(error);
-      alert('Could not verify the passcode: ' + errMsg(error) + '\n\nIf this is the first time using this feature, the school office may still need to finish setting it up.');
-      return;
-    }
-    if(data === true){
-      document.getElementById('staffPasscodeInput').value = '';
-      showView('staffFormView');
-    } else {
-      alert('Incorrect passcode.');
-    }
-  } catch(err){
-    console.error(err);
-    alert('Could not reach the server: ' + errMsg(err) + '\n\nCheck your internet connection and try again.');
-  } finally {
-    if(btn) btn.disabled = false;
-  }
-}
-document.getElementById('staffPasscodeInput').addEventListener('keydown', e => {
-  if(e.key === 'Enter') checkStaffPasscode();
-});
-/* SETUP (run once in Supabase SQL editor):
-   create extension if not exists pgcrypto;
-   create table if not exists app_secrets (key text primary key, value text not null);
-   insert into app_secrets (key, value) values ('staff_form_passcode', crypt('YourPasscodeHere', gen_salt('bf')))
-     on conflict (key) do update set value = excluded.value;
-   create or replace function verify_staff_passcode(code text)
-   returns boolean language sql security definer as $$
-     select value = crypt(code, value) from app_secrets where key = 'staff_form_passcode';
-   $$;
-   revoke all on function verify_staff_passcode(text) from public;
-   grant execute on function verify_staff_passcode(text) to anon, authenticated;
-
-   -- Lets staff change the passcode themselves by supplying the current one:
-   create or replace function change_staff_passcode(old_code text, new_code text)
-   returns boolean language plpgsql security definer as $$
-   begin
-     if not exists (select 1 from app_secrets where key = 'staff_form_passcode' and value = crypt(old_code, value)) then
-       return false;
-     end if;
-     update app_secrets set value = crypt(new_code, gen_salt('bf')) where key = 'staff_form_passcode';
-     return true;
-   end;
-   $$;
-   revoke all on function change_staff_passcode(text, text) from public;
-   grant execute on function change_staff_passcode(text, text) to anon, authenticated;
-*/
-
-function openStaffChangePasscode(){
-  document.getElementById('staffOldPasscodeInput').value = '';
-  document.getElementById('staffNewPasscodeInput').value = '';
-  document.getElementById('staffConfirmPasscodeInput').value = '';
-  document.getElementById('staffChangePasscodeNote').style.display = 'none';
-  showView('staffChangePasscodeScreen');
-}
-
-async function submitStaffPasscodeChange(){
-  const oldCode = document.getElementById('staffOldPasscodeInput').value;
-  const newCode = document.getElementById('staffNewPasscodeInput').value;
-  const confirmCode = document.getElementById('staffConfirmPasscodeInput').value;
-  const note = document.getElementById('staffChangePasscodeNote');
-  const showNote = msg => { note.textContent = msg; note.style.display = 'block'; };
-  if(!oldCode || !newCode || !confirmCode){ showNote('Please fill in all three fields.'); return; }
-  if(newCode.length < 6){ showNote('New passcode must be at least 6 characters.'); return; }
-  if(newCode !== confirmCode){ showNote('New passcode and confirmation do not match.'); return; }
-  const btn = document.getElementById('staffChangePasscodeBtn');
-  btn.disabled = true;
-  try{
-    const { data, error } = await supabaseClient.rpc('change_staff_passcode', { old_code: oldCode, new_code: newCode });
-    if(error){ showNote('Could not update the passcode: ' + errMsg(error)); return; }
-    if(data === true){
-      showNote('Passcode updated successfully.');
-      setTimeout(() => showView('staffGateScreen'), 1200);
-    } else {
-      showNote('Current passcode is incorrect.');
-    }
-  } finally {
-    btn.disabled = false;
-  }
-}
-['staffOldPasscodeInput','staffNewPasscodeInput','staffConfirmPasscodeInput'].forEach(id => {
-  document.getElementById(id).addEventListener('keydown', e => {
-    if(e.key === 'Enter') submitStaffPasscodeChange();
-  });
-});
 
 /* Soft client-side brake against rapid-fire login guessing. Supabase Auth enforces its own
    server-side rate limits regardless — this just avoids hammering the API from one tab. */
@@ -2453,6 +2328,15 @@ async function submitStaffData(){
     document.getElementById('stfStatusMsg').textContent = '';
     document.getElementById('stfStatusMsg').classList.remove('visible');
     showView('staffThankYouView');
+    const viewBtn = document.getElementById('stfViewMyDetailsBtn');
+    const againBtn = document.getElementById('stfSubmitAnotherBtn');
+    if(currentStaffLoginEmail){
+      if(viewBtn) viewBtn.style.display = '';
+      if(againBtn) againBtn.style.display = 'none';
+    } else {
+      if(viewBtn) viewBtn.style.display = 'none';
+      if(againBtn) againBtn.style.display = '';
+    }
     showOasisMatch(obj.fullName, obj.emailId);
     sendOasisConfirmationEmail();
     window.scrollTo({top:0, behavior:'smooth'});
@@ -2551,7 +2435,28 @@ function submitAnotherStaff(){
    logged in, view and edit only their own staff_records row (matched by
    email). Row-level access is enforced server-side by Supabase RLS —
    see the "staff can select own record" / "staff can update own record"
-   policies — this UI is just the front end for that. */
+   policies — this UI is just the front end for that.
+
+   Staff Data Bank and Staff Login are now one combined, login-first flow:
+   the old standalone passcode gate (app_secrets / verify_staff_passcode /
+   change_staff_passcode) has been removed from this page, so those table
+   and functions can be dropped in Supabase if nothing else uses them.
+
+   IMPORTANT — SUPABASE POLICY CHANGE NEEDED:
+   submitStaffData() (the "fill in the form" flow) now always runs as an
+   authenticated user instead of an anonymous, passcode-checked one, so the
+   INSERT policy on staff_records must allow the authenticated role rather
+   than (or in addition to) anon. To keep each staff member's own email
+   locked to their own inserted row, run in the Supabase SQL editor:
+
+     drop policy if exists "staff can insert own record" on staff_records;
+     create policy "staff can insert own record" on staff_records
+       for insert to authenticated
+       with check (lower(email_id) = lower(auth.jwt() ->> 'email'));
+
+   If an older, more permissive anon INSERT policy still exists on this
+   table from the passcode-gate days, drop it too, since anonymous
+   submissions are no longer possible from this page. */
 
 let staffAuthMode = 'login'; // 'login' | 'register'
 let currentStaffRecord = null; // the loaded staff_records row for the logged-in staff member
@@ -2666,22 +2571,24 @@ async function confirmStaffResetOtp(){
   });
 });
 
+let currentStaffLoginEmail = ''; // email of the currently logged-in staff member (once auth resolves)
+
 function staffLogout(){
   supabaseClient.auth.signOut();
   currentStaffRecord = null;
+  currentStaffLoginEmail = '';
   showView('landingView');
 }
 
-/* After login, fetches the staff_records row matching the logged-in user's
-   email (RLS restricts this query to their own row regardless) and shows
-   either the edit form or a "no record found" message. */
+/* After login/registration, fetches the staff_records row matching the logged-in
+   user's email (RLS restricts this query to their own row regardless). If a
+   record already exists, shows the edit form. If not — e.g. the first time a
+   newly-registered staff member logs in — sends them straight into the Staff
+   Data Bank form (with their email locked in) so they can create it. */
 async function loadMyStaffRecord(){
   const { data: userData } = await supabaseClient.auth.getUser();
   const email = userData && userData.user ? userData.user.email : '';
-  showView('staffEditView');
-  document.getElementById('staffEditWhoami').textContent = email ? ('Logged in as ' + email) : '';
-  document.getElementById('staffEditNotFound').style.display = 'none';
-  document.getElementById('staffEditForm').style.display = 'none';
+  currentStaffLoginEmail = email;
   try{
     const { data, error } = await supabaseClient
       .from('staff_records')
@@ -2689,17 +2596,46 @@ async function loadMyStaffRecord(){
       .ilike('email_id', email)
       .order('submitted_at', { ascending: false })
       .limit(1);
-    if(error){ showStfEditStatus('Could not load your record: ' + errMsg(error)); return; }
+    if(error){
+      showView('staffEditView');
+      document.getElementById('staffEditWhoami').textContent = email ? ('Logged in as ' + email) : '';
+      document.getElementById('staffEditNotFound').style.display = 'none';
+      document.getElementById('staffEditForm').style.display = 'none';
+      showStfEditStatus('Could not load your record: ' + errMsg(error));
+      return;
+    }
     if(!data || !data.length){
-      document.getElementById('staffEditNotFound').style.display = 'block';
+      openStaffFormForFill(email);
       return;
     }
     currentStaffRecord = data[0];
+    showView('staffEditView');
+    document.getElementById('staffEditWhoami').textContent = email ? ('Logged in as ' + email) : '';
+    document.getElementById('staffEditNotFound').style.display = 'none';
     populateStaffEditForm(currentStaffRecord);
     document.getElementById('staffEditForm').style.display = 'block';
   } catch(err){
+    showView('staffEditView');
+    document.getElementById('staffEditWhoami').textContent = email ? ('Logged in as ' + email) : '';
+    document.getElementById('staffEditForm').style.display = 'none';
     showStfEditStatus('Could not load your record: ' + errMsg(err));
   }
+}
+
+/* Opens the Staff Data Bank form for a logged-in staff member who doesn't have
+   a record yet, locking the email field to their login email (so future
+   logins find it) and swapping the back-nav to a log-out link. */
+function openStaffFormForFill(email){
+  showView('staffFormView');
+  const emailInput = document.getElementById('emailId');
+  if(emailInput){
+    emailInput.value = email || '';
+    emailInput.readOnly = !!email;
+  }
+  const backNav = document.getElementById('stfBackNav');
+  if(backNav) backNav.innerHTML = '<a onclick="staffLogout()">← Log Out</a>';
+  const note = document.getElementById('stfFillNote');
+  if(note) note.style.display = email ? 'block' : 'none';
 }
 
 function populateStaffEditForm(r){
