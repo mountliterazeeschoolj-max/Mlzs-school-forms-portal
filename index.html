@@ -1090,6 +1090,17 @@
   <a class="back-link" onclick="showView('staffLoginScreen')">← Back to Log In</a>
 </div>
 
+<!-- ================= STAFF EMAIL VERIFICATION — ENTER CODE (AFTER REGISTER) ================= -->
+<div id="staffVerifyEmailScreen" class="gate" style="display:none;">
+  <h2>Verify Your Email</h2>
+  <div class="session" style="margin:-6px 0 14px;">We emailed a 6-digit code to <span id="staffVerifyEmailDisplay"></span> to confirm it's really you.</div>
+  <input type="text" id="staffVerifyOtpInput" placeholder="Code from email" inputmode="numeric" maxlength="12">
+  <button id="staffVerifyOtpBtn" onclick="confirmStaffSignupOtp()">Verify &amp; Continue</button>
+  <a class="back-link" onclick="resendStaffSignupOtp()" style="margin-top:10px;">Resend code</a>
+  <div class="note" id="staffVerifyOtpNote" style="display:none;"></div>
+  <a class="back-link" onclick="showView('staffLoginScreen')">← Back to Log In</a>
+</div>
+
 <!-- ================= STAFF EDIT MY DETAILS ================= -->
 <div class="sheet" id="staffEditView" style="display:none;">
   <div class="back-nav"><a onclick="staffLogout()">← Log Out</a></div>
@@ -1389,7 +1400,7 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_
 
 /* ============ VIEW SWITCHING ============ */
 function showView(id){
-  ['landingView','studentFormView','class11FormView','staffFormView','staffThankYouView','staffLoginScreen','staffResetConfirmScreen','staffEditView','gateScreen','mainPanel','adminResetRequestScreen','adminResetConfirmScreen','adminChangePasswordScreen'].forEach(v => {
+  ['landingView','studentFormView','class11FormView','staffFormView','staffThankYouView','staffLoginScreen','staffResetConfirmScreen','staffVerifyEmailScreen','staffEditView','gateScreen','mainPanel','adminResetRequestScreen','adminResetConfirmScreen','adminChangePasswordScreen'].forEach(v => {
     const el = document.getElementById(v);
     if(v === id){
       el.style.display = 'block';
@@ -2456,7 +2467,21 @@ function submitAnotherStaff(){
 
    If an older, more permissive anon INSERT policy still exists on this
    table from the passcode-gate days, drop it too, since anonymous
-   submissions are no longer possible from this page. */
+   submissions are no longer possible from this page.
+
+   IMPORTANT — SUPABASE AUTH SETTINGS NEEDED FOR SIGN-UP OTP:
+   Registration now confirms the staff member's email with a 6-digit code
+   (verifyOtp/resend, type:'signup') instead of a confirmation link. For
+   Supabase to actually send a numeric code by email:
+     1. Authentication → Providers → Email: "Confirm email" must be ON.
+     2. Authentication → Email Templates → "Confirm signup": the template
+        must reference {{ .Token }} (the OTP code) rather than only
+        {{ .ConfirmationURL }} — edit the template body to show the code,
+        e.g. "Your verification code is {{ .Token }}". Without this, the
+        email won't contain a code for verifyOtp() to check.
+   If "Confirm email" is OFF, signUp() returns a session immediately and
+   this page skips the OTP screen entirely (see the data.session check in
+   staffLogin() below). */
 
 let staffAuthMode = 'login'; // 'login' | 'register'
 let currentStaffRecord = null; // the loaded staff_records row for the logged-in staff member
@@ -2497,10 +2522,15 @@ async function staffLogin(){
   try{
     if(staffAuthMode === 'register'){
       if(password.length < 8){ showStaffLoginNote('Password must be at least 8 characters.'); return; }
-      const { error } = await supabaseClient.auth.signUp({ email, password });
+      const { data, error } = await supabaseClient.auth.signUp({ email, password });
       if(error){ showStaffLoginNote('Could not create account: ' + errMsg(error)); return; }
-      showStaffLoginNote('Account created. If email confirmation is required, check your inbox, then log in below.');
-      toggleStaffAuthMode();
+      /* If the Supabase project has "Confirm email" turned off, signUp() already
+         returns a live session and there's nothing to verify — go straight in. */
+      if(data && data.session){
+        await loadMyStaffRecord();
+        return;
+      }
+      openStaffVerifyEmail(email);
       return;
     }
     const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
@@ -2569,6 +2599,60 @@ async function confirmStaffResetOtp(){
   document.getElementById(id).addEventListener('keydown', e => {
     if(e.key === 'Enter') confirmStaffResetOtp();
   });
+});
+
+/* ---- Email verification (OTP) after registering a new staff account ----
+   signUp() sends a "Confirm signup" email containing a 6-digit token as
+   long as that email template includes {{ .Token }} (see the Supabase
+   setup note further down). verifyOtp(type:'signup') checks that code
+   and, on success, both confirms the address and logs the user in. */
+let staffSignupEmailPending = '';
+
+function openStaffVerifyEmail(email){
+  staffSignupEmailPending = email;
+  document.getElementById('staffVerifyEmailDisplay').textContent = email;
+  document.getElementById('staffVerifyOtpInput').value = '';
+  document.getElementById('staffVerifyOtpNote').style.display = 'none';
+  showView('staffVerifyEmailScreen');
+}
+
+async function confirmStaffSignupOtp(){
+  const code = document.getElementById('staffVerifyOtpInput').value.trim();
+  const showNote = msg => {
+    const note = document.getElementById('staffVerifyOtpNote');
+    note.textContent = msg;
+    note.style.display = 'block';
+  };
+  if(!staffSignupEmailPending){ showView('staffLoginScreen'); return; }
+  if(!code){ showNote('Please enter the code from your email.'); return; }
+  const btn = document.getElementById('staffVerifyOtpBtn');
+  btn.disabled = true;
+  try{
+    const { error } = await supabaseClient.auth.verifyOtp({ email: staffSignupEmailPending, token: code, type: 'signup' });
+    if(error){ showNote('Incorrect or expired code: ' + errMsg(error)); return; }
+    staffSignupEmailPending = '';
+    await loadMyStaffRecord();
+  } catch(err){
+    showNote('Could not reach the server: ' + errMsg(err));
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function resendStaffSignupOtp(){
+  const note = document.getElementById('staffVerifyOtpNote');
+  if(!staffSignupEmailPending){ showView('staffLoginScreen'); return; }
+  try{
+    const { error } = await supabaseClient.auth.resend({ type: 'signup', email: staffSignupEmailPending });
+    note.textContent = error ? ('Could not resend the code: ' + errMsg(error)) : 'A new code has been sent.';
+    note.style.display = 'block';
+  } catch(err){
+    note.textContent = 'Could not reach the server: ' + errMsg(err);
+    note.style.display = 'block';
+  }
+}
+document.getElementById('staffVerifyOtpInput').addEventListener('keydown', e => {
+  if(e.key === 'Enter') confirmStaffSignupOtp();
 });
 
 let currentStaffLoginEmail = ''; // email of the currently logged-in staff member (once auth resolves)
