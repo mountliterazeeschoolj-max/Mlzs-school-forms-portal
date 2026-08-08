@@ -1103,8 +1103,8 @@
 <!-- ================= STAFF PASSWORD RESET — ENTER CODE ================= -->
 <div id="staffResetConfirmScreen" class="gate" style="display:none;">
   <h2>Enter Code</h2>
-  <div class="session" style="margin:-6px 0 14px;">We emailed a 6-digit code to <span id="staffResetEmailDisplay"></span>.</div>
-  <input type="text" id="staffResetOtpInput" placeholder="6-digit code from email" inputmode="numeric" maxlength="6">
+  <div class="session" style="margin:-6px 0 14px;">We emailed a code to <span id="staffResetEmailDisplay"></span>.</div>
+  <input type="text" id="staffResetOtpInput" placeholder="Code from email" inputmode="numeric" maxlength="12">
   <input type="password" id="staffResetNewPasswordInput" placeholder="New password" autocomplete="new-password">
   <input type="password" id="staffResetConfirmPasswordInput" placeholder="Confirm new password" autocomplete="new-password">
   <button id="staffResetConfirmBtn" onclick="confirmStaffResetOtp()">Reset Password</button>
@@ -1340,14 +1340,14 @@
   <h2>Reset Password</h2>
   <input type="text" id="resetEmailInput" placeholder="Admin email" autocomplete="username">
   <button onclick="sendResetOtp()">Send Code</button>
-  <div class="note" style="background:none;border:none;padding:0;">We'll email a 6-digit code to this address.</div>
+  <div class="note" style="background:none;border:none;padding:0;">We'll email a code to this address.</div>
   <a class="back-link" onclick="showView('gateScreen')">← Back to Log In</a>
 </div>
 
 <!-- ================= ADMIN PASSWORD RESET — ENTER CODE ================= -->
 <div id="adminResetConfirmScreen" class="gate" style="display:none;">
   <h2>Enter Code</h2>
-  <input type="text" id="resetOtpInput" placeholder="6-digit code from email" inputmode="numeric" maxlength="6">
+  <input type="text" id="resetOtpInput" placeholder="Code from email" inputmode="numeric" maxlength="12">
   <input type="password" id="resetNewPasswordInput" placeholder="New password" autocomplete="new-password">
   <input type="password" id="resetConfirmPasswordInput" placeholder="Confirm new password" autocomplete="new-password">
   <button onclick="confirmResetOtp()">Reset Password</button>
@@ -1607,7 +1607,7 @@ async function confirmResetOtp(){
   const newPassword = document.getElementById('resetNewPasswordInput').value;
   const confirmPassword = document.getElementById('resetConfirmPasswordInput').value;
   if(!resetEmailPending){ showView('adminResetRequestScreen'); return; }
-  if(!code){ alert('Please enter the 6-digit code from your email.'); return; }
+  if(!code){ alert('Please enter the code from your email.'); return; }
   if(!newPassword || newPassword.length < 6){ alert('Password must be at least 6 characters.'); return; }
   if(newPassword !== confirmPassword){ alert('Passwords do not match.'); return; }
   try{
@@ -2642,7 +2642,7 @@ async function confirmStaffResetOtp(){
     note.style.display = 'block';
   };
   if(!staffResetEmailPending){ showView('staffLoginScreen'); return; }
-  if(!code){ showNote('Please enter the 6-digit code from your email.'); return; }
+  if(!code){ showNote('Please enter the code from your email.'); return; }
   if(!newPassword || newPassword.length < 8){ showNote('Password must be at least 8 characters.'); return; }
   if(newPassword !== confirmPassword){ showNote('Passwords do not match.'); return; }
   const btn = document.getElementById('staffResetConfirmBtn');
