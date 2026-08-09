@@ -151,7 +151,6 @@
     .tab-btn{flex-shrink:0;}
     .stats{grid-template-columns:repeat(2,1fr);}
     .table-container{-webkit-overflow-scrolling:touch;}
-    .gate{margin:40px auto;max-width:92vw;padding:22px;}
     .site-footer{font-size:10.5px;padding:6px 8px;}
   }
   @media (max-width:400px){
@@ -170,8 +169,8 @@
   }
 
   /* ---- Watermark (subtle repeated school name behind page content) ---- */
-  .sheet, .wrap, .gate{ position:relative; z-index:0; }
-  .sheet::before, .wrap::before, .gate::before{
+  .sheet, .wrap{ position:relative; z-index:0; }
+  .sheet::before, .wrap::before{
     content:"";
     position:absolute; inset:0;
     z-index:-1;
@@ -180,7 +179,7 @@
     background-repeat:repeat;
   }
   @media print{
-    .sheet::before, .wrap::before, .gate::before{ display:none; }
+    .sheet::before, .wrap::before{ display:none; }
   }
 
   /* ---- View transitions ---- */
@@ -244,6 +243,9 @@
   .gate button{width:100%;}
   .gate .note{font-size:11.5px;color:var(--muted);margin-top:10px;background:none;border:none;padding:0;}
   .gate .back-link{display:block;margin-top:16px;font-size:12px;color:var(--muted);cursor:pointer;}
+  /* NOTE: the plain .gate styles above are now unused (all auth screens use the
+     branded .gate2 card below) — kept only in case another view still needs them. */
+
 
   /* ============ Staff Login / Register — branded card (gate2) ============ */
   .gate2{position:relative;max-width:400px;width:100%;margin:12px auto 28px;background:#f4f7fc;border-radius:24px;padding:26px 28px 24px;text-align:center;overflow:hidden;box-shadow:0 22px 46px -18px rgba(31,66,135,.3), 0 2px 8px rgba(31,66,135,.08);border:1px solid #e6ecfa;}
@@ -1447,44 +1449,132 @@
 </div>
 
 <!-- ================= ADMIN GATE VIEW ================= -->
-<div id="gateScreen" class="gate" style="display:none;">
-  <h2>Admin Access</h2>
-  <input type="text" id="adminEmailInput" placeholder="Admin email" autocomplete="username">
-  <input type="password" id="adminPasswordInput" placeholder="Password" autocomplete="current-password">
-  <button onclick="checkPasscode()">Log In</button>
-  <a class="back-link" onclick="showView('adminResetRequestScreen')" style="margin-top:10px;">Forgot password?</a>
-  <a class="back-link" onclick="showView('landingView')">← Back to Forms Portal</a>
+<div id="gateScreen" class="gate2" style="display:none;">
+  <img class="gate2-logo gate-logo" alt="Mount Litera Zee School Jhansi Logo">
+  <div class="gate2-brand">Mount Litera Zee School<span>Jhansi</span></div>
+  <h2 class="gate2-heading">Admin <span class="accent">Login</span></h2>
+  <div class="gate2-divider"></div>
+  <div class="gate2-subtitle">Log in to manage student, class XI and staff records.</div>
+
+  <div class="gate2-field">
+    <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="m4 6 8 7 8-7"/></svg></span>
+    <input type="text" id="adminEmailInput" placeholder="Admin email" autocomplete="username">
+  </div>
+  <div class="gate2-field">
+    <span class="ic"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
+    <input type="password" id="adminPasswordInput" placeholder="Password" autocomplete="current-password">
+    <span class="eye" onclick="togglePwVisibility('adminPasswordInput')"><svg viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></span>
+  </div>
+
+  <button class="gate2-btn" onclick="checkPasscode()">Log In</button>
+
+  <div class="gate2-links">
+    <a class="row" onclick="showView('adminResetRequestScreen')">
+      <svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+      <span>Forgot password?</span>
+    </a>
+  </div>
+
+  <div class="note" id="gateNote" style="display:none;"></div>
+
+  <div class="gate2-back" onclick="showView('landingView')">
+    <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    Back to Forms Portal
+  </div>
 </div>
 
 <!-- ================= ADMIN PASSWORD RESET — REQUEST CODE ================= -->
-<div id="adminResetRequestScreen" class="gate" style="display:none;">
-  <h2>Reset Password</h2>
-  <input type="text" id="resetEmailInput" placeholder="Admin email" autocomplete="username">
-  <button onclick="sendResetOtp()">Send Code</button>
-  <div class="note" style="background:none;border:none;padding:0;">We'll email a code to this address.</div>
-  <a class="back-link" onclick="showView('gateScreen')">← Back to Log In</a>
+<div id="adminResetRequestScreen" class="gate2" style="display:none;">
+  <img class="gate2-logo gate-logo" alt="Mount Litera Zee School Jhansi Logo">
+  <div class="gate2-brand">Mount Litera Zee School<span>Jhansi</span></div>
+  <h2 class="gate2-heading">Reset <span class="accent">Password</span></h2>
+  <div class="gate2-divider"></div>
+  <div class="gate2-subtitle">We'll email a code to your admin address.</div>
+
+  <div class="gate2-field">
+    <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="m4 6 8 7 8-7"/></svg></span>
+    <input type="text" id="resetEmailInput" placeholder="Admin email" autocomplete="username">
+  </div>
+
+  <button class="gate2-btn" onclick="sendResetOtp()">Send Code</button>
+
+  <div class="note" id="resetRequestNote" style="display:none;"></div>
+
+  <div class="gate2-back" onclick="showView('gateScreen')">
+    <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    Back to Log In
+  </div>
 </div>
 
 <!-- ================= ADMIN PASSWORD RESET — ENTER CODE ================= -->
-<div id="adminResetConfirmScreen" class="gate" style="display:none;">
-  <h2>Enter Code</h2>
-  <input type="text" id="resetOtpInput" placeholder="Code from email" inputmode="numeric" maxlength="12">
-  <input type="password" id="resetNewPasswordInput" placeholder="New password" autocomplete="new-password">
-  <input type="password" id="resetConfirmPasswordInput" placeholder="Confirm new password" autocomplete="new-password">
-  <button onclick="confirmResetOtp()">Reset Password</button>
-  <a class="back-link" onclick="resendResetOtp()" style="margin-top:10px;">Resend code</a>
-  <a class="back-link" onclick="showView('gateScreen')">← Back to Log In</a>
+<div id="adminResetConfirmScreen" class="gate2" style="display:none;">
+  <img class="gate2-logo gate-logo" alt="Mount Litera Zee School Jhansi Logo">
+  <div class="gate2-brand">Mount Litera Zee School<span>Jhansi</span></div>
+  <h2 class="gate2-heading">Enter <span class="accent">Code</span></h2>
+  <div class="gate2-divider"></div>
+  <div class="gate2-subtitle">Enter the code we emailed you, then choose a new password.</div>
+
+  <div class="gate2-field">
+    <span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9h4M7 13h7"/></svg></span>
+    <input type="text" id="resetOtpInput" placeholder="Code from email" inputmode="numeric" maxlength="12">
+  </div>
+  <div class="gate2-field">
+    <span class="ic"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
+    <input type="password" id="resetNewPasswordInput" placeholder="New password" autocomplete="new-password">
+    <span class="eye" onclick="togglePwVisibility('resetNewPasswordInput')"><svg viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></span>
+  </div>
+  <div class="gate2-field">
+    <span class="ic"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
+    <input type="password" id="resetConfirmPasswordInput" placeholder="Confirm new password" autocomplete="new-password">
+    <span class="eye" onclick="togglePwVisibility('resetConfirmPasswordInput')"><svg viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></span>
+  </div>
+
+  <button class="gate2-btn" onclick="confirmResetOtp()">Reset Password</button>
+
+  <div class="gate2-links">
+    <a onclick="resendResetOtp()">Resend code</a>
+  </div>
+
+  <div class="note" id="resetConfirmNote" style="display:none;"></div>
+
+  <div class="gate2-back" onclick="showView('gateScreen')">
+    <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    Back to Log In
+  </div>
 </div>
 
 <!-- ================= ADMIN CHANGE PASSWORD (uses current password) ================= -->
-<div id="adminChangePasswordScreen" class="gate" style="display:none;">
-  <h2>Change Password</h2>
-  <input type="password" id="changeCurrentPasswordInput" placeholder="Current password" autocomplete="current-password">
-  <input type="password" id="changeNewPasswordInput" placeholder="New password" autocomplete="new-password">
-  <input type="password" id="changeConfirmPasswordInput" placeholder="Confirm new password" autocomplete="new-password">
-  <button onclick="submitAdminChangePassword()">Update Password</button>
+<div id="adminChangePasswordScreen" class="gate2" style="display:none;">
+  <img class="gate2-logo gate-logo" alt="Mount Litera Zee School Jhansi Logo">
+  <div class="gate2-brand">Mount Litera Zee School<span>Jhansi</span></div>
+  <h2 class="gate2-heading">Change <span class="accent">Password</span></h2>
+  <div class="gate2-divider"></div>
+  <div class="gate2-subtitle">Re-enter your current password to set a new one.</div>
+
+  <div class="gate2-field">
+    <span class="ic"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
+    <input type="password" id="changeCurrentPasswordInput" placeholder="Current password" autocomplete="current-password">
+    <span class="eye" onclick="togglePwVisibility('changeCurrentPasswordInput')"><svg viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></span>
+  </div>
+  <div class="gate2-field">
+    <span class="ic"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
+    <input type="password" id="changeNewPasswordInput" placeholder="New password" autocomplete="new-password">
+    <span class="eye" onclick="togglePwVisibility('changeNewPasswordInput')"><svg viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></span>
+  </div>
+  <div class="gate2-field">
+    <span class="ic"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
+    <input type="password" id="changeConfirmPasswordInput" placeholder="Confirm new password" autocomplete="new-password">
+    <span class="eye" onclick="togglePwVisibility('changeConfirmPasswordInput')"><svg viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></span>
+  </div>
+
+  <button class="gate2-btn" onclick="submitAdminChangePassword()">Update Password</button>
+
   <div class="note" id="changePasswordNote" style="display:none;"></div>
-  <a class="back-link" onclick="showView('mainPanel')">← Back to Admin Panel</a>
+
+  <div class="gate2-back" onclick="showView('mainPanel')">
+    <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    Back to Admin Panel
+  </div>
 </div>
 
 <!-- ================= ADMIN PANEL VIEW ================= -->
@@ -1552,6 +1642,20 @@ function showView(id){
 }
 function showGate(){ showView('gateScreen'); }
 
+function togglePwVisibility(id){
+  const input = document.getElementById(id);
+  if(!input) return;
+  input.type = input.type === 'password' ? 'text' : 'password';
+}
+
+function showAuthNote(elId, msg, type){
+  const el = document.getElementById(elId);
+  if(!el) return;
+  el.textContent = msg;
+  el.className = 'note' + (type ? (' ' + type) : ' error');
+  el.style.display = 'block';
+}
+
 /* Soft client-side brake against rapid-fire login guessing. Supabase Auth enforces its own
    server-side rate limits regardless — this just avoids hammering the API from one tab. */
 let adminLoginFailures = 0;
@@ -1560,12 +1664,12 @@ let adminLoginLockedUntil = 0;
 async function checkPasscode(){
   if(Date.now() < adminLoginLockedUntil){
     const secondsLeft = Math.ceil((adminLoginLockedUntil - Date.now()) / 1000);
-    alert(`Too many failed attempts. Please wait ${secondsLeft} seconds and try again.`);
+    showAuthNote('gateNote', `Too many failed attempts. Please wait ${secondsLeft} seconds and try again.`);
     return;
   }
   const email = document.getElementById('adminEmailInput').value.trim();
   const password = document.getElementById('adminPasswordInput').value;
-  if(!email || !password){ alert('Please enter your admin email and password.'); return; }
+  if(!email || !password){ showAuthNote('gateNote', 'Please enter your admin email and password.'); return; }
   try{
     const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
     if(error){
@@ -1573,18 +1677,19 @@ async function checkPasscode(){
       if(adminLoginFailures >= 5){
         adminLoginLockedUntil = Date.now() + 60000;
         adminLoginFailures = 0;
-        alert('Too many failed attempts. Please wait 60 seconds before trying again.');
+        showAuthNote('gateNote', 'Too many failed attempts. Please wait 60 seconds before trying again.');
       } else {
-        alert('Login failed: ' + errMsg(error));
+        showAuthNote('gateNote', 'Login failed: ' + errMsg(error));
       }
       return;
     }
     adminLoginFailures = 0;
     document.getElementById('adminPasswordInput').value = '';
+    document.getElementById('gateNote').style.display = 'none';
     showView('mainPanel');
     switchTab('students');
   } catch(err){
-    alert('Could not reach the server. Check your internet connection and try again.');
+    showAuthNote('gateNote', 'Could not reach the server. Check your internet connection and try again.');
   }
 }
 ['adminEmailInput','adminPasswordInput'].forEach(id => {
@@ -1598,17 +1703,18 @@ let resetEmailPending = '';
 
 async function sendResetOtp(){
   const email = document.getElementById('resetEmailInput').value.trim();
-  if(!email){ alert('Please enter your admin email.'); return; }
+  if(!email){ showAuthNote('resetRequestNote', 'Please enter your admin email.'); return; }
   try{
     const { error } = await supabaseClient.auth.resetPasswordForEmail(email);
-    if(error){ alert('Could not send code: ' + errMsg(error)); return; }
+    if(error){ showAuthNote('resetRequestNote', 'Could not send code: ' + errMsg(error)); return; }
     resetEmailPending = email;
     document.getElementById('resetOtpInput').value = '';
     document.getElementById('resetNewPasswordInput').value = '';
     document.getElementById('resetConfirmPasswordInput').value = '';
+    document.getElementById('resetConfirmNote').style.display = 'none';
     showView('adminResetConfirmScreen');
   } catch(err){
-    alert('Could not reach the server. Check your internet connection and try again.');
+    showAuthNote('resetRequestNote', 'Could not reach the server. Check your internet connection and try again.');
   }
 }
 document.getElementById('resetEmailInput').addEventListener('keydown', e => {
@@ -1626,20 +1732,19 @@ async function confirmResetOtp(){
   const newPassword = document.getElementById('resetNewPasswordInput').value;
   const confirmPassword = document.getElementById('resetConfirmPasswordInput').value;
   if(!resetEmailPending){ showView('adminResetRequestScreen'); return; }
-  if(!code){ alert('Please enter the code from your email.'); return; }
-  if(!newPassword || newPassword.length < 6){ alert('Password must be at least 6 characters.'); return; }
-  if(newPassword !== confirmPassword){ alert('Passwords do not match.'); return; }
+  if(!code){ showAuthNote('resetConfirmNote', 'Please enter the code from your email.'); return; }
+  if(!newPassword || newPassword.length < 6){ showAuthNote('resetConfirmNote', 'Password must be at least 6 characters.'); return; }
+  if(newPassword !== confirmPassword){ showAuthNote('resetConfirmNote', 'Passwords do not match.'); return; }
   try{
     const { error: verifyError } = await supabaseClient.auth.verifyOtp({ email: resetEmailPending, token: code, type: 'recovery' });
-    if(verifyError){ alert('Incorrect or expired code: ' + errMsg(verifyError)); return; }
+    if(verifyError){ showAuthNote('resetConfirmNote', 'Incorrect or expired code: ' + errMsg(verifyError)); return; }
     const { error: updateError } = await supabaseClient.auth.updateUser({ password: newPassword });
-    if(updateError){ alert('Could not set new password: ' + errMsg(updateError)); return; }
+    if(updateError){ showAuthNote('resetConfirmNote', 'Could not set new password: ' + errMsg(updateError)); return; }
     resetEmailPending = '';
-    alert('Password reset successfully. You are now logged in.');
-    showView('mainPanel');
-    switchTab('students');
+    showAuthNote('resetConfirmNote', 'Password reset successfully. You are now logged in.', 'success');
+    setTimeout(() => { showView('mainPanel'); switchTab('students'); }, 900);
   } catch(err){
-    alert('Could not reach the server. Check your internet connection and try again.');
+    showAuthNote('resetConfirmNote', 'Could not reach the server. Check your internet connection and try again.');
   }
 }
 ['resetOtpInput','resetNewPasswordInput','resetConfirmPasswordInput'].forEach(id => {
@@ -1678,8 +1783,7 @@ async function submitAdminChangePassword(){
   const currentPassword = document.getElementById('changeCurrentPasswordInput').value;
   const newPassword = document.getElementById('changeNewPasswordInput').value;
   const confirmPassword = document.getElementById('changeConfirmPasswordInput').value;
-  const note = document.getElementById('changePasswordNote');
-  const showNote = msg => { note.textContent = msg; note.style.display = 'block'; };
+  const showNote = (msg, type) => showAuthNote('changePasswordNote', msg, type);
   if(!currentPassword || !newPassword || !confirmPassword){ showNote('Please fill in all three fields.'); return; }
   if(newPassword.length < 8){ showNote('New password must be at least 8 characters.'); return; }
   if(newPassword !== confirmPassword){ showNote('New password and confirmation do not match.'); return; }
@@ -1691,7 +1795,7 @@ async function submitAdminChangePassword(){
     if(verifyError){ showNote('Current password is incorrect.'); return; }
     const { error: updateError } = await supabaseClient.auth.updateUser({ password: newPassword });
     if(updateError){ showNote('Could not update password: ' + errMsg(updateError)); return; }
-    showNote('Password updated successfully.');
+    showNote('Password updated successfully.', 'success');
     setTimeout(() => showView('mainPanel'), 1200);
   } catch(err){
     showNote('Could not reach the server. Check your internet connection and try again.');
