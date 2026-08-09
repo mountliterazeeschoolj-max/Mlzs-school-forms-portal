@@ -17,7 +17,7 @@
   }
   *{box-sizing:border-box;}
   html{-webkit-text-size-adjust:100%;text-size-adjust:100%;}
-  body{margin:0;background:#e9edf0;font-family:'Segoe UI', Arial, sans-serif;color:var(--ink);padding:24px 12px;overflow-x:hidden;}
+  body{margin:0;background:#e9edf0;font-family:'Segoe UI', Arial, sans-serif;color:var(--ink);padding:14px 12px;overflow-x:hidden;}
   .sheet{max-width:820px;margin:0 auto;background:var(--paper);border:1px solid var(--line);box-shadow:0 4px 18px rgba(0,0,0,0.08);}
   .header{text-align:center;padding:18px 20px 16px;border-bottom:3px solid transparent;border-image:linear-gradient(90deg,var(--accent),var(--accent-light)) 1;position:relative;}
   .header .logo{width:280px;max-width:80%;height:auto;margin-bottom:6px;}
@@ -244,6 +244,66 @@
   .gate button{width:100%;}
   .gate .note{font-size:11.5px;color:var(--muted);margin-top:10px;background:none;border:none;padding:0;}
   .gate .back-link{display:block;margin-top:16px;font-size:12px;color:var(--muted);cursor:pointer;}
+
+  /* ============ Staff Login / Register — branded card (gate2) ============ */
+  .gate2{position:relative;max-width:400px;width:100%;margin:12px auto 28px;background:#f4f7fc;border-radius:24px;padding:26px 28px 24px;text-align:center;overflow:hidden;box-shadow:0 22px 46px -18px rgba(31,66,135,.3), 0 2px 8px rgba(31,66,135,.08);border:1px solid #e6ecfa;}
+  .gate2 > *{position:relative;z-index:1;}
+  .gate2-logo{width:68px;height:68px;border-radius:50%;object-fit:cover;background:#fff;border:1px solid #e3ebf9;box-shadow:0 4px 14px rgba(31,66,135,.14);margin:2px auto 8px;display:block;}
+  .gate2-brand{font-size:11.5px;font-weight:800;letter-spacing:.4px;color:#1b2b4b;line-height:1.5;text-transform:uppercase;margin-bottom:2px;}
+  .gate2-brand span{display:block;font-weight:600;color:#4a5b7c;text-transform:none;font-size:11px;letter-spacing:.2px;}
+
+  /* Segmented Login / Create Account tab switcher */
+  .gate2-tabs{display:flex;gap:4px;background:#e5ecfa;border-radius:14px;padding:4px;margin:16px 0 4px;position:relative;}
+  .gate2-tab{flex:1;border:none;background:transparent;padding:10px 8px;border-radius:11px;font-size:13px;font-weight:700;color:#5a6b8c;cursor:pointer;font-family:inherit;transition:color .2s ease;}
+  .gate2-tab.active{background:#fff;color:#1348c9;box-shadow:0 3px 10px -2px rgba(19,72,201,.28);}
+
+  .gate2-heading{font-size:24px;font-weight:800;color:#16233f;margin:16px 0 2px;letter-spacing:-.2px;}
+  .gate2-heading .accent{background:linear-gradient(90deg,#2f6fed,#1348c9);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .gate2-divider{width:70px;height:3px;margin:10px auto 12px;background:linear-gradient(90deg,#cfdcf7,#2f6fed,#cfdcf7);border-radius:3px;position:relative;}
+  .gate2-divider::after{content:'';position:absolute;left:50%;top:50%;width:7px;height:7px;border-radius:50%;background:#1348c9;transform:translate(-50%,-50%);}
+  .gate2-subtitle{font-size:13px;color:#5a6b8c;line-height:1.5;margin:0 0 20px;}
+  .gate2-field{position:relative;margin-bottom:12px;text-align:left;}
+  .gate2-field .ic{position:absolute;left:6px;top:50%;transform:translateY(-50%);width:30px;height:30px;border-radius:50%;background:#eaf1ff;display:flex;align-items:center;justify-content:center;}
+  .gate2-field .ic svg{width:15px;height:15px;stroke:#2f6fed;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+  .gate2-field input{width:100%;padding:13px 42px 13px 46px;border-radius:14px;border:1.5px solid #dfe7f7;background:#fff;font-size:14px;color:#1b2b4b;box-sizing:border-box;transition:border-color .15s ease, box-shadow .15s ease;}
+  .gate2-field input:focus{outline:none;border-color:#8fb1f5;box-shadow:0 0 0 4px rgba(47,111,237,.12);}
+  .gate2-field .eye{position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:#8092b3;display:flex;}
+  .gate2-field .eye svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.8;}
+  .gate2-field-hint{font-size:11px;color:#8092b3;text-align:left;margin:-7px 0 12px 4px;}
+  .gate2 button.gate2-btn{width:100%;padding:14px;border:none;border-radius:14px;background:linear-gradient(90deg,#3d7bf0,#1348c9);color:#fff;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 10px 22px -8px rgba(19,72,201,.55);margin-top:4px;transition:transform .1s ease, opacity .15s ease;}
+  .gate2 button.gate2-btn:active{transform:translateY(1px);}
+  .gate2 button.gate2-btn:disabled{opacity:.65;cursor:default;}
+  .gate2-links{margin-top:16px;font-size:12.5px;color:#3a4a6b;display:flex;flex-direction:column;gap:10px;align-items:center;}
+  .gate2-links a{color:#2f6fed;font-weight:700;cursor:pointer;text-decoration:none;}
+  .gate2-links .row{display:flex;align-items:center;gap:6px;cursor:pointer;}
+  .gate2-links .row svg{width:14px;height:14px;stroke:#3a4a6b;fill:none;stroke-width:2;}
+  .gate2-back{display:inline-flex;align-items:center;gap:6px;margin-top:18px;padding:9px 16px;border-radius:12px;background:#eaf1ff;color:#2f6fed;font-weight:700;font-size:12.5px;cursor:pointer;}
+  .gate2-back svg{width:13px;height:13px;stroke:#2f6fed;fill:none;stroke-width:2.4;}
+  .gate2 .note{font-size:12.5px;color:var(--muted);margin-top:14px;background:#eef2f9;border:1px solid #dde5f3;border-radius:12px;padding:10px 14px;text-align:left;line-height:1.45;animation:fadeInUp .25s ease;}
+  .gate2 .note.error{background:#fdecea;border-color:#f3b4ac;color:#9a2a20;font-weight:600;}
+  .gate2 .note.success{background:#e9f7ef;border-color:#a8ddc0;color:#1e7d43;font-weight:600;}
+
+  /* Desktop: card sits comfortably centered without excess top space */
+  @media (min-width:641px){
+    .gate2{margin:6vh auto 40px;}
+  }
+  /* Mobile: tighter padding/sizing so the whole card fits without crowding */
+  @media (max-width:480px){
+    .gate2{margin:6px auto 20px;padding:20px 16px 18px;border-radius:20px;max-width:100%;}
+    .gate2-logo{width:56px;height:56px;margin:0 auto 6px;}
+    .gate2-brand{font-size:10.5px;}
+    .gate2-tabs{margin:12px 0 2px;}
+    .gate2-tab{padding:9px 6px;font-size:12.5px;}
+    .gate2-heading{font-size:20px;margin:12px 0 2px;}
+    .gate2-subtitle{font-size:12.5px;margin:0 0 16px;}
+    .gate2-field{margin-bottom:10px;}
+    .gate2-field input{padding:12px 38px 12px 42px;font-size:14px;}
+    .gate2-field .ic{width:27px;height:27px;left:5px;}
+    .gate2-field .ic svg{width:14px;height:14px;}
+    .gate2 button.gate2-btn{padding:13px;font-size:14px;}
+    .gate2-back{margin-top:14px;padding:8px 14px;}
+  }
+
   .del-btn{background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;padding:2px 6px;}
   .del-btn:hover{text-decoration:underline;}
   .site-footer{
@@ -1065,41 +1125,113 @@
 </div>
 
 <!-- ================= STAFF SELF-SERVICE LOGIN / REGISTER ================= -->
-<div id="staffLoginScreen" class="gate" style="display:none;">
-  <h2 id="staffLoginHeading">Staff Login</h2>
-  <div class="session" style="margin:-6px 0 14px;">Log in to view and update your own Staff Data Bank record.</div>
-  <input type="text" id="staffLoginEmailInput" placeholder="Email" autocomplete="username">
-  <input type="password" id="staffLoginPasswordInput" placeholder="Password" autocomplete="current-password">
-  <button id="staffLoginBtn" onclick="staffLogin()">Log In</button>
-  <a class="back-link" onclick="toggleStaffAuthMode()" style="margin-top:10px;" id="staffAuthModeToggle">New here? Create an account</a>
-  <a class="back-link" onclick="staffSendPasswordReset()">Forgot password?</a>
+<div id="staffLoginScreen" class="gate2" style="display:none;">
+  <img class="gate2-logo gate-logo" alt="Mount Litera Zee School Jhansi Logo">
+  <div class="gate2-brand">Mount Litera Zee School<span>Jhansi</span></div>
+
+  <div class="gate2-tabs" role="tablist">
+    <button type="button" class="gate2-tab active" id="staffTabLogin" role="tab" aria-selected="true" onclick="setStaffAuthMode('login')">Log In</button>
+    <button type="button" class="gate2-tab" id="staffTabRegister" role="tab" aria-selected="false" onclick="setStaffAuthMode('register')">Create Account</button>
+  </div>
+
+  <h2 class="gate2-heading" id="staffLoginHeading">Staff <span class="accent">Login</span></h2>
+  <div class="gate2-divider"></div>
+  <div class="gate2-subtitle" id="staffLoginSubtitle">Log in to view and update your own Staff Data Bank record.</div>
+
+  <div class="gate2-field" id="staffFullNameField" style="display:none;">
+    <span class="ic"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></span>
+    <input type="text" id="staffLoginFullNameInput" placeholder="Full Name" autocomplete="name">
+  </div>
+  <div class="gate2-field">
+    <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="m4 6 8 7 8-7"/></svg></span>
+    <input type="text" id="staffLoginEmailInput" placeholder="Email" autocomplete="username">
+  </div>
+  <div class="gate2-field">
+    <span class="ic"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
+    <input type="password" id="staffLoginPasswordInput" placeholder="Password" autocomplete="current-password">
+    <span class="eye" onclick="toggleStaffLoginPasswordVisibility()"><svg viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></span>
+  </div>
+  <div class="gate2-field-hint" id="staffPasswordHint" style="display:none;">At least 8 characters.</div>
+  <div class="gate2-field" id="staffConfirmPasswordField" style="display:none;">
+    <span class="ic"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
+    <input type="password" id="staffLoginConfirmPasswordInput" placeholder="Confirm Password" autocomplete="new-password">
+    <span class="eye" onclick="toggleStaffLoginConfirmPasswordVisibility()"><svg viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></span>
+  </div>
+
+  <button class="gate2-btn" id="staffLoginBtn" onclick="staffLogin()">Log In</button>
+
+  <div class="gate2-links">
+    <a class="row" onclick="staffSendPasswordReset()">
+      <svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+      <span>Forgot password?</span>
+    </a>
+  </div>
+
   <div class="note" id="staffLoginNote" style="display:none;"></div>
-  <a class="back-link" onclick="showView('landingView')">← Back to Forms Portal</a>
+
+  <div class="gate2-back" onclick="showView('landingView')">
+    <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    Back to Forms Portal
+  </div>
 </div>
 
 <!-- ================= STAFF PASSWORD RESET — ENTER CODE ================= -->
-<div id="staffResetConfirmScreen" class="gate" style="display:none;">
-  <h2>Enter Code</h2>
-  <div class="session" style="margin:-6px 0 14px;">We emailed a code to <span id="staffResetEmailDisplay"></span>.</div>
-  <input type="text" id="staffResetOtpInput" placeholder="Code from email" inputmode="numeric" maxlength="12">
-  <input type="password" id="staffResetNewPasswordInput" placeholder="New password" autocomplete="new-password">
-  <input type="password" id="staffResetConfirmPasswordInput" placeholder="Confirm new password" autocomplete="new-password">
-  <button id="staffResetConfirmBtn" onclick="confirmStaffResetOtp()">Reset Password</button>
-  <a class="back-link" onclick="resendStaffResetOtp()" style="margin-top:10px;">Resend code</a>
+<div id="staffResetConfirmScreen" class="gate2" style="display:none;">
+  <img class="gate2-logo gate-logo" alt="Mount Litera Zee School Jhansi Logo">
+  <div class="gate2-brand">Mount Litera Zee School<span>Jhansi</span></div>
+  <h2 class="gate2-heading">Enter <span class="accent">Code</span></h2>
+  <div class="gate2-divider"></div>
+  <div class="gate2-subtitle">We emailed a code to <b id="staffResetEmailDisplay"></b>.</div>
+
+  <div class="gate2-field">
+    <span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9h4M7 13h7"/></svg></span>
+    <input type="text" id="staffResetOtpInput" placeholder="Code from email" inputmode="numeric" maxlength="12">
+  </div>
+  <div class="gate2-field">
+    <span class="ic"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
+    <input type="password" id="staffResetNewPasswordInput" placeholder="New password" autocomplete="new-password">
+  </div>
+  <div class="gate2-field">
+    <span class="ic"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
+    <input type="password" id="staffResetConfirmPasswordInput" placeholder="Confirm new password" autocomplete="new-password">
+  </div>
+
+  <button class="gate2-btn" id="staffResetConfirmBtn" onclick="confirmStaffResetOtp()">Reset Password</button>
+
+  <div class="gate2-links">
+    <a onclick="resendStaffResetOtp()">Resend code</a>
+  </div>
   <div class="note" id="staffResetConfirmNote" style="display:none;"></div>
-  <a class="back-link" onclick="showView('staffLoginScreen')">← Back to Log In</a>
+  <div class="gate2-back" onclick="showView('staffLoginScreen')">
+    <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    Back to Log In
+  </div>
 </div>
 
 <!-- ================= STAFF EMAIL VERIFICATION — ENTER CODE (AFTER REGISTER) ================= -->
-<div id="staffVerifyEmailScreen" class="gate" style="display:none;">
-  <h2>Verify Your Email</h2>
-  <div class="session" style="margin:-6px 0 14px;">We emailed a 6-digit code to <span id="staffVerifyEmailDisplay"></span> to confirm it's really you.</div>
-  <input type="text" id="staffVerifyOtpInput" placeholder="Code from email" inputmode="numeric" maxlength="12">
-  <button id="staffVerifyOtpBtn" onclick="confirmStaffSignupOtp()">Verify &amp; Continue</button>
-  <a class="back-link" onclick="resendStaffSignupOtp()" style="margin-top:10px;">Resend code</a>
+<div id="staffVerifyEmailScreen" class="gate2" style="display:none;">
+  <img class="gate2-logo gate-logo" alt="Mount Litera Zee School Jhansi Logo">
+  <div class="gate2-brand">Mount Litera Zee School<span>Jhansi</span></div>
+  <h2 class="gate2-heading">Verify Your <span class="accent">Email</span></h2>
+  <div class="gate2-divider"></div>
+  <div class="gate2-subtitle">We emailed a 6-digit code to <b id="staffVerifyEmailDisplay"></b> to confirm it's really you.</div>
+
+  <div class="gate2-field">
+    <span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9h4M7 13h7"/></svg></span>
+    <input type="text" id="staffVerifyOtpInput" placeholder="Code from email" inputmode="numeric" maxlength="12">
+  </div>
+
+  <button class="gate2-btn" id="staffVerifyOtpBtn" onclick="confirmStaffSignupOtp()">Verify &amp; Continue</button>
+
+  <div class="gate2-links">
+    <a onclick="resendStaffSignupOtp()">Resend code</a>
+  </div>
   <div class="note" id="staffVerifyOtpNote" style="display:none;"></div>
-  <div class="field-hint" style="margin:6px 0 0;">Not seeing it? Check your spam/junk folder — it can take a minute or two, and codes expire after a while, so use "Resend code" if it's been a bit.</div>
-  <a class="back-link" onclick="showView('staffLoginScreen')">← Back to Log In</a>
+  <div class="gate2-subtitle" style="margin:10px 0 0;font-size:11.5px;">Not seeing it? Check your spam/junk folder — it can take a minute or two, and codes expire after a while, so use "Resend code" if it's been a bit.</div>
+  <div class="gate2-back" onclick="showView('staffLoginScreen')">
+    <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    Back to Log In
+  </div>
 </div>
 
 <!-- ================= STAFF EDIT MY DETAILS ================= -->
@@ -2489,42 +2621,101 @@ let currentStaffRecord = null; // the loaded staff_records row for the logged-in
 const seFiles = { photo: null, aadharCardFront: null, aadharCardBack: null, panCard: null, passbook: null };
 
 function openStaffLogin(){
-  staffAuthMode = 'login';
-  document.getElementById('staffLoginHeading').textContent = 'Staff Login';
-  document.getElementById('staffAuthModeToggle').textContent = 'New here? Create an account';
-  document.getElementById('staffLoginBtn').textContent = 'Log In';
-  document.getElementById('staffLoginNote').style.display = 'none';
+  setStaffAuthMode('login');
   document.getElementById('staffLoginEmailInput').value = '';
   document.getElementById('staffLoginPasswordInput').value = '';
+  document.getElementById('staffLoginFullNameInput').value = '';
+  document.getElementById('staffLoginConfirmPasswordInput').value = '';
   showView('staffLoginScreen');
 }
 
-function toggleStaffAuthMode(){
-  staffAuthMode = staffAuthMode === 'login' ? 'register' : 'login';
-  const isRegister = staffAuthMode === 'register';
-  document.getElementById('staffLoginHeading').textContent = isRegister ? 'Create Staff Account' : 'Staff Login';
-  document.getElementById('staffAuthModeToggle').textContent = isRegister ? 'Already have an account? Log in' : 'New here? Create an account';
+function setStaffAuthMode(mode){
+  staffAuthMode = mode;
+  const isRegister = mode === 'register';
+  document.getElementById('staffTabLogin').classList.toggle('active', !isRegister);
+  document.getElementById('staffTabRegister').classList.toggle('active', isRegister);
+  document.getElementById('staffTabLogin').setAttribute('aria-selected', String(!isRegister));
+  document.getElementById('staffTabRegister').setAttribute('aria-selected', String(isRegister));
+  document.getElementById('staffLoginHeading').innerHTML = isRegister ? 'Create <span class="accent">Account</span>' : 'Staff <span class="accent">Login</span>';
+  document.getElementById('staffLoginSubtitle').textContent = isRegister
+    ? 'Register with your email to fill in and manage your own Staff Data Bank record.'
+    : 'Log in to view and update your own Staff Data Bank record.';
   document.getElementById('staffLoginBtn').textContent = isRegister ? 'Create Account' : 'Log In';
+  document.getElementById('staffFullNameField').style.display = isRegister ? 'block' : 'none';
+  document.getElementById('staffPasswordHint').style.display = isRegister ? 'block' : 'none';
+  document.getElementById('staffConfirmPasswordField').style.display = isRegister ? 'block' : 'none';
   document.getElementById('staffLoginNote').style.display = 'none';
 }
 
-function showStaffLoginNote(msg){
+function toggleStaffLoginPasswordVisibility(){
+  const input = document.getElementById('staffLoginPasswordInput');
+  input.type = input.type === 'password' ? 'text' : 'password';
+}
+
+function toggleStaffLoginConfirmPasswordVisibility(){
+  const input = document.getElementById('staffLoginConfirmPasswordInput');
+  input.type = input.type === 'password' ? 'text' : 'password';
+}
+
+/* The school crest is already embedded once (as a data URI) on the header
+   logos elsewhere on this page. Rather than duplicating that large data URI,
+   every .gate-logo placeholder copies its src from the first header logo
+   already present in the DOM. */
+function syncGateLogos(){
+  const master = document.querySelector('.header .logo, img.logo');
+  if(!master || !master.src) return;
+  document.querySelectorAll('.gate-logo').forEach(el => { el.src = master.src; });
+}
+document.addEventListener('DOMContentLoaded', syncGateLogos);
+if(document.readyState === 'complete' || document.readyState === 'interactive') syncGateLogos();
+
+function showStaffLoginNote(msg, type){
   const el = document.getElementById('staffLoginNote');
   el.textContent = msg;
+  el.className = 'note' + (type ? (' ' + type) : ' error');
   el.style.display = 'block';
 }
 
 async function staffLogin(){
+  const fullName = document.getElementById('staffLoginFullNameInput').value.trim();
   const email = document.getElementById('staffLoginEmailInput').value.trim();
   const password = document.getElementById('staffLoginPasswordInput').value;
+  const confirmPassword = document.getElementById('staffLoginConfirmPasswordInput').value;
   if(!email || !password){ showStaffLoginNote('Please enter your email and password.'); return; }
   const btn = document.getElementById('staffLoginBtn');
   btn.disabled = true;
   try{
     if(staffAuthMode === 'register'){
+      if(!fullName){ showStaffLoginNote('Please enter your full name.'); return; }
       if(password.length < 8){ showStaffLoginNote('Password must be at least 8 characters.'); return; }
-      const { data, error } = await supabaseClient.auth.signUp({ email, password });
-      if(error){ showStaffLoginNote('Could not create account: ' + errMsg(error)); return; }
+      if(password !== confirmPassword){ showStaffLoginNote('Passwords do not match.'); return; }
+      const { data, error } = await supabaseClient.auth.signUp({
+        email, password,
+        options: { data: { full_name: fullName } }
+      });
+      if(error){
+        /* Supabase raises this directly when the project has "Confirm email"
+           turned off (an unconfirmed-account anti-enumeration path can't
+           apply, since there's no unconfirmed state to hide behind). */
+        if(/already registered|already exists/i.test(errMsg(error))){
+          showStaffLoginNote('An account already exists for this email. Please log in instead.');
+          setStaffAuthMode('login');
+          return;
+        }
+        showStaffLoginNote('Could not create account: ' + errMsg(error));
+        return;
+      }
+      /* With "Confirm email" ON, Supabase never returns an error for a
+         duplicate signUp (to prevent attackers from probing which emails
+         are registered) — instead it returns a user object with an EMPTY
+         identities array and no session. A brand-new signup always has at
+         least one identity, so this is the reliable way to detect
+         "this email already has an account". */
+      if(data && data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0){
+        showStaffLoginNote('An account already exists for this email. Please log in instead.');
+        setStaffAuthMode('login');
+        return;
+      }
       /* If the Supabase project has "Confirm email" turned off, signUp() already
          returns a live session and there's nothing to verify — go straight in. */
       if(data && data.session){
@@ -2675,10 +2866,13 @@ function staffLogout(){
    record already exists, shows the edit form. If not — e.g. the first time a
    newly-registered staff member logs in — sends them straight into the Staff
    Data Bank form (with their email locked in) so they can create it. */
+let currentStaffLoginFullName = ''; // full_name from auth metadata, captured at Create Account
+
 async function loadMyStaffRecord(){
   const { data: userData } = await supabaseClient.auth.getUser();
   const email = userData && userData.user ? userData.user.email : '';
   currentStaffLoginEmail = email;
+  currentStaffLoginFullName = (userData && userData.user && userData.user.user_metadata && userData.user.user_metadata.full_name) || '';
   try{
     const { data, error } = await supabaseClient
       .from('staff_records')
@@ -2715,13 +2909,16 @@ async function loadMyStaffRecord(){
 /* Opens the Staff Data Bank form for a logged-in staff member who doesn't have
    a record yet, locking the email field to their login email (so future
    logins find it) and swapping the back-nav to a log-out link. */
-function openStaffFormForFill(email){
+function openStaffFormForFill(email, fullName){
   showView('staffFormView');
   const emailInput = document.getElementById('emailId');
   if(emailInput){
     emailInput.value = email || '';
     emailInput.readOnly = !!email;
   }
+  const nameInput = document.getElementById('fullName');
+  const nameToUse = fullName || currentStaffLoginFullName;
+  if(nameInput && nameToUse && !nameInput.value) nameInput.value = nameToUse;
   const backNav = document.getElementById('stfBackNav');
   if(backNav) backNav.innerHTML = '<a onclick="staffLogout()">← Log Out</a>';
   const note = document.getElementById('stfFillNote');
@@ -2858,7 +3055,10 @@ supabaseClient.auth.onAuthStateChange((event, session) => {
     if(newPassword && newPassword.length >= 8){
       supabaseClient.auth.updateUser({ password: newPassword }).then(({ error }) => {
         showView('staffLoginScreen');
-        showStaffLoginNote(error ? ('Could not update password: ' + errMsg(error)) : 'Password updated — you can log in now.');
+        showStaffLoginNote(
+          error ? ('Could not update password: ' + errMsg(error)) : 'Password updated — you can log in now.',
+          error ? 'error' : 'success'
+        );
       });
     }
   }
