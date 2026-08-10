@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover">
 <title>Mount Litera Zee School, Jhansi - Forms Portal</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <style>
   :root{
     --ink:#1a2b3c;
@@ -1588,6 +1589,7 @@
       <input type="text" id="searchBox" placeholder="Search..." oninput="currentPage=1; renderTable();">
       <button class="btn-secondary" onclick="loadAll()">Refresh</button>
       <button class="btn-primary" onclick="exportAllCSV()">Export All to Excel (CSV)</button>
+      <button class="btn-primary" id="exportFilesBtn" onclick="exportAllWithFiles()">Export All Data + Files (ZIP)</button>
       <button class="btn-secondary" onclick="openAdminChangePassword()">Change Password</button>
       <button class="btn-secondary" onclick="adminLogout()">Log Out</button>
     </div>
@@ -3561,66 +3563,201 @@ async function deleteRecord(key){
   }
 }
 
-function exportAllCSV(){
-  if(allRecords.length === 0){ alert('No records to export yet.'); return; }
-  let headers, keys, filename;
+/* Returns the CSV column headers/keys and base filename for the currently active tab. Shared by exportAllCSV and exportAllWithFiles. */
+function getExportSpec(){
   if(currentTab === 'students'){
-    headers = [
-      'Adm No','Date of Adm','Class & Section','Candidate Name','Date of Birth',
-      "Mother's Name","Father's Name",'APAAR ID','Gender','Caste','Only Child',
-      'Disabled','Disability %','Annual Income','Address','Mobile 1','Mobile 2',
-      'Subjects','Photo File','Birth Cert File','Student Aadhar Front File','Student Aadhar Back File',
-      'Parent Aadhar Front File(s)','Parent Aadhar Back File(s)',
-      'Disability Cert File','Submitted At'
-    ];
-    keys = [
-      'admNo','admDate','section','candidateName','dob','motherName','fatherName',
-      'apaarId','gender','caste','onlyChild','disabled','disabilityPct','income',
-      'address','mobile1','mobile2','subjects','photoFile','birthCertFile',
-      'studentAadharFrontFile','studentAadharBackFile','parentAadharFrontFiles','parentAadharBackFiles',
-      'disabilityCertFile','submittedAt'
-    ];
-    filename = `class9_registrations_${new Date().toISOString().slice(0,10)}.csv`;
+    return {
+      headers: [
+        'Adm No','Date of Adm','Class & Section','Candidate Name','Date of Birth',
+        "Mother's Name","Father's Name",'APAAR ID','Gender','Caste','Only Child',
+        'Disabled','Disability %','Annual Income','Address','Mobile 1','Mobile 2',
+        'Subjects','Photo File','Birth Cert File','Student Aadhar Front File','Student Aadhar Back File',
+        'Parent Aadhar Front File(s)','Parent Aadhar Back File(s)',
+        'Disability Cert File','Submitted At'
+      ],
+      keys: [
+        'admNo','admDate','section','candidateName','dob','motherName','fatherName',
+        'apaarId','gender','caste','onlyChild','disabled','disabilityPct','income',
+        'address','mobile1','mobile2','subjects','photoFile','birthCertFile',
+        'studentAadharFrontFile','studentAadharBackFile','parentAadharFrontFiles','parentAadharBackFiles',
+        'disabilityCertFile','submittedAt'
+      ],
+      baseName: 'class9_registrations'
+    };
   } else if(currentTab === 'class11'){
-    headers = [
-      'Adm No','Date of Adm','Class','Candidate Name',"Mother's Name","Father's/Guardian's Name",
-      'Gender','Category','Address','Minority Section','Only Child','PWD','PWD Certificate File',
-      'Photo File','Class X Marksheet File','Transfer Certificate File',
-      "Candidate's Aadhar Card Front File","Candidate's Aadhar Card Back File",
-      'Mobile','Email','Subject Stream','Subject 2','Subject 3','Subject 4','Subject 5','Subject 6',
-      'Annual Income','Roll No','Board','Year','Submitted At'
-    ];
-    keys = [
-      'admNo','admDate','section','candidateName','motherName','fatherName',
-      'gender','category','address','minority','onlyChild','pwd','pwdCertFile',
-      'photoFile','class10MarksheetFile','transferCertFile','aadharCardFrontFile','aadharCardBackFile',
-      'mobile','email','stream','subject2','subject3','subject4','subject5','subject6',
-      'income','rollNo','board','year','submittedAt'
-    ];
-    filename = `class11_registrations_${new Date().toISOString().slice(0,10)}.csv`;
+    return {
+      headers: [
+        'Adm No','Date of Adm','Class','Candidate Name',"Mother's Name","Father's/Guardian's Name",
+        'Gender','Category','Address','Minority Section','Only Child','PWD','PWD Certificate File',
+        'Photo File','Class X Marksheet File','Transfer Certificate File',
+        "Candidate's Aadhar Card Front File","Candidate's Aadhar Card Back File",
+        'Mobile','Email','Subject Stream','Subject 2','Subject 3','Subject 4','Subject 5','Subject 6',
+        'Annual Income','Roll No','Board','Year','Submitted At'
+      ],
+      keys: [
+        'admNo','admDate','section','candidateName','motherName','fatherName',
+        'gender','category','address','minority','onlyChild','pwd','pwdCertFile',
+        'photoFile','class10MarksheetFile','transferCertFile','aadharCardFrontFile','aadharCardBackFile',
+        'mobile','email','stream','subject2','subject3','subject4','subject5','subject6',
+        'income','rollNo','board','year','submittedAt'
+      ],
+      baseName: 'class11_registrations'
+    };
   } else {
-    headers = [
-      'Full Name','Designation','Gender',"Father's/Husband's Name",'Relation','Date of Birth','Contact Number',
-      "Father's/Husband's Number",'Email ID','Current Address','Full Address','Highest Qualification',
-      'B.Ed','Date of Joining','Total Experience','Subjects Taught','Class Taught','CBSE Oasis ID',
-      'Account Number','IFSC Code','Aadhar Number','PAN Number','Photo File','Aadhar Card Front File','Aadhar Card Back File','PAN Card File','Passbook File','Submitted At'
-    ];
-    keys = [
-      'fullName','designation','gender','parentName','parentRelation','dob','contactNumber','parentContactNumber','emailId',
-      'currentAddress','fullAddress','qualification','bed','dateOfJoining','totalExperience',
-      'subjectsTaught','classTaught','oasisId','accountNumber','ifscCode','aadharNumber','panNumber',
-      'photoFile','aadharCardFrontFile','aadharCardBackFile','panCardFile','passbookFile','submittedAt'
-    ];
-    filename = `staff_databank_${new Date().toISOString().slice(0,10)}.csv`;
+    return {
+      headers: [
+        'Full Name','Designation','Gender',"Father's/Husband's Name",'Relation','Date of Birth','Contact Number',
+        "Father's/Husband's Number",'Email ID','Current Address','Full Address','Highest Qualification',
+        'B.Ed','Date of Joining','Total Experience','Subjects Taught','Class Taught','CBSE Oasis ID',
+        'Account Number','IFSC Code','Aadhar Number','PAN Number','Photo File','Aadhar Card Front File','Aadhar Card Back File','PAN Card File','Passbook File','Submitted At'
+      ],
+      keys: [
+        'fullName','designation','gender','parentName','parentRelation','dob','contactNumber','parentContactNumber','emailId',
+        'currentAddress','fullAddress','qualification','bed','dateOfJoining','totalExperience',
+        'subjectsTaught','classTaught','oasisId','accountNumber','ifscCode','aadharNumber','panNumber',
+        'photoFile','aadharCardFrontFile','aadharCardBackFile','panCardFile','passbookFile','submittedAt'
+      ],
+      baseName: 'staff_databank'
+    };
   }
+}
+
+/* Builds the CSV text (with BOM) for the currently loaded records using the shared export spec. */
+function buildExportCSV(){
+  const { headers, keys } = getExportSpec();
   const lines = [headers.map(csvEscape).join(',')];
   allRecords.forEach(r => { lines.push(keys.map(k => csvEscape(r[k])).join(',')); });
-  const csv = '\uFEFF' + lines.join('\n');
+  return '\uFEFF' + lines.join('\n');
+}
+
+function exportAllCSV(){
+  if(allRecords.length === 0){ alert('No records to export yet.'); return; }
+  const { baseName } = getExportSpec();
+  const filename = `${baseName}_${new Date().toISOString().slice(0,10)}.csv`;
+  const csv = buildExportCSV();
   const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = filename;
   document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+/* Storage-path fields to include per tab when bundling actual uploaded documents. 'multi:true' fields
+   store several storage paths joined by '; ' (used for the parents' Aadhar uploads). */
+const FILE_FIELDS = {
+  students: [
+    { key:'photoFile', label:'Photo' },
+    { key:'birthCertFile', label:'BirthCert' },
+    { key:'studentAadharFrontFile', label:'StudentAadharFront' },
+    { key:'studentAadharBackFile', label:'StudentAadharBack' },
+    { key:'parentAadharFrontFiles', label:'ParentAadharFront', multi:true },
+    { key:'parentAadharBackFiles', label:'ParentAadharBack', multi:true },
+    { key:'disabilityCertFile', label:'DisabilityCert' }
+  ],
+  class11: [
+    { key:'photoFile', label:'Photo' },
+    { key:'pwdCertFile', label:'PWDCert' },
+    { key:'class10MarksheetFile', label:'Class10Marksheet' },
+    { key:'transferCertFile', label:'TransferCert' },
+    { key:'aadharCardFrontFile', label:'AadharFront' },
+    { key:'aadharCardBackFile', label:'AadharBack' }
+  ],
+  staff: [
+    { key:'photoFile', label:'Photo' },
+    { key:'aadharCardFrontFile', label:'AadharFront' },
+    { key:'aadharCardBackFile', label:'AadharBack' },
+    { key:'panCardFile', label:'PANCard' },
+    { key:'passbookFile', label:'Passbook' }
+  ]
+};
+
+/* Sanitizes a value into a safe folder/file name fragment. */
+function safeSlug(val){
+  return String(val || '').trim().replace(/[^a-zA-Z0-9._-]+/g,'_').replace(/^_+|_+$/g,'').slice(0,60) || 'record';
+}
+
+function fileBaseName(path){
+  const parts = String(path).split('/');
+  return parts[parts.length - 1];
+}
+
+/* Folder name used inside the ZIP for a given record's files. */
+function recordFolderName(r){
+  if(currentTab === 'staff'){
+    return safeSlug(r.fullName) + '_' + safeSlug(r._key).slice(0,8);
+  }
+  const adm = r.admNo ? safeSlug(r.admNo) + '_' : '';
+  return adm + safeSlug(r.candidateName) + '_' + safeSlug(r._key).slice(0,8);
+}
+
+/* Exports the current tab's data as a CSV plus every uploaded document (photos, certificates, Aadhar
+   cards, etc.), bundled together into a single downloadable ZIP file — one subfolder per record. */
+async function exportAllWithFiles(){
+  if(allRecords.length === 0){ alert('No records to export yet.'); return; }
+  if(typeof JSZip === 'undefined'){ alert('The ZIP export library failed to load. Check your connection and refresh the page, then try again.'); return; }
+
+  const btn = document.getElementById('exportFilesBtn');
+  const originalText = btn.textContent;
+  btn.disabled = true;
+
+  try{
+    const zip = new JSZip();
+    zip.file('data.csv', buildExportCSV());
+
+    const fileFields = FILE_FIELDS[currentTab] || [];
+    const jobs = [];
+    allRecords.forEach(r => {
+      const folder = recordFolderName(r);
+      fileFields.forEach(f => {
+        const raw = r[f.key];
+        if(!raw) return;
+        const paths = f.multi ? String(raw).split(';').map(s => s.trim()).filter(Boolean) : [raw];
+        paths.forEach((p, i) => {
+          const suffix = paths.length > 1 ? `_${i + 1}` : '';
+          jobs.push({ path: p, zipPath: `files/${folder}/${f.label}${suffix}_${fileBaseName(p)}` });
+        });
+      });
+    });
+
+    let done = 0;
+    const updateProgress = () => { btn.textContent = jobs.length ? `Exporting ${done}/${jobs.length} files...` : 'Exporting...'; };
+    updateProgress();
+
+    const CONCURRENCY = 4;
+    let idx = 0;
+    async function worker(){
+      while(idx < jobs.length){
+        const job = jobs[idx++];
+        try{
+          const { data, error } = await supabaseClient.storage.from(DOCS_BUCKET).createSignedUrl(job.path, 120);
+          if(error || !data) throw error || new Error('No signed URL returned');
+          const resp = await fetch(data.signedUrl);
+          if(!resp.ok) throw new Error('HTTP ' + resp.status);
+          zip.file(job.zipPath, await resp.blob());
+        } catch(err){
+          console.error('Could not fetch file for export:', job.path, err);
+          zip.file(job.zipPath + '.MISSING.txt', 'Could not retrieve this file from storage: ' + errMsg(err));
+        }
+        done++;
+        updateProgress();
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, jobs.length) || 1 }, worker));
+
+    btn.textContent = 'Zipping...';
+    const { baseName } = getExportSpec();
+    const zipBlob = await zip.generateAsync({ type:'blob' });
+    const url = URL.createObjectURL(zipBlob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `${baseName}_full_export_${new Date().toISOString().slice(0,10)}.zip`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  } catch(err){
+    console.error(err);
+    alert('Export failed: ' + errMsg(err));
+  } finally{
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
 }
 </script>
 </body>
