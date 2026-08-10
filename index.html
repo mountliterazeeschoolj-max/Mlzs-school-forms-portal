@@ -298,6 +298,31 @@
   .stat-card{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:14px 16px;}
   .stat-card .num{font-size:24px;font-weight:700;color:var(--accent);}
   .stat-card .label{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;}
+
+  /* ---- Admin: Overview dashboard tab ---- */
+  .ov-grid{display:grid;grid-template-columns:repeat(auto-fit, minmax(160px,1fr));gap:12px;margin-bottom:18px;}
+  .ov-card{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:16px 18px;}
+  .ov-card .num{font-size:28px;font-weight:800;color:var(--accent);}
+  .ov-card .label{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-top:2px;}
+  .ov-forms-grid{display:grid;grid-template-columns:repeat(auto-fit, minmax(200px,1fr));gap:14px;margin-bottom:22px;}
+  .ov-form-card{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:16px 18px;cursor:pointer;transition:all 0.15s;}
+  .ov-form-card:hover{border-color:var(--accent);background:#eaf2fa;transform:translateY(-1px);}
+  .ov-form-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;}
+  .ov-form-head span:first-child{font-size:13px;font-weight:700;color:var(--ink);text-transform:uppercase;letter-spacing:0.3px;}
+  .ov-form-num{font-size:30px;font-weight:800;color:var(--accent);line-height:1.1;}
+  .ov-form-sub{font-size:12px;color:var(--muted);margin-top:4px;}
+  .ov-pill{font-size:9.5px;font-weight:700;letter-spacing:0.3px;text-transform:uppercase;border-radius:20px;padding:2px 9px;white-space:nowrap;}
+  .ov-pill.open{background:#dcf0e0;color:#1e6b34;}
+  .ov-pill.closed{background:#f6d9d9;color:#8a2c22;}
+  .ov-pill.deadline{background:#fdeecb;color:#8a5a10;}
+  .ov-recent{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:16px 18px;}
+  .ov-recent h3{margin:0 0 12px;font-size:13px;text-transform:uppercase;letter-spacing:0.4px;color:var(--accent);}
+  .ov-recent table{font-size:13px;}
+  .ov-type-pill{font-size:10px;font-weight:700;letter-spacing:0.3px;text-transform:uppercase;border-radius:20px;padding:3px 10px;white-space:nowrap;}
+  .ov-type-students{background:#e2ecf7;color:var(--accent);}
+  .ov-type-class11{background:#e6f3ea;color:#1e6b34;}
+  .ov-type-staff{background:#f3e8f5;color:#7a2c8a;}
+  .ov-view-link{font-size:12px;color:var(--accent);cursor:pointer;text-decoration:underline;}
   .table-container{background:var(--paper);border:1px solid var(--line);border-radius:6px;overflow-x:auto;}
   table{border-collapse:collapse;width:100%;font-size:13px;}
   th, td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap;}
@@ -1663,8 +1688,8 @@
     </div>
     <div class="toolbar">
       <input type="text" id="searchBox" placeholder="Search..." oninput="currentPage=1; renderTable();">
-      <button class="btn-secondary" onclick="loadAll()">Refresh</button>
-      <button class="btn-primary" onclick="exportAllCSV()">Export All to Excel (CSV)</button>
+      <button class="btn-secondary" id="refreshBtn" onclick="refreshCurrentTab()">Refresh</button>
+      <button class="btn-primary" id="exportCsvBtn" onclick="exportAllCSV()">Export All to Excel (CSV)</button>
       <button class="btn-primary" id="exportFilesBtn" onclick="exportAllWithFiles()">Export All Data + Files (ZIP)</button>
       <button class="btn-secondary" onclick="openFormSettings()">Form Settings</button>
       <button class="btn-secondary" onclick="openOasisAdmin()">Oasis Records</button>
@@ -1674,10 +1699,13 @@
   </div>
 
   <div class="tabs">
-    <button class="tab-btn active" id="tabStudents" onclick="switchTab('students')">Class IX</button>
+    <button class="tab-btn active" id="tabOverview" onclick="switchTab('overview')">Overview</button>
+    <button class="tab-btn" id="tabStudents" onclick="switchTab('students')">Class IX</button>
     <button class="tab-btn" id="tabClass11" onclick="switchTab('class11')">Class XI</button>
     <button class="tab-btn" id="tabStaff" onclick="switchTab('staff')">Staff</button>
   </div>
+
+  <div id="overviewArea" style="display:none;"></div>
 
   <div class="stats" id="statsRow"></div>
 
@@ -2378,6 +2406,20 @@ function showAuthNote(elId, msg, type){
 let adminLoginFailures = 0;
 let adminLoginLockedUntil = 0;
 
+/* Confirms the just-authenticated Supabase session actually belongs to an admin account
+   (checked server-side via the am_i_admin() RPC, which is backed by RLS-protected admin_emails —
+   never trust the client alone here). Signs the session out and returns false if not. Staff
+   accounts authenticate against this same Supabase project, so without this check anyone who
+   self-registered via the Staff Data Bank could otherwise reach the admin panel. */
+async function verifyAdminSessionOrRejectAccess(){
+  try{
+    const { data, error } = await supabaseClient.rpc('am_i_admin');
+    if(!error && data === true) return true;
+  } catch(err){ /* treat as not-admin below */ }
+  await supabaseClient.auth.signOut();
+  return false;
+}
+
 async function checkPasscode(){
   if(Date.now() < adminLoginLockedUntil){
     const secondsLeft = Math.ceil((adminLoginLockedUntil - Date.now()) / 1000);
@@ -2400,11 +2442,16 @@ async function checkPasscode(){
       }
       return;
     }
+    if(!(await verifyAdminSessionOrRejectAccess())){
+      showAuthNote('gateNote', 'This account does not have admin access.');
+      document.getElementById('adminPasswordInput').value = '';
+      return;
+    }
     adminLoginFailures = 0;
     document.getElementById('adminPasswordInput').value = '';
     document.getElementById('gateNote').style.display = 'none';
     showView('mainPanel');
-    switchTab('students');
+    switchTab('overview');
   } catch(err){
     showAuthNote('gateNote', 'Could not reach the server. Check your internet connection and try again.');
   }
@@ -2457,9 +2504,13 @@ async function confirmResetOtp(){
     if(verifyError){ showAuthNote('resetConfirmNote', 'Incorrect or expired code: ' + errMsg(verifyError)); return; }
     const { error: updateError } = await supabaseClient.auth.updateUser({ password: newPassword });
     if(updateError){ showAuthNote('resetConfirmNote', 'Could not set new password: ' + errMsg(updateError)); return; }
+    if(!(await verifyAdminSessionOrRejectAccess())){
+      showAuthNote('resetConfirmNote', 'This account does not have admin access.');
+      return;
+    }
     resetEmailPending = '';
     showAuthNote('resetConfirmNote', 'Password reset successfully. You are now logged in.', 'success');
-    setTimeout(() => { showView('mainPanel'); switchTab('students'); }, 900);
+    setTimeout(() => { showView('mainPanel'); switchTab('overview'); }, 900);
   } catch(err){
     showAuthNote('resetConfirmNote', 'Could not reach the server. Check your internet connection and try again.');
   }
@@ -2470,13 +2521,15 @@ async function confirmResetOtp(){
   });
 });
 
-/* If an admin session is already active (e.g. page refresh), skip straight to the panel. */
+/* If an admin session is already active (e.g. page refresh), skip straight to the panel —
+   but only after confirming the session actually belongs to an admin account. */
 async function checkExistingSession(){
   try{
     const { data } = await supabaseClient.auth.getSession();
     if(data && data.session){
+      if(!(await verifyAdminSessionOrRejectAccess())) return;
       showView('mainPanel');
-      switchTab('students');
+      switchTab('overview');
     }
   } catch(err){ /* not logged in, stay on landing view */ }
 }
@@ -4040,17 +4093,38 @@ let sortDir = -1;
 const PAGE_SIZE = 25;
 let currentPage = 1;
 
-function switchTab(tab){
+async function switchTab(tab){
   currentTab = tab;
   sortKey = 'submittedAt';
   sortDir = -1;
   currentPage = 1;
   resetAdminIdleTimer();
+  document.getElementById('tabOverview').classList.toggle('active', tab === 'overview');
   document.getElementById('tabStudents').classList.toggle('active', tab === 'students');
   document.getElementById('tabClass11').classList.toggle('active', tab === 'class11');
   document.getElementById('tabStaff').classList.toggle('active', tab === 'staff');
   document.getElementById('searchBox').value = '';
-  loadAll();
+
+  const isOverview = tab === 'overview';
+  document.getElementById('overviewArea').style.display = isOverview ? 'block' : 'none';
+  document.getElementById('statsRow').style.display = isOverview ? 'none' : '';
+  document.querySelector('.table-container').style.display = isOverview ? 'none' : '';
+  document.getElementById('pageControls').style.display = isOverview ? 'none' : 'flex';
+  document.getElementById('searchBox').style.display = isOverview ? 'none' : '';
+  document.getElementById('exportCsvBtn').style.display = isOverview ? 'none' : '';
+  document.getElementById('exportFilesBtn').style.display = isOverview ? 'none' : '';
+
+  if(isOverview){
+    await loadOverview();
+  } else {
+    await loadAll();
+  }
+}
+
+/* Refreshes whichever tab is currently open — the Overview dashboard or a per-form table. */
+function refreshCurrentTab(){
+  if(currentTab === 'overview') loadOverview();
+  else loadAll();
 }
 
 /* Maps a Supabase row (snake_case, *_path columns) to the camelCase shape the admin UI was built around. */
@@ -4129,11 +4203,13 @@ function renderStats(){
     const science = allRecords.filter(r => r.stream === 'Science').length;
     const commerce = allRecords.filter(r => r.stream === 'Commerce').length;
     const humanities = allRecords.filter(r => r.stream === 'Humanities').length;
+    const missingDocs = allRecords.filter(r => !r.aadharCardFrontFile || !r.aadharCardBackFile || !r.class10MarksheetFile || !r.transferCertFile).length;
     document.getElementById('statsRow').innerHTML = `
       <div class="stat-card"><div class="num">${total}</div><div class="label">Total Registrations</div></div>
       <div class="stat-card"><div class="num">${science}</div><div class="label">Science</div></div>
       <div class="stat-card"><div class="num">${commerce}</div><div class="label">Commerce</div></div>
       <div class="stat-card"><div class="num">${humanities}</div><div class="label">Humanities</div></div>
+      <div class="stat-card"><div class="num">${missingDocs}</div><div class="label">Missing Documents</div></div>
     `;
   } else {
     const bedYes = allRecords.filter(r => r.bed === 'Yes').length;
@@ -4144,6 +4220,118 @@ function renderStats(){
       <div class="stat-card"><div class="num">${missingDocs}</div><div class="label">Missing Documents</div></div>
     `;
   }
+}
+
+/* ---- Overview dashboard: cross-form KPIs, per-form status, and a recent-activity feed ---- */
+let overviewRecentCache = [];
+
+/* Renders a status pill for a form's open/closed/deadline state, reusing the same
+   form_settings-backed logic that drives the public landing page badges. */
+function overviewFormPill(key){
+  const state = getFormClosedState(key);
+  if(state.closed) return '<span class="ov-pill closed">Closed</span>';
+  if(state.deadline){
+    const countdown = formatCountdown(state.deadline);
+    return '<span class="ov-pill deadline">' + (countdown ? ('Closes in ' + countdown) : 'Closing…') + '</span>';
+  }
+  return '<span class="ov-pill open">Open</span>';
+}
+
+async function loadOverview(){
+  const area = document.getElementById('overviewArea');
+  area.innerHTML = '<div class="loading">Loading overview...</div>';
+  try{
+    const [stuRes, c11Res, stfRes] = await Promise.all([
+      supabaseClient.from('student_registrations').select('*').order('submitted_at', { ascending: false }),
+      supabaseClient.from('class11_registrations').select('*').order('submitted_at', { ascending: false }),
+      supabaseClient.from('staff_records').select('*').order('submitted_at', { ascending: false })
+    ]);
+    if(stuRes.error) throw stuRes.error;
+    if(c11Res.error) throw c11Res.error;
+    if(stfRes.error) throw stfRes.error;
+
+    const stu = (stuRes.data || []).map(r => mapRow(r, 'students'));
+    const c11 = (c11Res.data || []).map(r => mapRow(r, 'class11'));
+    const stf = (stfRes.data || []).map(r => mapRow(r, 'staff'));
+
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfWeek = new Date(startOfDay);
+    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+
+    const all = [
+      ...stu.map(r => ({ ...r, _formType: 'students', _formLabel: 'Class IX' })),
+      ...c11.map(r => ({ ...r, _formType: 'class11', _formLabel: 'Class XI' })),
+      ...stf.map(r => ({ ...r, _formType: 'staff', _formLabel: 'Staff' }))
+    ];
+    const total = all.length;
+    const today = all.filter(r => r.submittedAt && new Date(r.submittedAt) >= startOfDay).length;
+    const week = all.filter(r => r.submittedAt && new Date(r.submittedAt) >= startOfWeek).length;
+
+    const stuMissing = stu.filter(r => !r.birthCertFile || !r.studentAadharFrontFile || !r.studentAadharBackFile).length;
+    const c11Missing = c11.filter(r => !r.aadharCardFrontFile || !r.aadharCardBackFile || !r.class10MarksheetFile || !r.transferCertFile).length;
+    const stfMissing = stf.filter(r => !r.aadharCardFrontFile || !r.aadharCardBackFile || !r.photoFile).length;
+
+    overviewRecentCache = all
+      .slice()
+      .sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0))
+      .slice(0, 10);
+
+    const recentRows = overviewRecentCache.map((r, idx) => `
+      <tr>
+        <td><span class="ov-type-pill ov-type-${r._formType}">${r._formLabel}</span></td>
+        <td>${escapeHtml(r.candidateName || r.fullName || '—')}</td>
+        <td>${r.submittedAt ? new Date(r.submittedAt).toLocaleString([], {dateStyle:'medium', timeStyle:'short'}) : '—'}</td>
+        <td><a class="ov-view-link" onclick="jumpToRecentIndex(${idx})">View →</a></td>
+      </tr>
+    `).join('');
+
+    area.innerHTML = `
+      <div class="ov-grid">
+        <div class="ov-card"><div class="num">${total}</div><div class="label">Total Submissions (All Forms)</div></div>
+        <div class="ov-card"><div class="num">${today}</div><div class="label">Submitted Today</div></div>
+        <div class="ov-card"><div class="num">${week}</div><div class="label">Submitted This Week</div></div>
+      </div>
+      <div class="ov-forms-grid">
+        <div class="ov-form-card" onclick="switchTab('students')">
+          <div class="ov-form-head"><span>Class IX</span>${overviewFormPill('students')}</div>
+          <div class="ov-form-num">${stu.length}</div>
+          <div class="ov-form-sub">${stuMissing} missing document${stuMissing === 1 ? '' : 's'}</div>
+        </div>
+        <div class="ov-form-card" onclick="switchTab('class11')">
+          <div class="ov-form-head"><span>Class XI</span>${overviewFormPill('class11')}</div>
+          <div class="ov-form-num">${c11.length}</div>
+          <div class="ov-form-sub">${c11Missing} missing document${c11Missing === 1 ? '' : 's'}</div>
+        </div>
+        <div class="ov-form-card" onclick="switchTab('staff')">
+          <div class="ov-form-head"><span>Staff Data Bank</span>${overviewFormPill('staff')}</div>
+          <div class="ov-form-num">${stf.length}</div>
+          <div class="ov-form-sub">${stfMissing} missing document${stfMissing === 1 ? '' : 's'}</div>
+        </div>
+      </div>
+      <div class="ov-recent">
+        <h3>Recent Submissions</h3>
+        ${overviewRecentCache.length ? `
+          <table>
+            <thead><tr><th>Form</th><th>Name</th><th>Submitted</th><th></th></tr></thead>
+            <tbody>${recentRows}</tbody>
+          </table>
+        ` : '<div class="empty">No submissions yet.</div>'}
+      </div>
+    `;
+  } catch(err){
+    console.error(err);
+    area.innerHTML = '<div class="empty">Could not load the overview (' + errMsg(err) + '). Try Refresh.</div>';
+  }
+}
+
+/* Jumps from a Recent Submissions row straight to that record's tab, pre-filtered by name. */
+async function jumpToRecentIndex(idx){
+  const r = overviewRecentCache[idx];
+  if(!r) return;
+  await switchTab(r._formType);
+  document.getElementById('searchBox').value = r.candidateName || r.fullName || '';
+  renderTable();
 }
 
 function sortByCol(key){
