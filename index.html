@@ -247,6 +247,39 @@
   .deadline-banner strong{font-variant-numeric:tabular-nums;}
   .fs-modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:18px;}
 
+  /* ---- Admin: Oasis Records modal ---- */
+  .fs-modal-inner.wide{max-width:760px;}
+  .oasis-stat-line{font-size:12.5px;color:var(--muted);margin:-6px 0 16px;}
+  .oasis-section{border:1px solid var(--line);border-radius:6px;padding:16px 18px;margin-bottom:16px;background:var(--field);}
+  .oasis-section h3{margin:0 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:0.4px;color:var(--accent);}
+  .oasis-single-row{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:10px;align-items:end;}
+  .oasis-single-row .field label{font-size:10.5px;}
+  .oasis-single-row input{border:1px solid var(--line);background:#fff;padding:8px 10px;font-size:13px;
+    border-radius:3px;font-family:inherit;color:var(--ink);width:100%;}
+  @media (max-width:640px){.oasis-single-row{grid-template-columns:1fr;}}
+  .oasis-bulk-textarea{width:100%;min-height:110px;border:1px solid var(--line);background:#fff;padding:10px;
+    font-size:12.5px;font-family:'Courier New',monospace;border-radius:3px;color:var(--ink);resize:vertical;}
+  .oasis-bulk-hint{font-size:11px;color:var(--muted);margin:6px 0 10px;line-height:1.5;}
+  .oasis-bulk-result{font-size:12px;margin-top:10px;white-space:pre-wrap;max-height:120px;overflow-y:auto;
+    background:#fff;border:1px solid var(--line);border-radius:4px;padding:8px 10px;display:none;}
+  .oasis-search-row{display:flex;gap:10px;margin-bottom:10px;}
+  .oasis-search-row input{flex:1;border:1px solid var(--line);background:#fff;padding:8px 10px;font-size:13px;
+    border-radius:3px;font-family:inherit;color:var(--ink);}
+  .oasis-table-wrap{max-height:260px;overflow-y:auto;border:1px solid var(--line);border-radius:4px;background:#fff;}
+  .oasis-table-wrap table{font-size:12.5px;}
+  .oasis-table-wrap th{position:sticky;top:0;background:var(--field);text-align:left;padding:7px 10px;
+    border-bottom:1px solid var(--line);}
+  .oasis-table-wrap td{padding:6px 10px;border-bottom:1px solid #eef1f3;}
+  .oasis-del-btn{border:1px solid #c0392b;color:#c0392b;background:#fff;border-radius:3px;padding:3px 9px;
+    font-size:11px;cursor:pointer;}
+  .oasis-del-btn:hover{background:#fdecea;}
+  .oasis-missing-dob{color:#a8721c;font-style:italic;}
+
+  /* ---- Public: Find My Oasis ID ---- */
+  .oasis-lookup-link{display:block;text-align:center;font-size:12.5px;color:var(--accent);cursor:pointer;
+    text-decoration:underline;margin:2px 0 22px;}
+  .oasis-lookup-link:hover{color:var(--accent-light);}
+
   /* ---- Admin view ---- */
   .wrap{max-width:1300px;margin:0 auto;}
   .admin-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:18px;}
@@ -387,6 +420,7 @@
       <p>Log in or register, then fill in &amp; update your staff record</p>
     </div>
   </div>
+  <a class="oasis-lookup-link" onclick="openOasisLookup()">🔍 Staff — Find your CBSE Oasis ID by name &amp; date of birth</a>
 </div>
 
 <!-- ================= STUDENT FORM VIEW ================= -->
@@ -1206,6 +1240,10 @@
       <svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
       <span>Forgot password?</span>
     </a>
+    <a class="row" onclick="openOasisLookup()">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <span>Find your CBSE Oasis ID</span>
+    </a>
   </div>
 
   <div class="note" id="staffLoginNote" style="display:none;"></div>
@@ -1629,6 +1667,7 @@
       <button class="btn-primary" onclick="exportAllCSV()">Export All to Excel (CSV)</button>
       <button class="btn-primary" id="exportFilesBtn" onclick="exportAllWithFiles()">Export All Data + Files (ZIP)</button>
       <button class="btn-secondary" onclick="openFormSettings()">Form Settings</button>
+      <button class="btn-secondary" onclick="openOasisAdmin()">Oasis Records</button>
       <button class="btn-secondary" onclick="openAdminChangePassword()">Change Password</button>
       <button class="btn-secondary" onclick="adminLogout()">Log Out</button>
     </div>
@@ -1716,6 +1755,83 @@
     <div class="fs-modal-actions">
       <button class="btn-secondary" onclick="closeFormSettings()">Cancel</button>
       <button class="btn-primary" id="fsSaveBtn" onclick="saveFormSettings()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= ADMIN: OASIS RECORDS MODAL ================= -->
+<div class="fs-modal" id="oasisAdminModal" style="display:none;">
+  <div class="fs-modal-inner wide">
+    <h2>Oasis Records</h2>
+    <p class="fs-modal-sub">Maintain the CBSE Oasis ID directory used to auto-suggest IDs on staff submissions, and to power the "Find My Oasis ID" self-service lookup for teachers (matched by full name + date of birth).</p>
+    <div class="oasis-stat-line" id="oasisStatLine">Loading records…</div>
+
+    <div class="oasis-section">
+      <h3>Add / Update a Single Record</h3>
+      <div class="oasis-single-row">
+        <div class="field"><label>Full Name</label><input type="text" id="oasisSingleName" placeholder="e.g. Yash Singh"></div>
+        <div class="field"><label>Date of Birth</label><input type="text" id="oasisSingleDob" placeholder="DD/MM/YYYY" inputmode="numeric" maxlength="10" oninput="formatDateInput(this)"></div>
+        <div class="field"><label>Oasis ID</label><input type="text" id="oasisSingleId" placeholder="e.g. 2950982"></div>
+        <button class="btn-primary" id="oasisSingleSaveBtn" onclick="saveOasisSingleRecord()">Save Record</button>
+      </div>
+      <div class="note" id="oasisSingleNote" style="display:none;margin-top:10px;"></div>
+    </div>
+
+    <div class="oasis-section">
+      <h3>Bulk Upload</h3>
+      <div class="oasis-bulk-hint">
+        Upload a CSV file, or paste rows below — one record per line: <strong>Full Name, Date of Birth (DD/MM/YYYY), Oasis ID</strong>.
+        A record already on file (matched by Oasis ID) will be updated; a new Oasis ID is added. A header row is fine — it's skipped automatically.
+      </div>
+      <input type="file" id="oasisCsvFile" accept=".csv,text/csv" onchange="handleOasisFileSelect(event)" style="margin-bottom:10px;">
+      <textarea class="oasis-bulk-textarea" id="oasisBulkTextarea" placeholder="Yash Singh, 14/05/1990, 2950982&#10;Ritu Pathak, 02/11/1988, 3341927"></textarea>
+      <div class="fs-modal-actions" style="justify-content:flex-start;margin-top:10px;">
+        <button class="btn-primary" id="oasisBulkBtn" onclick="bulkUploadOasisRecords()">Bulk Upload</button>
+        <button class="btn-secondary" onclick="document.getElementById('oasisBulkTextarea').value=''; document.getElementById('oasisCsvFile').value='';">Clear</button>
+      </div>
+      <div class="oasis-bulk-result" id="oasisBulkResult"></div>
+    </div>
+
+    <div class="oasis-section">
+      <h3>Existing Records</h3>
+      <div class="oasis-search-row">
+        <input type="text" id="oasisSearchInput" placeholder="Search by name or Oasis ID..." oninput="renderOasisAdminTable()">
+        <button class="btn-secondary" onclick="loadOasisRecordsAdmin()">Refresh</button>
+      </div>
+      <div class="oasis-table-wrap">
+        <table id="oasisAdminTable">
+          <thead><tr><th>Name</th><th>Date of Birth</th><th>Oasis ID</th><th></th></tr></thead>
+          <tbody id="oasisAdminTableBody"><tr><td colspan="4" style="padding:14px;color:var(--muted);">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="fs-modal-actions">
+      <button class="btn-secondary" onclick="closeOasisAdmin()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= PUBLIC: FIND MY OASIS ID MODAL ================= -->
+<div class="fs-modal" id="oasisLookupModal" style="display:none;">
+  <div class="fs-modal-inner">
+    <h2>Find Your CBSE Oasis ID</h2>
+    <p class="fs-modal-sub">Enter your full name and date of birth exactly as on school records. No login required — this only matches against the school's confidential Teacher Data Bank and won't show anyone else's details.</p>
+
+    <div class="field" style="margin-bottom:12px;">
+      <label>Full Name</label>
+      <input type="text" id="oasisLookupName" placeholder="Your full name as per school records">
+    </div>
+    <div class="field" style="margin-bottom:6px;">
+      <label>Date of Birth</label>
+      <input type="text" id="oasisLookupDob" placeholder="DD/MM/YYYY" inputmode="numeric" maxlength="10" oninput="formatDateInput(this)">
+    </div>
+
+    <div id="oasisLookupResult" style="margin-top:16px;"></div>
+
+    <div class="fs-modal-actions">
+      <button class="btn-secondary" onclick="closeOasisLookup()">Close</button>
+      <button class="btn-primary" id="oasisLookupBtn" onclick="performOasisSelfLookup()">Find My Oasis ID</button>
     </div>
   </div>
 </div>
@@ -1942,6 +2058,285 @@ async function saveFormSettings(){
     btn.textContent = originalText;
   }
 }
+
+/* ============ OASIS RECORDS (admin management + public self-lookup) ============
+   Backed by public.oasis_records (oasis_id unique, name, dob) plus the public.search_oasis_id(name, dob)
+   RPC, which is the only way anon/non-admin callers can query the table — it requires an exact DOB
+   match and never exposes the table for bulk browsing. Admins get direct table access (is_admin() RLS). */
+
+/* Converts a DD/MM/YYYY string (this site's date convention) to YYYY-MM-DD for Postgres date columns. */
+function dmyToIso(dmy){
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec((dmy || '').trim());
+  if(!m) return null;
+  return `${m[3]}-${m[2]}-${m[1]}`;
+}
+/* Converts a Postgres date (YYYY-MM-DD) back to this site's DD/MM/YYYY display convention. */
+function isoToDmy(iso){
+  if(!iso) return '';
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : '';
+}
+
+/* ---- Admin: Oasis Records modal ---- */
+let oasisRecordsCache = [];
+
+function openOasisAdmin(){
+  document.getElementById('oasisAdminModal').style.display = 'flex';
+  document.getElementById('oasisSingleNote').style.display = 'none';
+  document.getElementById('oasisBulkResult').style.display = 'none';
+  loadOasisRecordsAdmin();
+}
+function closeOasisAdmin(){
+  document.getElementById('oasisAdminModal').style.display = 'none';
+}
+
+async function loadOasisRecordsAdmin(){
+  const body = document.getElementById('oasisAdminTableBody');
+  body.innerHTML = '<tr><td colspan="4" style="padding:14px;color:var(--muted);">Loading…</td></tr>';
+  try{
+    const { data, error } = await supabaseClient.from('oasis_records').select('*').order('name');
+    if(error) throw error;
+    oasisRecordsCache = data || [];
+    const missingDob = oasisRecordsCache.filter(r => !r.dob).length;
+    document.getElementById('oasisStatLine').textContent =
+      `${oasisRecordsCache.length} record${oasisRecordsCache.length === 1 ? '' : 's'} on file` +
+      (missingDob ? ` — ${missingDob} missing a date of birth (won't be found by the self-lookup tool until added).` : '.');
+    renderOasisAdminTable();
+  } catch(err){
+    console.error(err);
+    body.innerHTML = '<tr><td colspan="4" style="padding:14px;color:var(--muted);">Could not load records: ' + errMsg(err) + '</td></tr>';
+  }
+}
+
+function renderOasisAdminTable(){
+  const body = document.getElementById('oasisAdminTableBody');
+  const q = (document.getElementById('oasisSearchInput').value || '').trim().toLowerCase();
+  const rows = oasisRecordsCache.filter(r =>
+    !q || r.name.toLowerCase().includes(q) || String(r.oasis_id).toLowerCase().includes(q)
+  );
+  if(rows.length === 0){
+    body.innerHTML = '<tr><td colspan="4" style="padding:14px;color:var(--muted);">No matching records.</td></tr>';
+    return;
+  }
+  body.innerHTML = rows.map(r => `
+    <tr>
+      <td>${escapeHtml(r.name)}</td>
+      <td>${r.dob ? escapeHtml(isoToDmy(r.dob)) : '<span class="oasis-missing-dob">not set</span>'}</td>
+      <td>${escapeHtml(String(r.oasis_id))}</td>
+      <td><button class="oasis-del-btn" onclick="deleteOasisRecord('${escapeHtml(String(r.oasis_id))}')">Delete</button></td>
+    </tr>
+  `).join('');
+}
+
+async function saveOasisSingleRecord(){
+  const noteEl = document.getElementById('oasisSingleNote');
+  const name = document.getElementById('oasisSingleName').value.trim();
+  const dobStr = document.getElementById('oasisSingleDob').value.trim();
+  const oasisId = document.getElementById('oasisSingleId').value.trim();
+  noteEl.style.display = 'block';
+  if(!name || !oasisId){
+    noteEl.textContent = 'Full Name and Oasis ID are required.';
+    noteEl.className = 'note';
+    return;
+  }
+  if(dobStr && !isValidDate(dobStr)){
+    noteEl.textContent = 'Date of Birth is not a valid date (use DD/MM/YYYY).';
+    noteEl.className = 'note';
+    return;
+  }
+  const btn = document.getElementById('oasisSingleSaveBtn');
+  btn.disabled = true;
+  try{
+    const { error } = await supabaseClient.from('oasis_records').upsert(
+      { oasis_id: oasisId, name, dob: dobStr ? dmyToIso(dobStr) : null },
+      { onConflict: 'oasis_id' }
+    );
+    if(error) throw error;
+    noteEl.textContent = 'Saved.';
+    noteEl.className = 'note visible';
+    document.getElementById('oasisSingleName').value = '';
+    document.getElementById('oasisSingleDob').value = '';
+    document.getElementById('oasisSingleId').value = '';
+    await loadOasisRecordsAdmin();
+  } catch(err){
+    console.error(err);
+    noteEl.textContent = 'Could not save: ' + errMsg(err);
+    noteEl.className = 'note';
+  } finally{
+    btn.disabled = false;
+  }
+}
+
+async function deleteOasisRecord(oasisId){
+  if(!confirm('Delete the Oasis record for ID ' + oasisId + '? This cannot be undone.')) return;
+  try{
+    const { error } = await supabaseClient.from('oasis_records').delete().eq('oasis_id', oasisId);
+    if(error) throw error;
+    await loadOasisRecordsAdmin();
+  } catch(err){
+    alert('Could not delete this record: ' + errMsg(err));
+  }
+}
+
+/* Loads a selected .csv file's text into the bulk textarea for review before uploading. */
+function handleOasisFileSelect(event){
+  const file = event.target.files && event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => { document.getElementById('oasisBulkTextarea').value = reader.result; };
+  reader.onerror = () => { alert('Could not read that file.'); };
+  reader.readAsText(file);
+}
+
+/* Minimal CSV line parser: handles simple comma-separated fields and "quoted, fields". */
+function parseCsvLine(line){
+  const fields = [];
+  let cur = '', inQuotes = false;
+  for(let i = 0; i < line.length; i++){
+    const c = line[i];
+    if(inQuotes){
+      if(c === '"' && line[i+1] === '"'){ cur += '"'; i++; }
+      else if(c === '"'){ inQuotes = false; }
+      else cur += c;
+    } else {
+      if(c === '"') inQuotes = true;
+      else if(c === ','){ fields.push(cur); cur = ''; }
+      else cur += c;
+    }
+  }
+  fields.push(cur);
+  return fields.map(f => f.trim());
+}
+
+/* Parses the bulk textarea (Name, DOB, Oasis ID per line) into records + a list of line-level errors.
+   Accepts DOB as DD/MM/YYYY (site convention) or YYYY-MM-DD; skips an obvious header row. */
+function parseOasisCsvText(text){
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+  const records = [];
+  const errors = [];
+  lines.forEach((line, idx) => {
+    const fields = parseCsvLine(line);
+    if(fields.length < 3){
+      errors.push(`Line ${idx + 1}: expected 3 columns (Name, DOB, Oasis ID), got ${fields.length}.`);
+      return;
+    }
+    const [name, dobRaw, oasisId] = fields;
+    if(idx === 0 && /oasis/i.test(oasisId) && /name/i.test(name)){
+      return; // header row, skip
+    }
+    if(!name){ errors.push(`Line ${idx + 1}: missing name.`); return; }
+    if(!oasisId){ errors.push(`Line ${idx + 1}: missing Oasis ID.`); return; }
+    let dobIso = null;
+    if(dobRaw){
+      if(/^\d{4}-\d{2}-\d{2}$/.test(dobRaw)) dobIso = dobRaw;
+      else if(isValidDate(dobRaw)) dobIso = dmyToIso(dobRaw);
+      else { errors.push(`Line ${idx + 1}: "${dobRaw}" is not a valid date (use DD/MM/YYYY).`); return; }
+    }
+    records.push({ oasis_id: oasisId, name, dob: dobIso });
+  });
+  return { records, errors };
+}
+
+async function bulkUploadOasisRecords(){
+  const text = document.getElementById('oasisBulkTextarea').value;
+  const resultEl = document.getElementById('oasisBulkResult');
+  resultEl.style.display = 'block';
+  if(!text.trim()){
+    resultEl.textContent = 'Nothing to upload — paste rows or choose a CSV file first.';
+    return;
+  }
+  const { records, errors } = parseOasisCsvText(text);
+  if(records.length === 0){
+    resultEl.textContent = 'No valid rows found.\n' + errors.join('\n');
+    return;
+  }
+  const btn = document.getElementById('oasisBulkBtn');
+  btn.disabled = true;
+  const originalText = btn.textContent;
+  let uploaded = 0;
+  const uploadErrors = [];
+  try{
+    const CHUNK = 200;
+    for(let i = 0; i < records.length; i += CHUNK){
+      const chunk = records.slice(i, i + CHUNK);
+      btn.textContent = `Uploading ${Math.min(i + CHUNK, records.length)}/${records.length}...`;
+      const { error } = await supabaseClient.from('oasis_records').upsert(chunk, { onConflict: 'oasis_id' });
+      if(error){ uploadErrors.push(error.message || String(error)); }
+      else uploaded += chunk.length;
+    }
+    const lines = [`Uploaded/updated ${uploaded} of ${records.length} record(s).`];
+    if(errors.length) lines.push('', 'Skipped rows:', ...errors);
+    if(uploadErrors.length) lines.push('', 'Upload errors:', ...uploadErrors);
+    resultEl.textContent = lines.join('\n');
+    await loadOasisRecordsAdmin();
+  } catch(err){
+    console.error(err);
+    resultEl.textContent = 'Bulk upload failed: ' + errMsg(err);
+  } finally{
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+}
+
+/* ---- Public: Find My Oasis ID self-service lookup ---- */
+function openOasisLookup(){
+  document.getElementById('oasisLookupModal').style.display = 'flex';
+  document.getElementById('oasisLookupName').value = '';
+  document.getElementById('oasisLookupDob').value = '';
+  document.getElementById('oasisLookupResult').innerHTML = '';
+}
+function closeOasisLookup(){
+  document.getElementById('oasisLookupModal').style.display = 'none';
+}
+
+async function performOasisSelfLookup(){
+  const resultEl = document.getElementById('oasisLookupResult');
+  const name = document.getElementById('oasisLookupName').value.trim();
+  const dobStr = document.getElementById('oasisLookupDob').value.trim();
+  if(!name || !dobStr || !isValidDate(dobStr)){
+    resultEl.innerHTML = '<div class="note visible">Please enter your full name and a valid date of birth (DD/MM/YYYY).</div>';
+    return;
+  }
+  const btn = document.getElementById('oasisLookupBtn');
+  btn.disabled = true;
+  const originalText = btn.textContent;
+  btn.textContent = 'Searching...';
+  try{
+    const { data, error } = await supabaseClient.rpc('search_oasis_id', { p_name: name, p_dob: dmyToIso(dobStr) });
+    if(error) throw error;
+    if(data && data.length){
+      const best = data[0];
+      const confidence = best.match_score >= 0.6 ? 'Likely Match' : 'Possible Match';
+      resultEl.innerHTML =
+        '<div class="oasis-card">' +
+          '<div class="oasis-icon">&#127891;</div>' +
+          '<div class="oasis-body">' +
+            '<div class="oasis-title">Match Found <span class="confidence-pill">' + confidence + '</span></div>' +
+            '<div class="oasis-name">Matched against record for <strong>' + escapeHtml(best.matched_name) + '</strong></div>' +
+            '<div class="oasis-id-badge"><span class="lbl">Oasis&nbsp;ID</span><span class="val">' + escapeHtml(String(best.oasis_id)) + '</span></div>' +
+            '<div class="oasis-note">If this doesn\'t look right, please contact the HR office to confirm.</div>' +
+          '</div>' +
+        '</div>';
+    } else {
+      resultEl.innerHTML =
+        '<div class="oasis-card not-found">' +
+          '<div class="oasis-icon">?</div>' +
+          '<div class="oasis-body">' +
+            '<div class="oasis-title">No Match Found</div>' +
+            '<div class="oasis-name">We couldn\'t find an Oasis ID on file for <strong>' + escapeHtml(name) + '</strong> with that date of birth.</div>' +
+            '<div class="oasis-note">Double-check the spelling and date, or contact the HR office — your record may not be on file yet.</div>' +
+          '</div>' +
+        '</div>';
+    }
+  } catch(err){
+    console.error(err);
+    resultEl.innerHTML = '<div class="note visible">Could not complete the search: ' + errMsg(err) + '</div>';
+  } finally{
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+}
+
 
 /* ============ VIEW SWITCHING ============ */
 function showView(id){
