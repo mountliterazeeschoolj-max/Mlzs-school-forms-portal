@@ -236,6 +236,15 @@
   .fs-deadline-row input[type=datetime-local]{border:1px solid var(--line);background:#fff;padding:7px 9px;
     font-size:13px;border-radius:3px;font-family:inherit;color:var(--ink);}
   .fs-clear-link{font-size:11.5px;color:var(--accent);cursor:pointer;text-decoration:underline;}
+  .fs-message-row{margin-top:10px;display:flex;flex-direction:column;gap:5px;}
+  .fs-message-row input[type=text]{border:1px solid var(--line);background:#fff;padding:8px 10px;
+    font-size:13px;border-radius:3px;font-family:inherit;color:var(--ink);width:100%;}
+
+  /* ---- Countdown banner shown on a form page when it has a deadline ---- */
+  .deadline-banner{margin:14px 28px 0;padding:11px 14px;background:#fdeecb;border-left:3px solid #b3821c;
+    border-radius:3px;font-size:12.5px;color:#6b4d0c;display:none;}
+  .deadline-banner.urgent{background:#f6d9d9;border-left-color:#a8342a;color:#7a231a;}
+  .deadline-banner strong{font-variant-numeric:tabular-nums;}
   .fs-modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:18px;}
 
   /* ---- Admin view ---- */
@@ -383,6 +392,7 @@
 <!-- ================= STUDENT FORM VIEW ================= -->
 <div class="sheet" id="studentFormView" style="display:none;">
   <div class="back-nav"><a onclick="showView('landingView')">← Back to Forms Portal</a></div>
+  <div class="deadline-banner" id="stuDeadlineBanner"></div>
   <div id="stuDraftBanner" class="note" style="display:none;">
     A previous unfinished draft was found for this form.
     <a onclick="applyDraft('regForm','draft_student_form','stuDraftBanner')" style="cursor:pointer;font-weight:700;text-decoration:underline;">Restore it</a>
@@ -590,6 +600,7 @@
 <!-- ================= STAFF FORM VIEW ================= -->
 <div class="sheet" id="staffFormView" style="display:none;">
   <div class="back-nav" id="stfBackNav"><a onclick="showView('landingView')">← Back to Forms Portal</a></div>
+  <div class="deadline-banner" id="stfDeadlineBanner"></div>
   <div id="stfFillNote" class="note" style="display:none;">
     You're logged in — this Staff Data Bank form hasn't been filled in yet for your account. Complete it below; your login email is locked in so you can log back in any time to view or update it.
   </div>
@@ -834,6 +845,7 @@
 <!-- ================= CLASS XI FORM VIEW ================= -->
 <div class="sheet" id="class11FormView" style="display:none;">
   <div class="back-nav"><a onclick="showView('landingView')">← Back to Forms Portal</a></div>
+  <div class="deadline-banner" id="c11DeadlineBanner"></div>
   <div id="c11DraftBanner" class="note" style="display:none;">
     A previous unfinished draft was found for this form.
     <a onclick="applyDraft('class11Form','draft_class11_form','c11DraftBanner')" style="cursor:pointer;font-weight:700;text-decoration:underline;">Restore it</a>
@@ -1655,6 +1667,10 @@
         <input type="datetime-local" class="fs-deadline-input">
         <span class="fs-clear-link" onclick="clearFsDeadline(this)">Clear</span>
       </div>
+      <div class="fs-message-row">
+        <span style="font-size:12px;color:var(--muted);">Closed message (optional):</span>
+        <input type="text" class="fs-message-input" maxlength="200" placeholder="e.g. Admissions for 2026–27 are now closed.">
+      </div>
     </div>
 
     <div class="fs-row" data-form-key="class11">
@@ -1670,6 +1686,10 @@
         <input type="datetime-local" class="fs-deadline-input">
         <span class="fs-clear-link" onclick="clearFsDeadline(this)">Clear</span>
       </div>
+      <div class="fs-message-row">
+        <span style="font-size:12px;color:var(--muted);">Closed message (optional):</span>
+        <input type="text" class="fs-message-input" maxlength="200" placeholder="e.g. Admissions for 2026–27 are now closed.">
+      </div>
     </div>
 
     <div class="fs-row" data-form-key="staff">
@@ -1684,6 +1704,10 @@
         <span style="font-size:12px;color:var(--muted);">Deadline (optional):</span>
         <input type="datetime-local" class="fs-deadline-input">
         <span class="fs-clear-link" onclick="clearFsDeadline(this)">Clear</span>
+      </div>
+      <div class="fs-message-row">
+        <span style="font-size:12px;color:var(--muted);">Closed message (optional):</span>
+        <input type="text" class="fs-message-input" maxlength="200" placeholder="e.g. Admissions for 2026–27 are now closed.">
       </div>
     </div>
 
@@ -1742,32 +1766,82 @@ function getFormClosedState(key){
   return { closed:false, deadline: s.deadline || null };
 }
 
-/* Greys out / relabels the landing cards for any form that's closed or past its deadline. */
+/* Formats the time remaining until an ISO deadline as a compact, live countdown string
+   ("2d 04h 12m" while there's more than a day left, "04:12:33" inside the final day).
+   Returns null once the deadline has passed. */
+function formatCountdown(deadlineIso){
+  const ms = new Date(deadlineIso).getTime() - Date.now();
+  if(ms <= 0) return null;
+  const totalSeconds = Math.floor(ms / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const pad = n => String(n).padStart(2, '0');
+  if(days > 0) return `${days}d ${pad(hours)}h ${pad(minutes)}m`;
+  return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+}
+
+/* Greys out / relabels the landing cards for any form that's closed or past its deadline,
+   and shows a live countdown badge for forms that still have a deadline ahead. */
 function renderLandingFormState(){
   const cardIds = { students:'cardStudents', class11:'cardClass11', staff:'cardStaff' };
   Object.keys(cardIds).forEach(key => {
     const card = document.getElementById(cardIds[key]);
     if(!card) return;
-    const existingBadge = card.querySelector('.card-badge');
-    if(existingBadge) existingBadge.remove();
     const state = getFormClosedState(key);
     if(state.closed){
       card.classList.add('form-closed');
-      const badge = document.createElement('div');
-      badge.className = 'card-badge closed';
+      let badge = card.querySelector('.card-badge');
+      if(!badge || !badge.classList.contains('closed')){
+        if(badge) badge.remove();
+        badge = document.createElement('div');
+        badge.className = 'card-badge closed';
+        card.appendChild(badge);
+      }
       badge.textContent = 'Closed';
-      card.appendChild(badge);
     } else {
       card.classList.remove('form-closed');
+      let badge = card.querySelector('.card-badge');
       if(state.deadline){
-        const badge = document.createElement('div');
-        badge.className = 'card-badge deadline';
-        badge.textContent = 'Closes ' + new Date(state.deadline).toLocaleString([], {dateStyle:'medium', timeStyle:'short'});
-        card.appendChild(badge);
+        const countdown = formatCountdown(state.deadline);
+        if(!badge || !badge.classList.contains('deadline')){
+          if(badge) badge.remove();
+          badge = document.createElement('div');
+          badge.className = 'card-badge deadline';
+          card.appendChild(badge);
+        }
+        badge.textContent = countdown ? ('Closes in ' + countdown) : 'Closing…';
+      } else if(badge){
+        badge.remove();
       }
     }
   });
+  updateDeadlineBanners();
 }
+
+/* Shows/updates the live countdown banner at the top of a form page, if that form has a deadline. */
+function updateDeadlineBanners(){
+  const banners = { students:'stuDeadlineBanner', class11:'c11DeadlineBanner', staff:'stfDeadlineBanner' };
+  Object.keys(banners).forEach(key => {
+    const el = document.getElementById(banners[key]);
+    if(!el) return;
+    const state = getFormClosedState(key);
+    if(state.closed || !state.deadline){
+      el.style.display = 'none';
+      return;
+    }
+    const countdown = formatCountdown(state.deadline);
+    if(!countdown){ el.style.display = 'none'; return; }
+    const msLeft = new Date(state.deadline).getTime() - Date.now();
+    el.classList.toggle('urgent', msLeft < 24 * 60 * 60 * 1000);
+    el.innerHTML = `⏳ This form closes in <strong>${countdown}</strong> (on ${new Date(state.deadline).toLocaleString([], {dateStyle:'medium', timeStyle:'short'})}).`;
+    el.style.display = 'block';
+  });
+}
+
+/* Keeps the landing badges and in-form banners ticking without a page refresh. */
+setInterval(renderLandingFormState, 1000);
 
 function goToStudentForm(){
   const state = getFormClosedState('students');
@@ -1811,6 +1885,7 @@ function openFormSettings(){
     row.querySelector('.fs-open-input').checked = s.is_open !== false;
     const deadlineInput = row.querySelector('.fs-deadline-input');
     deadlineInput.value = s.deadline ? toDatetimeLocalValue(s.deadline) : '';
+    row.querySelector('.fs-message-input').value = s.closed_message || '';
   });
   document.getElementById('formSettingsModal').style.display = 'flex';
 }
@@ -1842,10 +1917,12 @@ async function saveFormSettings(){
       const key = row.getAttribute('data-form-key');
       const isOpen = row.querySelector('.fs-open-input').checked;
       const deadlineVal = row.querySelector('.fs-deadline-input').value;
+      const messageVal = row.querySelector('.fs-message-input').value.trim();
       return {
         form_key: key,
         is_open: isOpen,
-        deadline: deadlineVal ? new Date(deadlineVal).toISOString() : null
+        deadline: deadlineVal ? new Date(deadlineVal).toISOString() : null,
+        closed_message: messageVal ? messageVal : null
       };
     });
     const { error } = await supabaseClient.from('form_settings').upsert(rows, { onConflict: 'form_key' });
