@@ -212,6 +212,32 @@
   .card p{margin:0;font-size:12.5px;color:var(--muted);}
   @media (max-width:640px){.cards{grid-template-columns:1fr;}}
 
+  /* ---- Form open/closed state (landing cards) ---- */
+  .card.form-closed{cursor:not-allowed;background:#f2f0ee;opacity:0.72;}
+  .card.form-closed:hover{transform:none;border-color:var(--line);background:#f2f0ee;}
+  .card-badge{display:inline-block;margin-top:8px;font-size:10.5px;font-weight:700;letter-spacing:0.4px;
+    text-transform:uppercase;padding:3px 9px;border-radius:20px;}
+  .card-badge.closed{background:#f6d9d9;color:#8a2c22;}
+  .card-badge.deadline{background:#fdeecb;color:#8a5a10;}
+
+  /* ---- Admin: Form Settings modal ---- */
+  .fs-modal{position:fixed;inset:0;background:rgba(20,30,40,0.45);display:flex;align-items:center;
+    justify-content:center;z-index:200;padding:16px;}
+  .fs-modal-inner{background:var(--paper);border-radius:10px;max-width:560px;width:100%;
+    max-height:88vh;overflow-y:auto;padding:24px 26px 20px;box-shadow:0 12px 34px rgba(0,0,0,0.25);}
+  .fs-modal-inner h2{margin:0 0 4px;font-size:19px;color:var(--ink);}
+  .fs-modal-sub{margin:0 0 18px;font-size:12.5px;color:var(--muted);line-height:1.5;}
+  .fs-row{border:1px solid var(--line);border-radius:6px;padding:14px 16px;margin-bottom:12px;background:var(--field);}
+  .fs-row-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;}
+  .fs-row-head .fs-name{font-size:14px;font-weight:700;color:var(--ink);}
+  .fs-toggle{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--muted);}
+  .fs-toggle input{width:38px;height:20px;accent-color:var(--accent);cursor:pointer;}
+  .fs-deadline-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .fs-deadline-row input[type=datetime-local]{border:1px solid var(--line);background:#fff;padding:7px 9px;
+    font-size:13px;border-radius:3px;font-family:inherit;color:var(--ink);}
+  .fs-clear-link{font-size:11.5px;color:var(--accent);cursor:pointer;text-decoration:underline;}
+  .fs-modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:18px;}
+
   /* ---- Admin view ---- */
   .wrap{max-width:1300px;margin:0 auto;}
   .admin-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:18px;}
@@ -336,17 +362,17 @@
     <div class="session">Please select a form to continue</div>
   </div>
   <div class="cards">
-    <div class="card" onclick="showView('studentFormView')">
+    <div class="card" id="cardStudents" onclick="goToStudentForm()">
       <div class="icon">🎓</div>
       <h3>Class IX Registration</h3>
       <p>CBSE Board Registration — Academic Session 2026–27</p>
     </div>
-    <div class="card" onclick="showView('class11FormView')">
+    <div class="card" id="cardClass11" onclick="goToClass11Form()">
       <div class="icon">📘</div>
       <h3>Class XI Registration</h3>
       <p>CBSE Board Registration — Academic Session 2026–27</p>
     </div>
-    <div class="card" onclick="openStaffLogin()">
+    <div class="card" id="cardStaff" onclick="goToStaffPortal()">
       <div class="icon">🧑‍🏫</div>
       <h3>Staff Data Bank</h3>
       <p>Log in or register, then fill in &amp; update your staff record</p>
@@ -1590,6 +1616,7 @@
       <button class="btn-secondary" onclick="loadAll()">Refresh</button>
       <button class="btn-primary" onclick="exportAllCSV()">Export All to Excel (CSV)</button>
       <button class="btn-primary" id="exportFilesBtn" onclick="exportAllWithFiles()">Export All Data + Files (ZIP)</button>
+      <button class="btn-secondary" onclick="openFormSettings()">Form Settings</button>
       <button class="btn-secondary" onclick="openAdminChangePassword()">Change Password</button>
       <button class="btn-secondary" onclick="adminLogout()">Log Out</button>
     </div>
@@ -1609,6 +1636,66 @@
   <div id="pageControls" style="display:flex;align-items:center;justify-content:center;gap:14px;padding:14px 0;"></div>
 </div>
 
+<!-- ================= ADMIN: FORM SETTINGS MODAL ================= -->
+<div class="fs-modal" id="formSettingsModal" style="display:none;">
+  <div class="fs-modal-inner">
+    <h2>Form Settings</h2>
+    <p class="fs-modal-sub">Open or close each registration form, and optionally set a deadline after which it closes automatically. Closed forms show a "Closed" message to visitors and can no longer be submitted.</p>
+
+    <div class="fs-row" data-form-key="students">
+      <div class="fs-row-head">
+        <span class="fs-name">Class IX Registration</span>
+        <label class="fs-toggle">
+          <span class="fs-toggle-label">Open</span>
+          <input type="checkbox" class="fs-open-input" checked>
+        </label>
+      </div>
+      <div class="fs-deadline-row">
+        <span style="font-size:12px;color:var(--muted);">Deadline (optional):</span>
+        <input type="datetime-local" class="fs-deadline-input">
+        <span class="fs-clear-link" onclick="clearFsDeadline(this)">Clear</span>
+      </div>
+    </div>
+
+    <div class="fs-row" data-form-key="class11">
+      <div class="fs-row-head">
+        <span class="fs-name">Class XI Registration</span>
+        <label class="fs-toggle">
+          <span class="fs-toggle-label">Open</span>
+          <input type="checkbox" class="fs-open-input" checked>
+        </label>
+      </div>
+      <div class="fs-deadline-row">
+        <span style="font-size:12px;color:var(--muted);">Deadline (optional):</span>
+        <input type="datetime-local" class="fs-deadline-input">
+        <span class="fs-clear-link" onclick="clearFsDeadline(this)">Clear</span>
+      </div>
+    </div>
+
+    <div class="fs-row" data-form-key="staff">
+      <div class="fs-row-head">
+        <span class="fs-name">Staff Data Bank</span>
+        <label class="fs-toggle">
+          <span class="fs-toggle-label">Open</span>
+          <input type="checkbox" class="fs-open-input" checked>
+        </label>
+      </div>
+      <div class="fs-deadline-row">
+        <span style="font-size:12px;color:var(--muted);">Deadline (optional):</span>
+        <input type="datetime-local" class="fs-deadline-input">
+        <span class="fs-clear-link" onclick="clearFsDeadline(this)">Clear</span>
+      </div>
+    </div>
+
+    <div class="note" id="formSettingsNote" style="display:none;"></div>
+
+    <div class="fs-modal-actions">
+      <button class="btn-secondary" onclick="closeFormSettings()">Cancel</button>
+      <button class="btn-primary" id="fsSaveBtn" onclick="saveFormSettings()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
 <div class="site-footer">© <span id="footerYear"></span> Mount Litera Zee School, Jhansi. All rights reserved. &nbsp;|&nbsp; Developed by <span class="credit">Yash Singh</span></div>
 
 <script>
@@ -1622,6 +1709,162 @@ const SUPABASE_URL = "https://iabzcjgudcrmylidtetl.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhYnpjamd1ZGNybXlsaWR0ZXRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3OTUxMzQsImV4cCI6MjEwMTM3MTEzNH0.gCB0af6GZ7zKVxkH1-egfrI87Bk3s4NwrxJZhX_mIc8";
 const DOCS_BUCKET = "school-documents";
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+/* ============ FORM OPEN/CLOSE + DEADLINE SETTINGS ============
+   Backed by the public.form_settings table (form_key, is_open, deadline, closed_message).
+   Anyone can read it; only admins (is_admin()) can write to it. */
+const FORM_LABELS = { students: 'Class IX Registration', class11: 'Class XI Registration', staff: 'Staff Data Bank' };
+let formSettingsCache = {}; // form_key -> { is_open, deadline, closed_message }
+
+/* Loads current settings for all three forms and reflects them on the landing cards. */
+async function loadFormSettings(){
+  try{
+    const { data, error } = await supabaseClient.from('form_settings').select('*');
+    if(error) throw error;
+    formSettingsCache = {};
+    (data || []).forEach(row => { formSettingsCache[row.form_key] = row; });
+  } catch(err){
+    console.error('Could not load form settings:', err);
+  }
+  renderLandingFormState();
+}
+
+/* Returns { closed, reason } for a form key based on the (cached) settings. */
+function getFormClosedState(key){
+  const s = formSettingsCache[key];
+  if(!s) return { closed:false };
+  if(s.is_open === false){
+    return { closed:true, reason: s.closed_message || 'This form is currently closed for new submissions.' };
+  }
+  if(s.deadline && new Date(s.deadline).getTime() <= Date.now()){
+    return { closed:true, reason: s.closed_message || ('The deadline for this form was ' + new Date(s.deadline).toLocaleString() + '.') };
+  }
+  return { closed:false, deadline: s.deadline || null };
+}
+
+/* Greys out / relabels the landing cards for any form that's closed or past its deadline. */
+function renderLandingFormState(){
+  const cardIds = { students:'cardStudents', class11:'cardClass11', staff:'cardStaff' };
+  Object.keys(cardIds).forEach(key => {
+    const card = document.getElementById(cardIds[key]);
+    if(!card) return;
+    const existingBadge = card.querySelector('.card-badge');
+    if(existingBadge) existingBadge.remove();
+    const state = getFormClosedState(key);
+    if(state.closed){
+      card.classList.add('form-closed');
+      const badge = document.createElement('div');
+      badge.className = 'card-badge closed';
+      badge.textContent = 'Closed';
+      card.appendChild(badge);
+    } else {
+      card.classList.remove('form-closed');
+      if(state.deadline){
+        const badge = document.createElement('div');
+        badge.className = 'card-badge deadline';
+        badge.textContent = 'Closes ' + new Date(state.deadline).toLocaleString([], {dateStyle:'medium', timeStyle:'short'});
+        card.appendChild(badge);
+      }
+    }
+  });
+}
+
+function goToStudentForm(){
+  const state = getFormClosedState('students');
+  if(state.closed){ alert(state.reason); return; }
+  showView('studentFormView');
+}
+function goToClass11Form(){
+  const state = getFormClosedState('class11');
+  if(state.closed){ alert(state.reason); return; }
+  showView('class11FormView');
+}
+function goToStaffPortal(){
+  const state = getFormClosedState('staff');
+  if(state.closed){ alert(state.reason); return; }
+  openStaffLogin();
+}
+
+/* Re-checks a form's status live against the database (not just the cache) right before a
+   submission is saved, and shows the given status element if it's closed. Returns true if OK to proceed. */
+async function checkFormOpenOrWarn(key, statusElId){
+  try{
+    const { data, error } = await supabaseClient.from('form_settings').select('*').eq('form_key', key).maybeSingle();
+    if(!error && data) formSettingsCache[key] = data;
+  } catch(err){ /* if this check fails, fall back to the cached value below */ }
+  const state = getFormClosedState(key);
+  if(state.closed){
+    const el = document.getElementById(statusElId);
+    if(el){ el.textContent = state.reason; el.classList.add('visible'); el.scrollIntoView({behavior:'smooth', block:'nearest'}); }
+    else alert(state.reason);
+    return false;
+  }
+  return true;
+}
+
+/* ---- Admin: Form Settings modal ---- */
+function openFormSettings(){
+  document.getElementById('formSettingsNote').style.display = 'none';
+  document.querySelectorAll('#formSettingsModal .fs-row').forEach(row => {
+    const key = row.getAttribute('data-form-key');
+    const s = formSettingsCache[key] || { is_open:true, deadline:null };
+    row.querySelector('.fs-open-input').checked = s.is_open !== false;
+    const deadlineInput = row.querySelector('.fs-deadline-input');
+    deadlineInput.value = s.deadline ? toDatetimeLocalValue(s.deadline) : '';
+  });
+  document.getElementById('formSettingsModal').style.display = 'flex';
+}
+
+function closeFormSettings(){
+  document.getElementById('formSettingsModal').style.display = 'none';
+}
+
+function clearFsDeadline(linkEl){
+  linkEl.closest('.fs-deadline-row').querySelector('.fs-deadline-input').value = '';
+}
+
+/* Converts an ISO timestamp into the local value a <input type=datetime-local> expects. */
+function toDatetimeLocalValue(iso){
+  const d = new Date(iso);
+  if(isNaN(d.getTime())) return '';
+  const pad = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+async function saveFormSettings(){
+  const btn = document.getElementById('fsSaveBtn');
+  const noteEl = document.getElementById('formSettingsNote');
+  btn.disabled = true;
+  const originalText = btn.textContent;
+  btn.textContent = 'Saving...';
+  try{
+    const rows = Array.from(document.querySelectorAll('#formSettingsModal .fs-row')).map(row => {
+      const key = row.getAttribute('data-form-key');
+      const isOpen = row.querySelector('.fs-open-input').checked;
+      const deadlineVal = row.querySelector('.fs-deadline-input').value;
+      return {
+        form_key: key,
+        is_open: isOpen,
+        deadline: deadlineVal ? new Date(deadlineVal).toISOString() : null
+      };
+    });
+    const { error } = await supabaseClient.from('form_settings').upsert(rows, { onConflict: 'form_key' });
+    if(error) throw error;
+    await loadFormSettings();
+    noteEl.textContent = 'Saved. Changes apply immediately for anyone opening a form.';
+    noteEl.className = 'note visible';
+    noteEl.style.display = 'block';
+    setTimeout(() => { closeFormSettings(); }, 1100);
+  } catch(err){
+    console.error(err);
+    noteEl.textContent = 'Could not save: ' + errMsg(err);
+    noteEl.className = 'note';
+    noteEl.style.display = 'block';
+  } finally{
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+}
 
 /* ============ VIEW SWITCHING ============ */
 function showView(id){
@@ -1766,6 +2009,7 @@ async function checkExistingSession(){
   } catch(err){ /* not logged in, stay on landing view */ }
 }
 checkExistingSession();
+loadFormSettings();
 
 function adminLogout(){
   supabaseClient.auth.signOut();
@@ -2068,6 +2312,7 @@ function showStuStatus(msg){
 }
 
 async function submitStudentRegistration(){
+  if(!(await checkFormOpenOrWarn('students', 'stuStatusMsg'))) return;
   const obj = collectStudentData();
   const errors = [];
   if(!obj.candidateName || !obj.candidateName.trim()) errors.push('Candidate Name is required.');
@@ -2187,6 +2432,10 @@ function downloadStudentCSV(){
 }
 
 function submitStudentEmail(){
+  {
+    const state = getFormClosedState('students');
+    if(state.closed){ showStuStatus(state.reason); return; }
+  }
   const obj = collectStudentData();
   const subjects = Array.isArray(obj.subjects) ? obj.subjects.join(', ') : (obj.subjects || 'None selected');
   const parts = [];
@@ -2269,6 +2518,7 @@ function showC11Status(msg){
 }
 
 async function submitClass11Registration(){
+  if(!(await checkFormOpenOrWarn('class11', 'c11StatusMsg'))) return;
   const obj = collectClass11Data();
   const errors = [];
   if(!obj.candidateName || !obj.candidateName.trim()) errors.push('Candidate Name is required.');
@@ -2377,6 +2627,10 @@ function downloadClass11CSV(){
 }
 
 function submitClass11Email(){
+  {
+    const state = getFormClosedState('class11');
+    if(state.closed){ showC11Status(state.reason); return; }
+  }
   const obj = collectClass11Data();
   const bodyLines = [
     'CLASS XI CBSE REGISTRATION - 2026-27','Mount Litera Zee School, Jhansi','',
@@ -2515,6 +2769,7 @@ function showStfStatus(msg){
 }
 
 async function submitStaffData(){
+  if(!(await checkFormOpenOrWarn('staff', 'stfStatusMsg'))) return;
   const obj = collectStaffData();
   const errors = [];
   if(!obj.fullName || !obj.fullName.trim()) errors.push('Full Name is required.');
@@ -3269,6 +3524,10 @@ function downloadStaffCSV(){
 }
 
 function submitStaffEmail(){
+  {
+    const state = getFormClosedState('staff');
+    if(state.closed){ showStfStatus(state.reason); return; }
+  }
   const obj = collectStaffData();
   const autoMatch = (!obj.oasisId || !obj.oasisId.trim()) ? findOasisIdMatch(obj.fullName) : null;
   const oasisIdLine = obj.oasisId || (autoMatch ? autoMatch.oasisId + ' (auto-matched from Teacher Data Bank — please verify with HR)' : '');
