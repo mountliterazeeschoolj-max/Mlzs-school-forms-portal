@@ -5002,12 +5002,48 @@ async function saveBulkFeePayments(){
 
 function openFeeStructureDialog(){
   const rows = [...feeStructure.values()].map(r => `<tr><td>${escapeHtml(r.class_section)}</td>${['q1_fee','q2_fee','q3_fee','q4_fee'].map(k => `<td><input id="feeStructure_${r.class_section}_${k}" type="number" min="0" step="0.01" value="${Number(r[k] || 0)}"></td>`).join('')}</tr>`).join('');
-  openFeeDialog('Edit Fee Structure', `<p class="fs-modal-sub">Changes apply to future bulk student imports. Existing students retain their current fees until you edit them individually. Bus fee remains a per-student amount.</p><div class="table-container"><table><thead><tr><th>Class</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th></tr></thead><tbody>${rows}</tbody></table></div><div class="actions"><button class="btn-secondary" onclick="closeFeeDialog()">Cancel</button><button class="btn-primary" onclick="saveFeeStructure()">Save Structure</button></div>`);
+  openFeeDialog('Edit Fee Structure', `<p class="fs-modal-sub">Bus fee always remains a per-student amount and is never touched here.</p><div class="table-container"><table><thead><tr><th>Class</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <label style="display:flex;align-items:flex-start;gap:9px;margin:16px 0 4px;font-size:13px;font-weight:600;color:var(--ink);cursor:pointer;">
+      <input type="checkbox" id="feeStructureApplyExisting" checked style="width:16px;height:16px;margin-top:1px;accent-color:var(--accent);flex-shrink:0;">
+      <span>Also update existing students in these classes to match the new fee amounts<br><span style="font-weight:400;color:var(--muted);font-size:11.5px;">A quarter is skipped for a student only if they've already paid more than the new amount — those are listed afterwards so you can review them.</span></span>
+    </label>
+    <div class="actions"><button class="btn-secondary" onclick="closeFeeDialog()">Cancel</button><button class="btn-primary" onclick="saveFeeStructure()">Save Structure</button></div>`);
 }
 async function saveFeeStructure(){
+  const applyExisting = document.getElementById('feeStructureApplyExisting').checked;
   const updates = [...feeStructure.values()].map(r => ({class_section:r.class_section,q1_fee:Number(document.getElementById(`feeStructure_${r.class_section}_q1_fee`).value||0),q2_fee:Number(document.getElementById(`feeStructure_${r.class_section}_q2_fee`).value||0),q3_fee:Number(document.getElementById(`feeStructure_${r.class_section}_q3_fee`).value||0),q4_fee:Number(document.getElementById(`feeStructure_${r.class_section}_q4_fee`).value||0)}));
   const { error } = await supabaseClient.from('fee_structure').upsert(updates,{onConflict:'class_section'}); if(error){ alert('Could not save fee structure: '+errMsg(error)); return; }
+  const syncMsg = applyExisting ? await syncFeeStructureToStudents(updates) : '';
   closeFeeDialog(); await loadFeePortal();
+  if(syncMsg) alert(syncMsg);
+}
+
+/* Propagates newly-saved fee_structure amounts onto existing student_fees rows for the
+   matching class_section. A quarter is only ever raised/lowered down to what's already been
+   paid (never below it) so a due amount can never go negative; anything blocked that way is
+   reported back to the admin instead of being silently skipped. */
+async function syncFeeStructureToStudents(updates){
+  const byClass = new Map(updates.map(u => [u.class_section, u]));
+  const jobs = []; const held = [];
+  feeRecords.forEach(r => {
+    const upd = byClass.get(r.class_section);
+    if(!upd) return;
+    const patch = {};
+    ['q1','q2','q3','q4'].forEach(q => {
+      const newFee = Number(upd[q + '_fee'] || 0);
+      const paid = Number(r[q + '_paid'] || 0);
+      if(newFee === Number(r[q + '_fee'] || 0)) return;
+      if(newFee < paid){ held.push(`${r.reg_no} - ${r.student_name}: ${q.toUpperCase()} already has ${feeMoney(paid)} paid, above the new fee of ${feeMoney(newFee)}`); return; }
+      patch[q + '_fee'] = newFee;
+    });
+    if(Object.keys(patch).length) jobs.push({ id:r.id, patch });
+  });
+  let updated = 0;
+  for(const { id, patch } of jobs){
+    const { error } = await supabaseClient.from('student_fees').update(patch).eq('id', id);
+    if(error) held.push(`Student id ${id}: ${errMsg(error)}`); else updated++;
+  }
+  return `Fee structure saved. Synced to ${updated} existing student record(s).${held.length ? '\nNeeds manual review (fee already paid exceeds new amount):\n' + held.join('\n') : ''}`;
 }
 
 function exportFeeReport(component){
