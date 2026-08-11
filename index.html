@@ -4674,6 +4674,10 @@ const feeMoney = value => '₹' + Number(value || 0).toLocaleString('en-IN', {ma
 const feeTotal = r => Number(r.q1_fee || 0) + Number(r.q2_fee || 0) + Number(r.q3_fee || 0) + Number(r.q4_fee || 0) + Number(r.bus_fee || 0);
 const feePaid = r => Number(r.q1_paid || 0) + Number(r.q2_paid || 0) + Number(r.q3_paid || 0) + Number(r.q4_paid || 0) + Number(r.bus_fee_paid || 0);
 const feeDue = r => Math.max(0, feeTotal(r) - feePaid(r));
+function feeComponentDue(r, component){
+  const key = component === 'BUS' ? 'bus' : component.toLowerCase();
+  return Math.max(0, Number(r[key + '_fee'] || 0) - Number(r[key + '_paid'] || 0));
+}
 
 async function loadFeePortal(){
   const area = document.getElementById('feeTableArea');
@@ -4727,7 +4731,7 @@ function renderFeeStudentDashboard(){
   const block = (label, fee, paid) => `<div>${label}<strong>${feeMoney(Math.max(0, fee - paid))}</strong><small>Paid ${feeMoney(paid)} · Due ${feeMoney(Math.max(0, fee-paid))}</small></div>`;
   area.innerHTML = `<h2>${escapeHtml(r.student_name)} <span style="font-weight:400;color:var(--muted);font-size:13px;">(${escapeHtml(r.reg_no)} · ${escapeHtml(r.class_section)})</span></h2>
     <div class="fee-summary">${block('Q1',Number(r.q1_fee||0),Number(r.q1_paid||0))}${block('Q2',Number(r.q2_fee||0),Number(r.q2_paid||0))}${block('Q3',Number(r.q3_fee||0),Number(r.q3_paid||0))}${block('Q4',Number(r.q4_fee||0),Number(r.q4_paid||0))}${block('Bus Fee',Number(r.bus_fee||0),Number(r.bus_fee_paid||0))}<div>Last Year Due<strong>${feeMoney(r.prev_session_fee)}</strong><small>Previous-session balance</small></div><div>Total<strong>${feeMoney(feeDue(r))}</strong><small>Due after ${feeMoney(feePaid(r))} paid</small></div></div>
-    <div class="fee-actions" style="margin-top:12px;"><button class="btn-primary" onclick="openFeePaymentDialog(${r.id})">Record Payment</button><button class="btn-secondary" onclick="openFeeStudentDialog(${r.id})">Edit Student</button></div>`;
+    <div class="fee-actions" style="margin-top:12px;"><button class="btn-primary" onclick="openFeePaymentDialog(${r.id})">Record Payment</button><button class="btn-secondary" onclick="openFeePaymentHistory(${r.id})">Payment History</button><button class="btn-secondary" onclick="openFeeStudentDialog(${r.id})">Edit Student</button></div>`;
 }
 
 function openFeeDialog(title, content){
@@ -4760,9 +4764,10 @@ async function saveFeeStudent(id){
 
 function openFeePaymentDialog(id){
   const r = feeRecords.find(x => x.id === id); if(!r) return;
+  const options = ['Q1','Q2','Q3','Q4','BUS'].map(component => `<option value="${component}">${component === 'BUS' ? 'Bus Fee' : component} (due ${feeMoney(feeComponentDue(r, component))})</option>`).join('');
   openFeeDialog('Record Payment — ' + escapeHtml(r.student_name), `<div class="fee-form-grid">
-    <div class="field"><label>Fee Component</label><select id="fp_component"><option value="Q1">Q1</option><option value="Q2">Q2</option><option value="Q3">Q3</option><option value="Q4">Q4</option><option value="BUS">Bus Fee</option></select></div>
-    <div class="field"><label>Amount</label><input id="fp_amount" type="number" min="1" step="0.01"></div>
+    <div class="field"><label>Fee Component</label><select id="fp_component">${options}</select></div>
+    <div class="field"><label>Amount</label><input id="fp_amount" type="number" min="0.01" step="0.01"></div>
     <div class="field"><label>Payment Date</label><input id="fp_date" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
     <div class="field"><label>Mode</label><input id="fp_mode" placeholder="Cash / UPI / Bank"></div>
     <div class="field"><label>Receipt No.</label><input id="fp_receipt"></div><div class="field"><label>Remarks</label><input id="fp_remarks"></div>
@@ -4770,10 +4775,26 @@ function openFeePaymentDialog(id){
 }
 
 async function saveFeePayment(id){
+  const record = feeRecords.find(x => x.id === id);
+  const component = document.getElementById('fp_component').value;
+  const amount = Number(document.getElementById('fp_amount').value);
+  const remaining = feeComponentDue(record, component);
+  if(!(amount > 0)){ alert('Enter a payment amount greater than zero.'); return; }
+  if(amount > remaining){ alert(`Amount exceeds the remaining ${component === 'BUS' ? 'Bus Fee' : component} due of ${feeMoney(remaining)}.`); return; }
   const { data: user } = await supabaseClient.auth.getUser();
-  const { error } = await supabaseClient.rpc('record_fee_payment', { p_student_fee_id:id, p_component:document.getElementById('fp_component').value, p_amount:Number(document.getElementById('fp_amount').value), p_payment_date:document.getElementById('fp_date').value, p_mode:document.getElementById('fp_mode').value || null, p_receipt_no:document.getElementById('fp_receipt').value || null, p_remarks:document.getElementById('fp_remarks').value || null, p_recorded_by:user?.user?.email || null });
+  const { error } = await supabaseClient.rpc('record_fee_payment', { p_student_fee_id:id, p_component:component, p_amount:amount, p_payment_date:document.getElementById('fp_date').value, p_mode:document.getElementById('fp_mode').value || null, p_receipt_no:document.getElementById('fp_receipt').value || null, p_remarks:document.getElementById('fp_remarks').value || null, p_recorded_by:user?.user?.email || null });
   if(error){ alert('Could not record payment: ' + errMsg(error)); return; }
   closeFeeDialog(); await loadFeePortal();
+}
+
+async function openFeePaymentHistory(id){
+  const record = feeRecords.find(x => x.id === id); if(!record) return;
+  openFeeDialog('Payment History — ' + escapeHtml(record.student_name), '<div class="loading">Loading payments...</div>');
+  const dialog = document.querySelector('#feeDialog .fee-dialog-inner');
+  const { data, error } = await supabaseClient.from('fee_payments').select('*').eq('student_fee_id', id).order('payment_date', {ascending:false}).order('id', {ascending:false});
+  if(error){ dialog.innerHTML += '<div class="empty">Could not load payment history: ' + escapeHtml(errMsg(error)) + '</div>'; return; }
+  const table = (data || []).length ? `<table><thead><tr><th>Date</th><th>Component</th><th>Amount</th><th>Mode</th><th>Receipt</th><th>Remarks</th></tr></thead><tbody>${data.map(p => `<tr><td>${escapeHtml(p.payment_date || '')}</td><td>${escapeHtml(p.component)}</td><td>${feeMoney(p.amount)}</td><td>${escapeHtml(p.mode || '—')}</td><td>${escapeHtml(p.receipt_no || '—')}</td><td>${escapeHtml(p.remarks || '—')}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">No payments have been recorded for this student.</div>';
+  dialog.innerHTML = `<h2>Payment History — ${escapeHtml(record.student_name)}</h2><div class="table-container">${table}</div><div class="actions"><button class="btn-secondary" onclick="closeFeeDialog()">Close</button></div>`;
 }
 
 async function deleteFeeStudent(id){
@@ -4853,12 +4874,16 @@ async function saveBulkFeePayments(){
   const { headers, rows } = parseFeeCsv(document.getElementById('bulkPaymentsFile_text').value);
   if(!rows.length || ['admission no','component','amount'].some(h => !headers.includes(h))){ alert('CSV must include Admission No, Component, Amount.'); return; }
   const byReg = new Map(feeRecords.map(r => [String(r.reg_no).trim(), r]));
+  const remaining = new Map();
   const { data: user } = await supabaseClient.auth.getUser(); let saved = 0; const skipped = [];
   for(let i=0;i<rows.length;i++){
     const row = rows[i], reg = valueAt(headers,row,['admission no','admission no.','reg no','reg. no']), component = valueAt(headers,row,['component']).toUpperCase(), amount = Number(valueAt(headers,row,['amount'])); const record = byReg.get(reg);
     if(!record || !['Q1','Q2','Q3','Q4','BUS'].includes(component) || !(amount > 0)){ skipped.push(`Row ${i+2}: invalid admission no., component, or amount`); continue; }
+    const remainingKey = `${record.id}:${component}`;
+    const available = remaining.has(remainingKey) ? remaining.get(remainingKey) : feeComponentDue(record, component);
+    if(amount > available){ skipped.push(`Row ${i+2}: amount exceeds ${component} due of ${feeMoney(available)}`); continue; }
     const { error } = await supabaseClient.rpc('record_fee_payment',{p_student_fee_id:record.id,p_component:component,p_amount:amount,p_payment_date:normaliseFeeDate(valueAt(headers,row,['date','payment date'])) || new Date().toISOString().slice(0,10),p_mode:valueAt(headers,row,['mode']) || null,p_receipt_no:valueAt(headers,row,['receipt no','receipt number']) || null,p_remarks:valueAt(headers,row,['remarks']) || null,p_recorded_by:user?.user?.email || null});
-    if(error) skipped.push(`Row ${i+2}: ${errMsg(error)}`); else saved++;
+    if(error) skipped.push(`Row ${i+2}: ${errMsg(error)}`); else { saved++; remaining.set(remainingKey, available - amount); }
   }
   closeFeeDialog(); await loadFeePortal(); alert(`Updated ${saved} payment(s).${skipped.length ? '\nSkipped:\n' + skipped.join('\n') : ''}`);
 }
