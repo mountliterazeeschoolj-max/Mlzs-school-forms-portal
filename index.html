@@ -1741,6 +1741,17 @@
       <button class="btn-secondary" onclick="loadFeePortal()">Refresh</button>
     </div>
     <div class="fee-kpis" id="feeKpis"></div>
+    <div class="fee-panel" id="feeOnlineReport">
+      <h2>Online Fee Report</h2>
+      <div class="fee-actions">
+        <select id="feeOnlineQuarter" onchange="renderOnlineFeeReport()"><option value="FULL">Full Year</option><option value="Q1">Q1</option><option value="Q2">Q2</option><option value="Q3">Q3</option><option value="Q4">Q4</option><option value="BUS">Bus Fee</option></select>
+        <select id="feeOnlineStatus" onchange="renderOnlineFeeReport()"><option value="ALL">All Students</option><option value="PAID">Paid</option><option value="UNPAID">Unpaid / Due</option></select>
+        <select id="feeOnlineClass" onchange="updateFeeOnlineSections()"><option value="ALL">All Classes</option></select>
+        <select id="feeOnlineSection" onchange="renderOnlineFeeReport()"><option value="ALL">All Sections</option></select>
+        <button class="btn-secondary" onclick="exportOnlineFeeReport()">Export This Report</button>
+      </div>
+      <div id="feeOnlineReportArea"><div class="loading">Loading report...</div></div>
+    </div>
     <div class="fee-panel" id="feeStudentDashboard"><h2>Fee Dashboard</h2><div class="empty">Select a student to view the Sheet 3-style fee summary.</div></div>
     <div class="table-container"><div id="feeTableArea"><div class="loading">Loading fee records...</div></div></div>
   </div>
@@ -4693,6 +4704,8 @@ async function loadFeePortal(){
     feeStructure = new Map((structureRes.data || []).map(row => [row.class_section, row]));
     feeRecords = data || [];
     renderFeeKpis();
+    populateFeeOnlineClasses();
+    renderOnlineFeeReport();
     renderFeeTable();
     if(selectedFeeRecord){ selectedFeeRecord = feeRecords.find(r => r.id === selectedFeeRecord.id) || null; }
     renderFeeStudentDashboard();
@@ -4710,6 +4723,63 @@ function renderFeeKpis(){
     <div class="fee-kpi"><div class="label">Total Fees</div><div class="value">${feeMoney(total)}</div></div>
     <div class="fee-kpi"><div class="label">Total Paid</div><div class="value">${feeMoney(paid)}</div></div>
     <div class="fee-kpi due"><div class="label">Total Due</div><div class="value">${feeMoney(due)}</div></div>`;
+}
+
+function splitClassSection(value){
+  const text = String(value || '').trim();
+  const match = /^(.*?)\s*\((.*?)\)\s*$/.exec(text);
+  return match ? {className:match[1].trim(), section:match[2].trim()} : {className:text, section:''};
+}
+function populateFeeOnlineClasses(){
+  const classSelect = document.getElementById('feeOnlineClass');
+  const previous = classSelect.value || 'ALL';
+  const classes = [...new Set(feeRecords.map(r => splitClassSection(r.class_section).className).filter(Boolean))].sort();
+  classSelect.innerHTML = '<option value="ALL">All Classes</option>' + classes.map(c => `<option value="${escapeHtml(c)}">Class ${escapeHtml(c)}</option>`).join('');
+  classSelect.value = classes.includes(previous) ? previous : 'ALL';
+  updateFeeOnlineSections();
+}
+function updateFeeOnlineSections(){
+  const className = document.getElementById('feeOnlineClass').value;
+  const sectionSelect = document.getElementById('feeOnlineSection');
+  const previous = sectionSelect.value || 'ALL';
+  const sections = [...new Set(feeRecords.filter(r => className === 'ALL' || splitClassSection(r.class_section).className === className).map(r => splitClassSection(r.class_section).section).filter(Boolean))].sort();
+  sectionSelect.innerHTML = '<option value="ALL">All Sections</option>' + sections.map(s => `<option value="${escapeHtml(s)}">Section ${escapeHtml(s)}</option>`).join('');
+  sectionSelect.value = sections.includes(previous) ? previous : 'ALL';
+  renderOnlineFeeReport();
+}
+function feeReportMetrics(record, quarter){
+  if(quarter === 'FULL') return {fee:feeTotal(record), paid:feePaid(record), due:feeDue(record)};
+  const key = quarter === 'BUS' ? 'bus' : quarter.toLowerCase();
+  const fee = Number(record[key + '_fee'] || 0), paid = Number(record[key + '_paid'] || 0);
+  return {fee, paid, due:Math.max(0, fee - paid)};
+}
+function getOnlineFeeReportRows(){
+  const quarter = document.getElementById('feeOnlineQuarter').value;
+  const status = document.getElementById('feeOnlineStatus').value;
+  const className = document.getElementById('feeOnlineClass').value;
+  const section = document.getElementById('feeOnlineSection').value;
+  return feeRecords.map(record => ({record, metrics:feeReportMetrics(record,quarter), parts:splitClassSection(record.class_section)})).filter(item => {
+    if(className !== 'ALL' && item.parts.className !== className) return false;
+    if(section !== 'ALL' && item.parts.section !== section) return false;
+    if(status === 'PAID' && !(item.metrics.fee > 0 && item.metrics.due <= 0)) return false;
+    if(status === 'UNPAID' && !(item.metrics.due > 0)) return false;
+    return true;
+  });
+}
+function renderOnlineFeeReport(){
+  const area = document.getElementById('feeOnlineReportArea'); if(!area) return;
+  const rows = getOnlineFeeReportRows();
+  const total = rows.reduce((sum,x) => sum + x.metrics.fee,0), paid = rows.reduce((sum,x) => sum + x.metrics.paid,0), due = rows.reduce((sum,x) => sum + x.metrics.due,0);
+  const groups = new Map(); rows.forEach(x => { const key=x.record.class_section || 'Unassigned'; if(!groups.has(key)) groups.set(key,{count:0,fee:0,paid:0,due:0}); const g=groups.get(key);g.count++;g.fee+=x.metrics.fee;g.paid+=x.metrics.paid;g.due+=x.metrics.due; });
+  const groupTable = [...groups.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([name,g]) => `<tr><td>${escapeHtml(name)}</td><td>${g.count}</td><td>${feeMoney(g.fee)}</td><td>${feeMoney(g.paid)}</td><td>${feeMoney(g.due)}</td></tr>`).join('');
+  area.innerHTML = `<div class="fee-summary"><div>Students<strong>${rows.length}</strong><small>Matching selected filters</small></div><div>Total Fee<strong>${feeMoney(total)}</strong><small>Selected period</small></div><div>Total Paid<strong>${feeMoney(paid)}</strong><small>Selected period</small></div><div>Total Due<strong>${feeMoney(due)}</strong><small>Selected period</small></div></div>${rows.length ? `<h3 style="font-size:13px;margin:16px 0 8px;">Class & Section Summary</h3><div class="table-container"><table><thead><tr><th>Class / Section</th><th>Students</th><th>Fee</th><th>Paid</th><th>Due</th></tr></thead><tbody>${groupTable}</tbody></table></div>` : '<div class="empty" style="margin-top:14px;">No students match these filters.</div>'}`;
+}
+function exportOnlineFeeReport(){
+  const quarter = document.getElementById('feeOnlineQuarter').value;
+  const rows = getOnlineFeeReportRows();
+  const headers = ['Admission No','Student Name','Class','Section','Father Name','Mobile','Fee','Paid','Due','Status'];
+  const output = [headers, ...rows.map(x => [x.record.reg_no,x.record.student_name,x.parts.className,x.parts.section,x.record.father_name,x.record.mobile_number,x.metrics.fee,x.metrics.paid,x.metrics.due,x.metrics.due > 0 ? 'UNPAID' : 'PAID'])];
+  const csv = '\uFEFF' + output.map(row=>row.map(csvEscape).join(',')).join('\n'); const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})); const a=document.createElement('a'); a.href=url;a.download=`online_fee_${quarter.toLowerCase()}_report_${new Date().toISOString().slice(0,10)}.csv`;a.click();URL.revokeObjectURL(url);
 }
 
 function renderFeeTable(){
