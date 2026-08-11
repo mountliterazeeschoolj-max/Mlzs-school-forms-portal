@@ -299,25 +299,35 @@
   .stat-card .num{font-size:24px;font-weight:700;color:var(--accent);}
   .stat-card .label{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;}
   /* ---- Fees portal ---- */
-  .fee-actions{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px;}
-  .fee-actions input{min-width:240px;}
-  .fee-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px;}
-  .fee-kpi{background:var(--paper);border:1px solid var(--line);border-radius:7px;padding:14px 16px;}
-  .fee-kpi .label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
-  .fee-kpi .value{font-size:23px;font-weight:800;color:var(--accent);margin-top:4px;}
-  .fee-kpi.due .value{color:#b3261e;}
-  .fee-panel{background:var(--paper);border:1px solid var(--line);border-radius:7px;padding:16px;margin-bottom:16px;}
-  .fee-panel h2{font-size:16px;margin:0 0 10px;}
-  .fee-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;}
-  .fee-summary div{background:var(--field);padding:9px;border-radius:4px;font-size:12px;}
-  .fee-summary strong{display:block;font-size:16px;color:var(--accent);margin-top:3px;}
-  .fee-table td,.fee-table th{white-space:nowrap;}
+  #feeArea{background:linear-gradient(180deg,#eff5fa 0,#f8fbfd 170px,#fff 170px);border:1px solid #d7e2eb;border-radius:12px;padding:18px;margin-top:4px;box-shadow:0 9px 24px rgba(22,58,104,.07);}
+  .fee-tabs{margin:0 0 20px;padding:5px;background:#e2edf5;border:1px solid #cfdee9;border-radius:9px;gap:4px;display:flex;flex-wrap:wrap;}
+  .fee-tabs .tab-btn{border:0;border-radius:6px;background:transparent;color:#476174;padding:10px 16px;min-width:108px;}
+  .fee-tabs .tab-btn:hover{background:#f7fbfe;color:var(--accent);}
+  .fee-tabs .tab-btn.active{background:#fff;color:var(--accent);box-shadow:0 2px 7px rgba(22,58,104,.14);}
+  .fee-actions{display:flex;gap:9px;flex-wrap:wrap;margin:0 0 16px;align-items:center;}
+  .fee-actions input,.fee-actions select{min-width:170px;border:1px solid #c5d4df;background:#fff;border-radius:5px;padding:9px 10px;font-family:inherit;color:var(--ink);font-size:13px;}
+  .fee-actions input{min-width:290px;}
+  .fee-actions button{padding:9px 14px;font-size:12.5px;}
+  .fee-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:13px;margin-bottom:20px;}
+  .fee-kpi{background:#fff;border:1px solid #d6e3ec;border-radius:10px;padding:16px 18px;box-shadow:0 4px 12px rgba(22,58,104,.05);position:relative;overflow:hidden;}
+  .fee-kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent-light);}
+  .fee-kpi .label{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;font-weight:700;}
+  .fee-kpi .value{font-size:25px;font-weight:800;color:var(--accent);margin-top:6px;font-variant-numeric:tabular-nums;}
+  .fee-kpi.due::before{background:#d8614f;}.fee-kpi.due .value{color:#b1392d;}
+  .fee-panel{background:#fff;border:1px solid #d8e3eb;border-radius:10px;padding:20px;margin-bottom:18px;box-shadow:0 4px 13px rgba(22,58,104,.04);}
+  .fee-panel h2{font-size:17px;margin:0 0 5px;color:#193c66;}.fee-panel h3{color:#476174;}
+  .fee-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;}
+  .fee-summary div{background:linear-gradient(145deg,#f5f9fc,#eaf2f8);border:1px solid #d8e4ed;padding:12px;border-radius:7px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.35px;font-weight:700;}
+  .fee-summary strong{display:block;font-size:18px;color:var(--accent);margin-top:5px;letter-spacing:0;text-transform:none;font-variant-numeric:tabular-nums;}
+  .fee-summary small{display:block;margin-top:4px;text-transform:none;letter-spacing:0;font-weight:400;line-height:1.35;}
+  .fee-table{border-collapse:separate;border-spacing:0;width:100%;}.fee-table th{background:#edf4f9;color:#38576e;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;padding:11px 10px;}.fee-table td{padding:11px 10px;border-bottom:1px solid #e8eef3;}.fee-table tbody tr:hover{background:#f6faff;}.fee-table td,.fee-table th{white-space:nowrap;}
+  #feeOnlineReportArea .table-container{border-radius:7px;border:1px solid #dbe6ed;}#feeOnlineReportArea table th{background:#edf4f9;}
   .fee-dialog{position:fixed;inset:0;background:rgba(20,30,40,.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:16px;}
   .fee-dialog-inner{width:min(720px,100%);max-height:90vh;overflow:auto;background:var(--paper);border-radius:9px;padding:22px;box-shadow:0 14px 38px rgba(0,0,0,.3);}
   .fee-dialog-inner h2{margin:0 0 14px;font-size:19px;}
   .fee-form-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
   .fee-form-grid .full{grid-column:1/-1;}
-  @media(max-width:640px){.fee-summary,.fee-form-grid{grid-template-columns:1fr;}.fee-form-grid .full{grid-column:auto;}.fee-actions input{min-width:0;width:100%;}}
+  @media(max-width:640px){#feeArea{padding:12px;border-radius:8px;}.fee-tabs{overflow-x:auto;flex-wrap:nowrap;}.fee-tabs .tab-btn{min-width:120px;}.fee-summary,.fee-form-grid{grid-template-columns:1fr;}.fee-form-grid .full{grid-column:auto;}.fee-actions input,.fee-actions select{min-width:0;width:100%;}.fee-actions button{flex:1 1 auto;}}
 
   /* ---- Admin: Overview dashboard tab ---- */
   .ov-grid{display:grid;grid-template-columns:repeat(auto-fit, minmax(160px,1fr));gap:12px;margin-bottom:18px;}
