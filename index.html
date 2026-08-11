@@ -1728,20 +1728,31 @@
 
   <div id="overviewArea" style="display:none;"></div>
   <div id="feeArea" style="display:none;">
-    <div class="fee-actions">
-      <input type="text" id="feeSearchBox" placeholder="Search admission no., student, class, parent or mobile" oninput="renderFeeTable()">
-      <button class="btn-primary" onclick="openFeeStudentDialog()">Add Student</button>
-      <button class="btn-primary" onclick="openFeeBulkStudentDialog()">Bulk Add Students</button>
-      <button class="btn-primary" onclick="openBulkPaymentDialog()">Bulk Update Paid Fees</button>
-      <button class="btn-secondary" onclick="openFeeStructureDialog()">Edit Fee Structure</button>
-      <button class="btn-secondary" onclick="exportFeeCsv('due')">Export Due Data</button>
-      <button class="btn-secondary" onclick="exportFeeCsv('paid')">Export Paid Data</button>
-      <select id="feeReportQuarter"><option value="full">Full Fee Report</option><option value="Q1">Q1 Report</option><option value="Q2">Q2 Report</option><option value="Q3">Q3 Report</option><option value="Q4">Q4 Report</option><option value="BUS">Bus Fee Report</option></select>
-      <button class="btn-secondary" onclick="exportFeeReport(document.getElementById('feeReportQuarter').value)">Export Report</button>
-      <button class="btn-secondary" onclick="loadFeePortal()">Refresh</button>
+    <div class="tabs fee-tabs">
+      <button class="tab-btn active" id="feeViewOverview" onclick="switchFeeView('overview')">Overview</button>
+      <button class="tab-btn" id="feeViewStudents" onclick="switchFeeView('students')">Students</button>
+      <button class="tab-btn" id="feeViewReports" onclick="switchFeeView('reports')">Reports</button>
+      <button class="tab-btn" id="feeViewManage" onclick="switchFeeView('manage')">Import & Setup</button>
     </div>
-    <div class="fee-kpis" id="feeKpis"></div>
-    <div class="fee-panel" id="feeOnlineReport">
+
+    <div id="feeOverviewView">
+      <div class="fee-actions"><button class="btn-secondary" onclick="loadFeePortal()">Refresh Fee Data</button></div>
+      <div class="fee-kpis" id="feeKpis"></div>
+      <div class="fee-panel" id="feeStudentDashboard"><h2>Student Fee Dashboard</h2><div class="empty">Choose a student from the Students tab to view their fee summary.</div></div>
+    </div>
+
+    <div id="feeStudentsView" style="display:none;">
+      <div class="fee-actions">
+        <input type="text" id="feeSearchBox" placeholder="Search admission no., student, class, parent or mobile" oninput="renderFeeTable()">
+        <button class="btn-primary" onclick="openFeeStudentDialog()">Add Student</button>
+        <button class="btn-secondary" onclick="exportFeeCsv('due')">Export Due Data</button>
+        <button class="btn-secondary" onclick="exportFeeCsv('paid')">Export Paid Data</button>
+      </div>
+      <div class="table-container"><div id="feeTableArea"><div class="loading">Loading fee records...</div></div></div>
+    </div>
+
+    <div id="feeReportsView" style="display:none;">
+      <div class="fee-panel" id="feeOnlineReport">
       <h2>Online Fee Report</h2>
       <div class="fee-actions">
         <select id="feeOnlineQuarter" onchange="renderOnlineFeeReport()"><option value="FULL">Full Year</option><option value="Q1">Q1</option><option value="Q2">Q2</option><option value="Q3">Q3</option><option value="Q4">Q4</option><option value="BUS">Bus Fee</option></select>
@@ -1751,9 +1762,19 @@
         <button class="btn-secondary" onclick="exportOnlineFeeReport()">Export This Report</button>
       </div>
       <div id="feeOnlineReportArea"><div class="loading">Loading report...</div></div>
+      </div>
+      <div class="fee-panel">
+        <h2>Downloadable Reports</h2>
+        <div class="fee-actions">
+          <select id="feeReportQuarter"><option value="full">Full Fee Report</option><option value="Q1">Q1 Report</option><option value="Q2">Q2 Report</option><option value="Q3">Q3 Report</option><option value="Q4">Q4 Report</option><option value="BUS">Bus Fee Report</option></select>
+          <button class="btn-secondary" onclick="exportFeeReport(document.getElementById('feeReportQuarter').value)">Export Report</button>
+        </div>
+      </div>
     </div>
-    <div class="fee-panel" id="feeStudentDashboard"><h2>Fee Dashboard</h2><div class="empty">Select a student to view the Sheet 3-style fee summary.</div></div>
-    <div class="table-container"><div id="feeTableArea"><div class="loading">Loading fee records...</div></div></div>
+
+    <div id="feeManageView" style="display:none;">
+      <div class="fee-panel"><h2>Bulk Operations</h2><p class="fs-modal-sub">Import new students, update paid fees from a CSV, or maintain the fee schedule used for new students.</p><div class="fee-actions"><button class="btn-primary" onclick="openFeeBulkStudentDialog()">Bulk Add Students</button><button class="btn-primary" onclick="openBulkPaymentDialog()">Bulk Update Paid Fees</button><button class="btn-secondary" onclick="openFeeStructureDialog()">Edit Fee Structure</button></div></div>
+    </div>
   </div>
 
   <div class="stats" id="statsRow"></div>
@@ -4681,6 +4702,7 @@ function recordFolderName(r){
 let feeRecords = [];
 let selectedFeeRecord = null;
 let feeStructure = new Map();
+let currentFeeView = 'overview';
 const feeMoney = value => '₹' + Number(value || 0).toLocaleString('en-IN', {maximumFractionDigits: 2});
 const feeTotal = r => Number(r.q1_fee || 0) + Number(r.q2_fee || 0) + Number(r.q3_fee || 0) + Number(r.q4_fee || 0) + Number(r.bus_fee || 0);
 const feePaid = r => Number(r.q1_paid || 0) + Number(r.q2_paid || 0) + Number(r.q3_paid || 0) + Number(r.q4_paid || 0) + Number(r.bus_fee_paid || 0);
@@ -4688,6 +4710,16 @@ const feeDue = r => Math.max(0, feeTotal(r) - feePaid(r));
 function feeComponentDue(r, component){
   const key = component === 'BUS' ? 'bus' : component.toLowerCase();
   return Math.max(0, Number(r[key + '_fee'] || 0) - Number(r[key + '_paid'] || 0));
+}
+function switchFeeView(view){
+  currentFeeView = view;
+  const views = ['overview','students','reports','manage'];
+  views.forEach(name => {
+    document.getElementById('feeView' + name[0].toUpperCase() + name.slice(1)).classList.toggle('active', name === view);
+    document.getElementById('fee' + name[0].toUpperCase() + name.slice(1) + 'View').style.display = name === view ? 'block' : 'none';
+  });
+  if(view === 'reports') renderOnlineFeeReport();
+  if(view === 'students') renderFeeTable();
 }
 
 async function loadFeePortal(){
@@ -4792,7 +4824,7 @@ function renderFeeTable(){
   </tr>`).join('')}</tbody></table>` : '<div class="empty">No students match this search.</div>';
 }
 
-function selectFeeStudent(id){ selectedFeeRecord = feeRecords.find(r => r.id === id) || null; renderFeeStudentDashboard(); }
+function selectFeeStudent(id){ selectedFeeRecord = feeRecords.find(r => r.id === id) || null; switchFeeView('overview'); renderFeeStudentDashboard(); }
 
 function renderFeeStudentDashboard(){
   const area = document.getElementById('feeStudentDashboard');
