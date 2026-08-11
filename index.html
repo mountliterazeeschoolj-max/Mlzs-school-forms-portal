@@ -298,6 +298,26 @@
   .stat-card{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:14px 16px;}
   .stat-card .num{font-size:24px;font-weight:700;color:var(--accent);}
   .stat-card .label{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;}
+  /* ---- Fees portal ---- */
+  .fee-actions{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px;}
+  .fee-actions input{min-width:240px;}
+  .fee-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px;}
+  .fee-kpi{background:var(--paper);border:1px solid var(--line);border-radius:7px;padding:14px 16px;}
+  .fee-kpi .label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
+  .fee-kpi .value{font-size:23px;font-weight:800;color:var(--accent);margin-top:4px;}
+  .fee-kpi.due .value{color:#b3261e;}
+  .fee-panel{background:var(--paper);border:1px solid var(--line);border-radius:7px;padding:16px;margin-bottom:16px;}
+  .fee-panel h2{font-size:16px;margin:0 0 10px;}
+  .fee-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;}
+  .fee-summary div{background:var(--field);padding:9px;border-radius:4px;font-size:12px;}
+  .fee-summary strong{display:block;font-size:16px;color:var(--accent);margin-top:3px;}
+  .fee-table td,.fee-table th{white-space:nowrap;}
+  .fee-dialog{position:fixed;inset:0;background:rgba(20,30,40,.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:16px;}
+  .fee-dialog-inner{width:min(720px,100%);max-height:90vh;overflow:auto;background:var(--paper);border-radius:9px;padding:22px;box-shadow:0 14px 38px rgba(0,0,0,.3);}
+  .fee-dialog-inner h2{margin:0 0 14px;font-size:19px;}
+  .fee-form-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+  .fee-form-grid .full{grid-column:1/-1;}
+  @media(max-width:640px){.fee-summary,.fee-form-grid{grid-template-columns:1fr;}.fee-form-grid .full{grid-column:auto;}.fee-actions input{min-width:0;width:100%;}}
 
   /* ---- Admin: Overview dashboard tab ---- */
   .ov-grid{display:grid;grid-template-columns:repeat(auto-fit, minmax(160px,1fr));gap:12px;margin-bottom:18px;}
@@ -1703,9 +1723,22 @@
     <button class="tab-btn" id="tabStudents" onclick="switchTab('students')">Class IX</button>
     <button class="tab-btn" id="tabClass11" onclick="switchTab('class11')">Class XI</button>
     <button class="tab-btn" id="tabStaff" onclick="switchTab('staff')">Staff</button>
+    <button class="tab-btn" id="tabFees" onclick="switchTab('fees')">Fees Portal</button>
   </div>
 
   <div id="overviewArea" style="display:none;"></div>
+  <div id="feeArea" style="display:none;">
+    <div class="fee-actions">
+      <input type="text" id="feeSearchBox" placeholder="Search admission no., student, class, parent or mobile" oninput="renderFeeTable()">
+      <button class="btn-primary" onclick="openFeeStudentDialog()">Add Student</button>
+      <button class="btn-secondary" onclick="exportFeeCsv('due')">Export Due Data</button>
+      <button class="btn-secondary" onclick="exportFeeCsv('paid')">Export Paid Data</button>
+      <button class="btn-secondary" onclick="loadFeePortal()">Refresh</button>
+    </div>
+    <div class="fee-kpis" id="feeKpis"></div>
+    <div class="fee-panel" id="feeStudentDashboard"><h2>Fee Dashboard</h2><div class="empty">Select a student to view the Sheet 3-style fee summary.</div></div>
+    <div class="table-container"><div id="feeTableArea"><div class="loading">Loading fee records...</div></div></div>
+  </div>
 
   <div class="stats" id="statsRow"></div>
 
@@ -3936,6 +3969,18 @@ async function saveStaffEdit(){
 /* If the person arrives via a Supabase password-recovery link, prompt for a
    new password right in the staff login screen. */
 supabaseClient.auth.onAuthStateChange((event, session) => {
+  /* A session can end in another tab or after an explicit sign-out.  Return to
+     the public landing view immediately so a protected screen is never left
+     visible with stale client-side state. Database access remains protected by
+     RLS independently of this UI guard. */
+  if(event === 'SIGNED_OUT' || !session){
+    currentStaffRecord = null;
+    currentStaffLoginEmail = '';
+    currentStaffLoginFullName = '';
+    clearTimeout(adminIdleTimer);
+    showView('landingView');
+    return;
+  }
   if(event === 'PASSWORD_RECOVERY'){
     const newPassword = prompt('Enter a new password (min 8 characters):');
     if(newPassword && newPassword.length >= 8){
@@ -4103,19 +4148,24 @@ async function switchTab(tab){
   document.getElementById('tabStudents').classList.toggle('active', tab === 'students');
   document.getElementById('tabClass11').classList.toggle('active', tab === 'class11');
   document.getElementById('tabStaff').classList.toggle('active', tab === 'staff');
+  document.getElementById('tabFees').classList.toggle('active', tab === 'fees');
   document.getElementById('searchBox').value = '';
 
   const isOverview = tab === 'overview';
+  const isFees = tab === 'fees';
   document.getElementById('overviewArea').style.display = isOverview ? 'block' : 'none';
-  document.getElementById('statsRow').style.display = isOverview ? 'none' : '';
-  document.querySelector('.table-container').style.display = isOverview ? 'none' : '';
-  document.getElementById('pageControls').style.display = isOverview ? 'none' : 'flex';
-  document.getElementById('searchBox').style.display = isOverview ? 'none' : '';
-  document.getElementById('exportCsvBtn').style.display = isOverview ? 'none' : '';
-  document.getElementById('exportFilesBtn').style.display = isOverview ? 'none' : '';
+  document.getElementById('feeArea').style.display = isFees ? 'block' : 'none';
+  document.getElementById('statsRow').style.display = (isOverview || isFees) ? 'none' : '';
+  document.querySelector('#mainPanel > .table-container').style.display = (isOverview || isFees) ? 'none' : '';
+  document.getElementById('pageControls').style.display = (isOverview || isFees) ? 'none' : 'flex';
+  document.getElementById('searchBox').style.display = (isOverview || isFees) ? 'none' : '';
+  document.getElementById('exportCsvBtn').style.display = (isOverview || isFees) ? 'none' : '';
+  document.getElementById('exportFilesBtn').style.display = (isOverview || isFees) ? 'none' : '';
 
   if(isOverview){
     await loadOverview();
+  } else if(isFees){
+    await loadFeePortal();
   } else {
     await loadAll();
   }
@@ -4124,6 +4174,7 @@ async function switchTab(tab){
 /* Refreshes whichever tab is currently open — the Overview dashboard or a per-form table. */
 function refreshCurrentTab(){
   if(currentTab === 'overview') loadOverview();
+  else if(currentTab === 'fees') loadFeePortal();
   else loadAll();
 }
 
@@ -4607,6 +4658,128 @@ function recordFolderName(r){
   }
   const adm = r.admNo ? safeSlug(r.admNo) + '_' : '';
   return adm + safeSlug(r.candidateName) + '_' + safeSlug(r._key).slice(0,8);
+}
+
+/* ============ FEES PORTAL ============
+   Admin-only by the same RLS policies that protect the rest of this panel. */
+let feeRecords = [];
+let selectedFeeRecord = null;
+const feeMoney = value => '₹' + Number(value || 0).toLocaleString('en-IN', {maximumFractionDigits: 2});
+const feeTotal = r => Number(r.q1_fee || 0) + Number(r.q2_fee || 0) + Number(r.q3_fee || 0) + Number(r.q4_fee || 0) + Number(r.bus_fee || 0);
+const feePaid = r => Number(r.q1_paid || 0) + Number(r.q2_paid || 0) + Number(r.q3_paid || 0) + Number(r.q4_paid || 0) + Number(r.bus_fee_paid || 0);
+const feeDue = r => Math.max(0, feeTotal(r) - feePaid(r));
+
+async function loadFeePortal(){
+  const area = document.getElementById('feeTableArea');
+  area.innerHTML = '<div class="loading">Loading fee records...</div>';
+  try{
+    const { data, error } = await supabaseClient.from('student_fees').select('*').order('student_name');
+    if(error) throw error;
+    feeRecords = data || [];
+    renderFeeKpis();
+    renderFeeTable();
+    if(selectedFeeRecord){ selectedFeeRecord = feeRecords.find(r => r.id === selectedFeeRecord.id) || null; }
+    renderFeeStudentDashboard();
+  } catch(err){
+    area.innerHTML = '<div class="empty">Could not load fee records: ' + escapeHtml(errMsg(err)) + '</div>';
+  }
+}
+
+function renderFeeKpis(){
+  const total = feeRecords.reduce((sum, r) => sum + feeTotal(r), 0);
+  const paid = feeRecords.reduce((sum, r) => sum + feePaid(r), 0);
+  const due = feeRecords.reduce((sum, r) => sum + feeDue(r), 0);
+  document.getElementById('feeKpis').innerHTML = `
+    <div class="fee-kpi"><div class="label">Students</div><div class="value">${feeRecords.length}</div></div>
+    <div class="fee-kpi"><div class="label">Total Fees</div><div class="value">${feeMoney(total)}</div></div>
+    <div class="fee-kpi"><div class="label">Total Paid</div><div class="value">${feeMoney(paid)}</div></div>
+    <div class="fee-kpi due"><div class="label">Total Due</div><div class="value">${feeMoney(due)}</div></div>`;
+}
+
+function renderFeeTable(){
+  const query = (document.getElementById('feeSearchBox').value || '').trim().toLowerCase();
+  const rows = feeRecords.filter(r => !query || [r.reg_no,r.student_name,r.class_section,r.father_name,r.mother_name,r.mobile_number].some(v => String(v || '').toLowerCase().includes(query)));
+  document.getElementById('feeTableArea').innerHTML = rows.length ? `<table class="fee-table"><thead><tr><th>Adm. No.</th><th>Student</th><th>Class</th><th>Total Fees</th><th>Paid</th><th>Due</th><th>Status</th><th></th></tr></thead><tbody>${rows.map(r => `<tr>
+    <td>${escapeHtml(r.reg_no)}</td><td>${escapeHtml(r.student_name)}</td><td>${escapeHtml(r.class_section)}</td>
+    <td>${feeMoney(feeTotal(r))}</td><td>${feeMoney(feePaid(r))}</td><td>${feeMoney(feeDue(r))}</td><td><span class="badge">${escapeHtml(r.fee_status)}</span></td>
+    <td><button class="tab-btn" onclick="selectFeeStudent(${r.id})">View</button> <button class="tab-btn" onclick="openFeePaymentDialog(${r.id})">Payment</button> <button class="del-btn" onclick="deleteFeeStudent(${r.id})">Remove</button></td>
+  </tr>`).join('')}</tbody></table>` : '<div class="empty">No students match this search.</div>';
+}
+
+function selectFeeStudent(id){ selectedFeeRecord = feeRecords.find(r => r.id === id) || null; renderFeeStudentDashboard(); }
+
+function renderFeeStudentDashboard(){
+  const area = document.getElementById('feeStudentDashboard');
+  const r = selectedFeeRecord;
+  if(!r){ area.innerHTML = '<h2>Fee Dashboard</h2><div class="empty">Select a student to view the Sheet 3-style fee summary.</div>'; return; }
+  const block = (label, fee, paid) => `<div>${label}<strong>${feeMoney(feePaid ? fee - paid : fee)}</strong><small>Paid ${feeMoney(paid)} · Due ${feeMoney(Math.max(0, fee-paid))}</small></div>`;
+  area.innerHTML = `<h2>${escapeHtml(r.student_name)} <span style="font-weight:400;color:var(--muted);font-size:13px;">(${escapeHtml(r.reg_no)} · ${escapeHtml(r.class_section)})</span></h2>
+    <div class="fee-summary">${block('Q1',Number(r.q1_fee||0),Number(r.q1_paid||0))}${block('Q2',Number(r.q2_fee||0),Number(r.q2_paid||0))}${block('Q3',Number(r.q3_fee||0),Number(r.q3_paid||0))}${block('Q4',Number(r.q4_fee||0),Number(r.q4_paid||0))}${block('Bus Fee',Number(r.bus_fee||0),Number(r.bus_fee_paid||0))}<div>Total<strong>${feeMoney(feeDue(r))}</strong><small>Due after ${feeMoney(feePaid(r))} paid</small></div></div>
+    <div class="fee-actions" style="margin-top:12px;"><button class="btn-primary" onclick="openFeePaymentDialog(${r.id})">Record Payment</button><button class="btn-secondary" onclick="openFeeStudentDialog(${r.id})">Edit Student</button></div>`;
+}
+
+function openFeeDialog(title, content){
+  const el = document.createElement('div'); el.className = 'fee-dialog'; el.id = 'feeDialog';
+  el.innerHTML = `<div class="fee-dialog-inner"><h2>${title}</h2>${content}</div>`;
+  document.body.appendChild(el);
+}
+function closeFeeDialog(){ const el = document.getElementById('feeDialog'); if(el) el.remove(); }
+
+function openFeeStudentDialog(id){
+  const r = id ? feeRecords.find(x => x.id === id) : {};
+  const field = (label,key,type='text') => `<div class="field"><label>${label}</label><input id="fs_${key}" type="${type}" value="${escapeHtml(r?.[key] ?? '')}"></div>`;
+  openFeeDialog(id ? 'Edit Fee Student' : 'Add Fee Student', `<div class="fee-form-grid">
+    ${field('Admission No.','reg_no')}${field('Student Name','student_name')}${field('Class / Section','class_section')}${field('Mobile','mobile_number','tel')}${field('Father Name','father_name')}${field('Mother Name','mother_name')}${field('Date of Birth','dob','date')}${field('Admission Date','admission_date','date')}${field('Category','category')}<div class="field full"><label>Address</label><textarea id="fs_address">${escapeHtml(r?.address ?? '')}</textarea></div>
+    ${field('Q1 Fee','q1_fee','number')}${field('Q2 Fee','q2_fee','number')}${field('Q3 Fee','q3_fee','number')}${field('Q4 Fee','q4_fee','number')}${field('Bus Fee','bus_fee','number')}
+  </div><div class="actions"><button class="btn-secondary" onclick="closeFeeDialog()">Cancel</button><button class="btn-primary" onclick="saveFeeStudent(${id || 'null'})">Save Student</button></div>`);
+}
+
+async function saveFeeStudent(id){
+  const keys = ['reg_no','student_name','class_section','mobile_number','father_name','mother_name','dob','admission_date','category','address','q1_fee','q2_fee','q3_fee','q4_fee','bus_fee'];
+  const record = Object.fromEntries(keys.map(k => [k, document.getElementById('fs_'+k).value.trim()]));
+  ['q1_fee','q2_fee','q3_fee','q4_fee','bus_fee'].forEach(k => record[k] = Number(record[k] || 0));
+  if(!record.reg_no || !record.student_name || !record.class_section){ alert('Admission number, student name and class are required.'); return; }
+  try{
+    const result = id ? await supabaseClient.from('student_fees').update(record).eq('id', id) : await supabaseClient.from('student_fees').insert(record);
+    if(result.error) throw result.error;
+    closeFeeDialog(); await loadFeePortal();
+  } catch(err){ alert('Could not save student: ' + errMsg(err)); }
+}
+
+function openFeePaymentDialog(id){
+  const r = feeRecords.find(x => x.id === id); if(!r) return;
+  openFeeDialog('Record Payment — ' + escapeHtml(r.student_name), `<div class="fee-form-grid">
+    <div class="field"><label>Fee Component</label><select id="fp_component"><option value="Q1">Q1</option><option value="Q2">Q2</option><option value="Q3">Q3</option><option value="Q4">Q4</option><option value="BUS">Bus Fee</option></select></div>
+    <div class="field"><label>Amount</label><input id="fp_amount" type="number" min="1" step="0.01"></div>
+    <div class="field"><label>Payment Date</label><input id="fp_date" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
+    <div class="field"><label>Mode</label><input id="fp_mode" placeholder="Cash / UPI / Bank"></div>
+    <div class="field"><label>Receipt No.</label><input id="fp_receipt"></div><div class="field"><label>Remarks</label><input id="fp_remarks"></div>
+  </div><div class="actions"><button class="btn-secondary" onclick="closeFeeDialog()">Cancel</button><button class="btn-primary" onclick="saveFeePayment(${id})">Save Payment</button></div>`);
+}
+
+async function saveFeePayment(id){
+  const { data: user } = await supabaseClient.auth.getUser();
+  const { error } = await supabaseClient.rpc('record_fee_payment', { p_student_fee_id:id, p_component:document.getElementById('fp_component').value, p_amount:Number(document.getElementById('fp_amount').value), p_payment_date:document.getElementById('fp_date').value, p_mode:document.getElementById('fp_mode').value || null, p_receipt_no:document.getElementById('fp_receipt').value || null, p_remarks:document.getElementById('fp_remarks').value || null, p_recorded_by:user?.user?.email || null });
+  if(error){ alert('Could not record payment: ' + errMsg(error)); return; }
+  closeFeeDialog(); await loadFeePortal();
+}
+
+async function deleteFeeStudent(id){
+  if(!confirm('Remove this student and their payment history? This cannot be undone.')) return;
+  try{
+    const { error: paymentsError } = await supabaseClient.from('fee_payments').delete().eq('student_fee_id', id); if(paymentsError) throw paymentsError;
+    const { error } = await supabaseClient.from('student_fees').delete().eq('id', id); if(error) throw error;
+    if(selectedFeeRecord?.id === id) selectedFeeRecord = null;
+    await loadFeePortal();
+  } catch(err){ alert('Could not remove student: ' + errMsg(err)); }
+}
+
+function exportFeeCsv(kind){
+  const rows = feeRecords.filter(r => kind === 'due' ? feeDue(r) > 0 : feePaid(r) > 0);
+  const headers = ['Admission No','Student Name','Class','Mobile','Total Fees','Total Paid','Total Due','Status'];
+  const csv = '\uFEFF' + [headers, ...rows.map(r => [r.reg_no,r.student_name,r.class_section,r.mobile_number,feeTotal(r),feePaid(r),feeDue(r),r.fee_status])].map(row => row.map(csvEscape).join(',')).join('\n');
+  const url = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'})); const a = document.createElement('a');
+  a.href = url; a.download = `fee_${kind}_data_${new Date().toISOString().slice(0,10)}.csv`; a.click(); URL.revokeObjectURL(url);
 }
 
 /* Exports the current tab's data as a CSV plus every uploaded document (photos, certificates, Aadhar
