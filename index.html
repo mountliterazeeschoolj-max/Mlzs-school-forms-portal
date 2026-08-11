@@ -1731,8 +1731,13 @@
     <div class="fee-actions">
       <input type="text" id="feeSearchBox" placeholder="Search admission no., student, class, parent or mobile" oninput="renderFeeTable()">
       <button class="btn-primary" onclick="openFeeStudentDialog()">Add Student</button>
+      <button class="btn-primary" onclick="openFeeBulkStudentDialog()">Bulk Add Students</button>
+      <button class="btn-primary" onclick="openBulkPaymentDialog()">Bulk Update Paid Fees</button>
+      <button class="btn-secondary" onclick="openFeeStructureDialog()">Edit Fee Structure</button>
       <button class="btn-secondary" onclick="exportFeeCsv('due')">Export Due Data</button>
       <button class="btn-secondary" onclick="exportFeeCsv('paid')">Export Paid Data</button>
+      <select id="feeReportQuarter"><option value="full">Full Fee Report</option><option value="Q1">Q1 Report</option><option value="Q2">Q2 Report</option><option value="Q3">Q3 Report</option><option value="Q4">Q4 Report</option><option value="BUS">Bus Fee Report</option></select>
+      <button class="btn-secondary" onclick="exportFeeReport(document.getElementById('feeReportQuarter').value)">Export Report</button>
       <button class="btn-secondary" onclick="loadFeePortal()">Refresh</button>
     </div>
     <div class="fee-kpis" id="feeKpis"></div>
@@ -4664,6 +4669,7 @@ function recordFolderName(r){
    Admin-only by the same RLS policies that protect the rest of this panel. */
 let feeRecords = [];
 let selectedFeeRecord = null;
+let feeStructure = new Map();
 const feeMoney = value => '₹' + Number(value || 0).toLocaleString('en-IN', {maximumFractionDigits: 2});
 const feeTotal = r => Number(r.q1_fee || 0) + Number(r.q2_fee || 0) + Number(r.q3_fee || 0) + Number(r.q4_fee || 0) + Number(r.bus_fee || 0);
 const feePaid = r => Number(r.q1_paid || 0) + Number(r.q2_paid || 0) + Number(r.q3_paid || 0) + Number(r.q4_paid || 0) + Number(r.bus_fee_paid || 0);
@@ -4673,8 +4679,14 @@ async function loadFeePortal(){
   const area = document.getElementById('feeTableArea');
   area.innerHTML = '<div class="loading">Loading fee records...</div>';
   try{
-    const { data, error } = await supabaseClient.from('student_fees').select('*').order('student_name');
-    if(error) throw error;
+    const [studentRes, structureRes] = await Promise.all([
+      supabaseClient.from('student_fees').select('*').order('student_name'),
+      supabaseClient.from('fee_structure').select('*').order('class_section')
+    ]);
+    if(studentRes.error) throw studentRes.error;
+    if(structureRes.error) throw structureRes.error;
+    const data = studentRes.data;
+    feeStructure = new Map((structureRes.data || []).map(row => [row.class_section, row]));
     feeRecords = data || [];
     renderFeeKpis();
     renderFeeTable();
@@ -4712,9 +4724,9 @@ function renderFeeStudentDashboard(){
   const area = document.getElementById('feeStudentDashboard');
   const r = selectedFeeRecord;
   if(!r){ area.innerHTML = '<h2>Fee Dashboard</h2><div class="empty">Select a student to view the Sheet 3-style fee summary.</div>'; return; }
-  const block = (label, fee, paid) => `<div>${label}<strong>${feeMoney(feePaid ? fee - paid : fee)}</strong><small>Paid ${feeMoney(paid)} · Due ${feeMoney(Math.max(0, fee-paid))}</small></div>`;
+  const block = (label, fee, paid) => `<div>${label}<strong>${feeMoney(Math.max(0, fee - paid))}</strong><small>Paid ${feeMoney(paid)} · Due ${feeMoney(Math.max(0, fee-paid))}</small></div>`;
   area.innerHTML = `<h2>${escapeHtml(r.student_name)} <span style="font-weight:400;color:var(--muted);font-size:13px;">(${escapeHtml(r.reg_no)} · ${escapeHtml(r.class_section)})</span></h2>
-    <div class="fee-summary">${block('Q1',Number(r.q1_fee||0),Number(r.q1_paid||0))}${block('Q2',Number(r.q2_fee||0),Number(r.q2_paid||0))}${block('Q3',Number(r.q3_fee||0),Number(r.q3_paid||0))}${block('Q4',Number(r.q4_fee||0),Number(r.q4_paid||0))}${block('Bus Fee',Number(r.bus_fee||0),Number(r.bus_fee_paid||0))}<div>Total<strong>${feeMoney(feeDue(r))}</strong><small>Due after ${feeMoney(feePaid(r))} paid</small></div></div>
+    <div class="fee-summary">${block('Q1',Number(r.q1_fee||0),Number(r.q1_paid||0))}${block('Q2',Number(r.q2_fee||0),Number(r.q2_paid||0))}${block('Q3',Number(r.q3_fee||0),Number(r.q3_paid||0))}${block('Q4',Number(r.q4_fee||0),Number(r.q4_paid||0))}${block('Bus Fee',Number(r.bus_fee||0),Number(r.bus_fee_paid||0))}<div>Last Year Due<strong>${feeMoney(r.prev_session_fee)}</strong><small>Previous-session balance</small></div><div>Total<strong>${feeMoney(feeDue(r))}</strong><small>Due after ${feeMoney(feePaid(r))} paid</small></div></div>
     <div class="fee-actions" style="margin-top:12px;"><button class="btn-primary" onclick="openFeePaymentDialog(${r.id})">Record Payment</button><button class="btn-secondary" onclick="openFeeStudentDialog(${r.id})">Edit Student</button></div>`;
 }
 
@@ -4730,14 +4742,14 @@ function openFeeStudentDialog(id){
   const field = (label,key,type='text') => `<div class="field"><label>${label}</label><input id="fs_${key}" type="${type}" value="${escapeHtml(r?.[key] ?? '')}"></div>`;
   openFeeDialog(id ? 'Edit Fee Student' : 'Add Fee Student', `<div class="fee-form-grid">
     ${field('Admission No.','reg_no')}${field('Student Name','student_name')}${field('Class / Section','class_section')}${field('Mobile','mobile_number','tel')}${field('Father Name','father_name')}${field('Mother Name','mother_name')}${field('Date of Birth','dob','date')}${field('Admission Date','admission_date','date')}${field('Category','category')}<div class="field full"><label>Address</label><textarea id="fs_address">${escapeHtml(r?.address ?? '')}</textarea></div>
-    ${field('Q1 Fee','q1_fee','number')}${field('Q2 Fee','q2_fee','number')}${field('Q3 Fee','q3_fee','number')}${field('Q4 Fee','q4_fee','number')}${field('Bus Fee','bus_fee','number')}
+    ${field('Last Year Due','prev_session_fee','number')}${field('Q1 Fee','q1_fee','number')}${field('Q2 Fee','q2_fee','number')}${field('Q3 Fee','q3_fee','number')}${field('Q4 Fee','q4_fee','number')}${field('Bus Fee','bus_fee','number')}
   </div><div class="actions"><button class="btn-secondary" onclick="closeFeeDialog()">Cancel</button><button class="btn-primary" onclick="saveFeeStudent(${id || 'null'})">Save Student</button></div>`);
 }
 
 async function saveFeeStudent(id){
-  const keys = ['reg_no','student_name','class_section','mobile_number','father_name','mother_name','dob','admission_date','category','address','q1_fee','q2_fee','q3_fee','q4_fee','bus_fee'];
+  const keys = ['reg_no','student_name','class_section','mobile_number','father_name','mother_name','dob','admission_date','category','address','prev_session_fee','q1_fee','q2_fee','q3_fee','q4_fee','bus_fee'];
   const record = Object.fromEntries(keys.map(k => [k, document.getElementById('fs_'+k).value.trim()]));
-  ['q1_fee','q2_fee','q3_fee','q4_fee','bus_fee'].forEach(k => record[k] = Number(record[k] || 0));
+  ['prev_session_fee','q1_fee','q2_fee','q3_fee','q4_fee','bus_fee'].forEach(k => record[k] = Number(record[k] || 0));
   if(!record.reg_no || !record.student_name || !record.class_section){ alert('Admission number, student name and class are required.'); return; }
   try{
     const result = id ? await supabaseClient.from('student_fees').update(record).eq('id', id) : await supabaseClient.from('student_fees').insert(record);
@@ -4780,6 +4792,92 @@ function exportFeeCsv(kind){
   const csv = '\uFEFF' + [headers, ...rows.map(r => [r.reg_no,r.student_name,r.class_section,r.mobile_number,feeTotal(r),feePaid(r),feeDue(r),r.fee_status])].map(row => row.map(csvEscape).join(',')).join('\n');
   const url = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'})); const a = document.createElement('a');
   a.href = url; a.download = `fee_${kind}_data_${new Date().toISOString().slice(0,10)}.csv`; a.click(); URL.revokeObjectURL(url);
+}
+
+function csvFileInput(targetId){
+  return `<input id="${targetId}" type="file" accept=".csv,text/csv" onchange="readFeeCsvFile('${targetId}')">`;
+}
+function readFeeCsvFile(inputId){
+  const file = document.getElementById(inputId).files?.[0]; if(!file) return;
+  const reader = new FileReader(); reader.onload = () => { document.getElementById(inputId + '_text').value = reader.result; };
+  reader.readAsText(file);
+}
+function parseFeeCsv(text){
+  const lines = String(text || '').split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+  if(lines.length < 2) return { headers:[], rows:[] };
+  const headers = parseCsvLine(lines[0]).map(x => x.trim().toLowerCase());
+  return { headers, rows: lines.slice(1).map(parseCsvLine).filter(row => row.some(Boolean)) };
+}
+function valueAt(headers, row, names){
+  const i = headers.findIndex(h => names.includes(h)); return i < 0 ? '' : String(row[i] ?? '').trim();
+}
+function normaliseFeeDate(value){
+  const input = String(value || '').trim();
+  const dmy = /^(\d{2})[-/](\d{2})[-/](\d{4})$/.exec(input);
+  return dmy ? `${dmy[3]}-${dmy[2]}-${dmy[1]}` : (input || null);
+}
+
+function openFeeBulkStudentDialog(){
+  openFeeDialog('Bulk Add Students', `<p class="fs-modal-sub">Upload or paste CSV. Required columns: <strong>Admission No, Student Name, Class</strong>. Optional: Father Name, Mother Name, DOB, Admission Date, Category, Mobile, Address, Last Year Due. Q1–Q4 and Bus Fee are automatically read from the current Fee Structure.</p>
+    <div class="field">${csvFileInput('bulkStudentsFile')}<textarea id="bulkStudentsFile_text" placeholder="Admission No,Student Name,Class,Father Name,Mother Name,DOB,Admission Date,Category,Mobile,Address,Last Year Due"></textarea></div>
+    <div class="actions"><button class="btn-secondary" onclick="closeFeeDialog()">Cancel</button><button class="btn-primary" onclick="saveBulkFeeStudents()">Import Students</button></div>`);
+}
+async function saveBulkFeeStudents(){
+  const { headers, rows } = parseFeeCsv(document.getElementById('bulkStudentsFile_text').value);
+  if(!headers.length || !rows.length){ alert('Add a CSV with a header row and at least one student.'); return; }
+  const require = ['admission no','student name','class'];
+  if(require.some(h => !headers.includes(h))){ alert('CSV must include: Admission No, Student Name, Class.'); return; }
+  const existing = new Set(feeRecords.map(r => String(r.reg_no).trim()));
+  const records = [], skipped = [];
+  rows.forEach((row, index) => {
+    const reg_no = valueAt(headers,row,['admission no','admission no.','reg no','reg. no']);
+    const student_name = valueAt(headers,row,['student name','name']);
+    const class_section = valueAt(headers,row,['class','class section','class/section']);
+    const schedule = feeStructure.get(class_section);
+    if(!reg_no || !student_name || !class_section){ skipped.push(`Row ${index + 2}: missing required value`); return; }
+    if(existing.has(reg_no)){ skipped.push(`Row ${index + 2}: admission no. ${reg_no} already exists`); return; }
+    if(!schedule){ skipped.push(`Row ${index + 2}: no fee structure for ${class_section}`); return; }
+    records.push({ reg_no, student_name, class_section, father_name:valueAt(headers,row,['father name','father']), mother_name:valueAt(headers,row,['mother name','mother']), dob:normaliseFeeDate(valueAt(headers,row,['dob','date of birth'])), admission_date:normaliseFeeDate(valueAt(headers,row,['admission date','admission'])), category:valueAt(headers,row,['category']) || null, mobile_number:valueAt(headers,row,['mobile','mobile number','mobile no']) || null, address:valueAt(headers,row,['address']) || null, prev_session_fee:Number(valueAt(headers,row,['last year due','previous session fee','prev session fee']) || 0), q1_fee:Number(schedule.q1_fee || 0), q2_fee:Number(schedule.q2_fee || 0), q3_fee:Number(schedule.q3_fee || 0), q4_fee:Number(schedule.q4_fee || 0), bus_fee:Number(schedule.bus_fee || 0), fee_status:'DUE' });
+  });
+  if(!records.length){ alert('No rows can be imported.\n' + skipped.join('\n')); return; }
+  for(let i=0;i<records.length;i+=100){ const { error } = await supabaseClient.from('student_fees').insert(records.slice(i,i+100)); if(error){ alert('Import stopped: ' + errMsg(error)); return; } }
+  closeFeeDialog(); await loadFeePortal(); alert(`Imported ${records.length} student(s).${skipped.length ? '\nSkipped:\n' + skipped.join('\n') : ''}`);
+}
+
+function openBulkPaymentDialog(){
+  openFeeDialog('Bulk Update Paid Fees', `<p class="fs-modal-sub">CSV columns: <strong>Admission No, Component, Amount</strong>. Optional: Date, Mode, Receipt No, Remarks. Component must be Q1, Q2, Q3, Q4, or BUS. Each valid row creates a payment record.</p>
+    <div class="field">${csvFileInput('bulkPaymentsFile')}<textarea id="bulkPaymentsFile_text" placeholder="Admission No,Component,Amount,Date,Mode,Receipt No,Remarks"></textarea></div>
+    <div class="actions"><button class="btn-secondary" onclick="closeFeeDialog()">Cancel</button><button class="btn-primary" onclick="saveBulkFeePayments()">Update Paid Fees</button></div>`);
+}
+async function saveBulkFeePayments(){
+  const { headers, rows } = parseFeeCsv(document.getElementById('bulkPaymentsFile_text').value);
+  if(!rows.length || ['admission no','component','amount'].some(h => !headers.includes(h))){ alert('CSV must include Admission No, Component, Amount.'); return; }
+  const byReg = new Map(feeRecords.map(r => [String(r.reg_no).trim(), r]));
+  const { data: user } = await supabaseClient.auth.getUser(); let saved = 0; const skipped = [];
+  for(let i=0;i<rows.length;i++){
+    const row = rows[i], reg = valueAt(headers,row,['admission no','admission no.','reg no','reg. no']), component = valueAt(headers,row,['component']).toUpperCase(), amount = Number(valueAt(headers,row,['amount'])); const record = byReg.get(reg);
+    if(!record || !['Q1','Q2','Q3','Q4','BUS'].includes(component) || !(amount > 0)){ skipped.push(`Row ${i+2}: invalid admission no., component, or amount`); continue; }
+    const { error } = await supabaseClient.rpc('record_fee_payment',{p_student_fee_id:record.id,p_component:component,p_amount:amount,p_payment_date:normaliseFeeDate(valueAt(headers,row,['date','payment date'])) || new Date().toISOString().slice(0,10),p_mode:valueAt(headers,row,['mode']) || null,p_receipt_no:valueAt(headers,row,['receipt no','receipt number']) || null,p_remarks:valueAt(headers,row,['remarks']) || null,p_recorded_by:user?.user?.email || null});
+    if(error) skipped.push(`Row ${i+2}: ${errMsg(error)}`); else saved++;
+  }
+  closeFeeDialog(); await loadFeePortal(); alert(`Updated ${saved} payment(s).${skipped.length ? '\nSkipped:\n' + skipped.join('\n') : ''}`);
+}
+
+function openFeeStructureDialog(){
+  const rows = [...feeStructure.values()].map(r => `<tr><td>${escapeHtml(r.class_section)}</td>${['q1_fee','q2_fee','q3_fee','q4_fee'].map(k => `<td><input id="feeStructure_${r.class_section}_${k}" type="number" min="0" step="0.01" value="${Number(r[k] || 0)}"></td>`).join('')}</tr>`).join('');
+  openFeeDialog('Edit Fee Structure', `<p class="fs-modal-sub">Changes apply to future bulk student imports. Existing students retain their current fees until you edit them individually. Bus fee remains a per-student amount.</p><div class="table-container"><table><thead><tr><th>Class</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th></tr></thead><tbody>${rows}</tbody></table></div><div class="actions"><button class="btn-secondary" onclick="closeFeeDialog()">Cancel</button><button class="btn-primary" onclick="saveFeeStructure()">Save Structure</button></div>`);
+}
+async function saveFeeStructure(){
+  const updates = [...feeStructure.values()].map(r => ({class_section:r.class_section,q1_fee:Number(document.getElementById(`feeStructure_${r.class_section}_q1_fee`).value||0),q2_fee:Number(document.getElementById(`feeStructure_${r.class_section}_q2_fee`).value||0),q3_fee:Number(document.getElementById(`feeStructure_${r.class_section}_q3_fee`).value||0),q4_fee:Number(document.getElementById(`feeStructure_${r.class_section}_q4_fee`).value||0)}));
+  const { error } = await supabaseClient.from('fee_structure').upsert(updates,{onConflict:'class_section'}); if(error){ alert('Could not save fee structure: '+errMsg(error)); return; }
+  closeFeeDialog(); await loadFeePortal();
+}
+
+function exportFeeReport(component){
+  const columns = component === 'full' ? [['Q1 Fee','q1_fee'],['Q1 Paid','q1_paid'],['Q1 Due',r=>Math.max(0,Number(r.q1_fee||0)-Number(r.q1_paid||0))],['Q2 Fee','q2_fee'],['Q2 Paid','q2_paid'],['Q2 Due',r=>Math.max(0,Number(r.q2_fee||0)-Number(r.q2_paid||0))],['Q3 Fee','q3_fee'],['Q3 Paid','q3_paid'],['Q3 Due',r=>Math.max(0,Number(r.q3_fee||0)-Number(r.q3_paid||0))],['Q4 Fee','q4_fee'],['Q4 Paid','q4_paid'],['Q4 Due',r=>Math.max(0,Number(r.q4_fee||0)-Number(r.q4_paid||0))],['Bus Fee','bus_fee'],['Bus Paid','bus_fee_paid'],['Bus Due',r=>Math.max(0,Number(r.bus_fee||0)-Number(r.bus_fee_paid||0))],['Last Year Due','prev_session_fee'],['Total Fee',feeTotal],['Total Paid',feePaid],['Total Due',feeDue]] : [[`${component} Fee`,component === 'BUS' ? 'bus_fee' : component.toLowerCase()+'_fee'],[`${component} Paid`,component === 'BUS' ? 'bus_fee_paid' : component.toLowerCase()+'_paid'],[`${component} Due`,r=>{const fee=component==='BUS'?r.bus_fee:r[component.toLowerCase()+'_fee'];const paid=component==='BUS'?r.bus_fee_paid:r[component.toLowerCase()+'_paid'];return Math.max(0,Number(fee||0)-Number(paid||0));}]];
+  const header = ['Admission No','Student Name','Class','Father Name','Mobile',...columns.map(c=>c[0])];
+  const output = [header,...feeRecords.map(r=>[r.reg_no,r.student_name,r.class_section,r.father_name,r.mobile_number,...columns.map(([,key])=>typeof key==='function'?key(r):r[key])])];
+  const csv = '\uFEFF' + output.map(row=>row.map(csvEscape).join(',')).join('\n'); const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})); const a=document.createElement('a'); a.href=url;a.download=`fee_report_${component.toLowerCase()}_${new Date().toISOString().slice(0,10)}.csv`;a.click();URL.revokeObjectURL(url);
 }
 
 /* Exports the current tab's data as a CSV plus every uploaded document (photos, certificates, Aadhar
