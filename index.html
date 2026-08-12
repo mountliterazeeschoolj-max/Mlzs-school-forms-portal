@@ -6009,22 +6009,6 @@ function renderTTBuilder(){
   area.innerHTML = `<table class="tt-grid"><thead><tr><th></th>${DAY_NAMES.slice(1).map(d => `<th>${d}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>`;
 }
 
-function openTTCellDialog(day, periodId, classSection){
-  const period = ttPeriods.find(p => p.id === periodId);
-  const existing = ttTimetable.find(t => t.day_of_week === day && t.period_id === periodId && t.class_section === classSection);
-  const encodedClassSection = ttEncodeValue(classSection);
-  const busyTeacherIds = new Set(ttTimetable.filter(t => t.day_of_week === day && t.period_id === periodId && t.teacher_id && t.id !== existing?.id).map(t => t.teacher_id));
-  const subjectOptions = '<option value="">— No subject —</option>' + ttSubjects.map(s => `<option value="${s.id}" ${existing?.subject_id === s.id ? 'selected' : ''}>${escapeHtml(s.name)}</option>`).join('');
-  const teacherOptions = '<option value="">— No teacher —</option>' + ttTeachers.map(t => `<option value="${t.id}" ${existing?.teacher_id === t.id ? 'selected' : ''} ${busyTeacherIds.has(t.id) ? 'disabled' : ''}>${escapeHtml(t.full_name?.trim() || '')}${busyTeacherIds.has(t.id) ? ' (busy this period)' : ''}</option>`).join('');
-  openFeeDialog(`${DAY_NAMES[day]} &middot; ${escapeHtml(period?.label || '')} &middot; ${escapeHtml(classSection)}`, `<div class="fee-form-grid">
-    <div class="field"><label>Subject</label><select id="tt_cell_subject">${subjectOptions}</select></div>
-    <div class="field"><label>Teacher</label><select id="tt_cell_teacher">${teacherOptions}</select></div>
-  </div><div class="actions">
-    ${existing ? `<button class="del-btn" onclick="clearTTCell(${existing.id})">Clear Slot</button>` : ''}
-    <button class="btn-secondary" onclick="closeFeeDialog()">Cancel</button>
-    <button class="btn-primary" onclick="saveTTCell(${day},${periodId},ttDecodeValue('${encodedClassSection}'),${existing?.id || 'null'})">Save</button>
-  </div>`);
-}
 async function saveTTCell(day, periodId, classSection, existingId){
   const subjectId = document.getElementById('tt_cell_subject').value || null;
   const teacherId = document.getElementById('tt_cell_teacher').value || null;
@@ -6078,27 +6062,6 @@ function populateTTAbsentTeacherSelect(){
   if(ttTeachers.some(t => t.id === previous)) select.value = previous;
 }
 
-async function ttMarkAbsentAndFill(){
-  const teacherId = document.getElementById('ttAbsentTeacher').value;
-  const date = document.getElementById('ttAbsentDate').value;
-  const reason = document.getElementById('ttAbsentReason').value.trim() || null;
-  if(!teacherId || !date){ alert('Choose a teacher and a date.'); return; }
-  if(!ttWeekdayForDate(date)){
-    alert('Auto-substitution is available for Monday through Saturday only.');
-    return;
-  }
-  try{
-    const { data, error } = await supabaseClient.rpc('auto_fill_substitutes', { p_teacher_id: teacherId, p_absence_date: date, p_reason: reason });
-    if(error) throw error;
-    document.getElementById('ttAbsentReason').value = '';
-    document.getElementById('ttSubsViewDate').value = date;
-    await loadTTSubsForDate();
-    const rows = data || [];
-    const unassigned = rows.filter(r => r.status === 'UNASSIGNED').length;
-    alert(rows.length ? `Assigned substitutes for ${rows.length} period(s).${unassigned ? ` ${unassigned} period(s) still need a substitute picked manually below.` : ''}` : `${ttTeacherName(teacherId)} has no periods scheduled on that weekday.`);
-  } catch(err){ alert('Could not process this absence: ' + errMsg(err)); }
-}
-
 let ttSubsRows = [];
 async function loadTTSubsForDate(){
   const date = document.getElementById('ttSubsViewDate').value;
@@ -6115,41 +6078,6 @@ async function loadTTSubsForDate(){
     await renderTTSubsTable();
   } catch(err){ area.innerHTML = '<div class="empty">Could not load substitutions: ' + escapeHtml(errMsg(err)) + '</div>'; }
 }
-async function renderTTSubsTable(){
-  const area = document.getElementById('ttSubsArea');
-  const dayOfWeek = ttWeekdayForDate(ttSubsRows[0]?.absence_date || '');
-  if(!dayOfWeek) throw new Error('Substitution charts are available for Monday through Saturday only.');
-  const candidateLists = await Promise.all(ttSubsRows.map(row => {
-    return supabaseClient.rpc('get_substitute_candidates', { p_absence_date: row.absence_date, p_day_of_week: dayOfWeek, p_period_id: row.period_id, p_subject_id: row.subject_id, p_original_teacher: row.original_teacher_id });
-  }));
-  const candidateError = candidateLists.find(result => result.error)?.error;
-  if(candidateError) throw candidateError;
-  const rowsHtml = ttSubsRows.map((row, i) => {
-    const period = ttPeriods.find(p => p.id === row.period_id);
-    const candidates = candidateLists[i]?.data || [];
-    const options = ['<option value="">— Unassigned —</option>']
-      .concat(row.substitute_teacher_id && !candidates.some(c => c.teacher_id === row.substitute_teacher_id) ? [`<option value="${row.substitute_teacher_id}" selected>${escapeHtml(ttTeacherName(row.substitute_teacher_id))} (currently assigned)</option>`] : [])
-      .concat(candidates.map(c => `<option value="${c.teacher_id}" ${row.substitute_teacher_id === c.teacher_id ? 'selected' : ''}>${escapeHtml(c.full_name)}${c.subject_match ? ' — same subject' : ''}</option>`));
-    const badgeClass = row.status === 'AUTO' ? 'auto' : (row.status === 'MANUAL' ? 'manual' : 'unassigned');
-    return `<tr>
-      <td>${escapeHtml(period?.label || '')}</td>
-      <td>${escapeHtml(row.class_section)}</td>
-      <td>${escapeHtml(ttSubjectName(row.subject_id) || '—')}</td>
-      <td>${escapeHtml(ttTeacherName(row.original_teacher_id))}</td>
-      <td><select onchange="ttSetSubstitute(${row.id}, this.value)">${options.join('')}</select></td>
-      <td><span class="tt-badge ${badgeClass}">${row.status}</span></td>
-    </tr>`;
-  }).join('');
-  area.innerHTML = `<table class="tt-subs-table"><thead><tr><th>Period</th><th>Class</th><th>Subject</th><th>Absent Teacher</th><th>Substitute</th><th>Status</th></tr></thead><tbody>${rowsHtml}</tbody></table>`;
-}
-async function ttSetSubstitute(subId, newTeacherId){
-  try{
-    const { error } = await supabaseClient.from('tt_substitutions').update({ substitute_teacher_id: newTeacherId || null, status: newTeacherId ? 'MANUAL' : 'UNASSIGNED' }).eq('id', subId);
-    if(error) throw error;
-    await loadTTSubsForDate();
-  } catch(err){ alert('Could not set this substitute — they may already be booked elsewhere that period. ' + errMsg(err)); }
-}
-
 /* ---- Attendance-aware substitutions and safe manual override ---- */
 function ttToggleOnDutyFields(){
   const isOnDuty = document.getElementById('ttAttendanceStatus')?.value === 'ON_DUTY';
