@@ -377,6 +377,9 @@
   .tt-chip{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #d6e3ec;border-radius:20px;padding:7px 8px 7px 14px;font-size:12.5px;color:var(--ink);}
   .tt-chip .tt-chip-del{cursor:pointer;width:18px;height:18px;border-radius:50%;background:#f1e3e0;color:#b1392d;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;line-height:1;}
   .tt-chip .tt-chip-del:hover{background:#e6c9c4;}
+  .tt-chip-click{cursor:pointer;}
+  .tt-chip-click:hover{border-color:var(--accent-light);background:#f5fafd;}
+  .tt-chip-count{font-size:10.5px;font-weight:600;color:var(--muted);background:var(--field);padding:2px 8px;border-radius:10px;}
   .tt-period-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #e8eef3;font-size:12.5px;}
   .tt-period-row:last-child{border-bottom:none;}
   .tt-period-row .no{font-weight:800;color:var(--accent);min-width:26px;}
@@ -1890,8 +1893,8 @@
     <div id="ttSetupView">
       <div class="fee-panel">
         <h2>Classes</h2>
-        <p class="fs-modal-sub">Every class/section that needs a timetable. Use the same format as elsewhere, e.g. <code>9 (A)</code>.</p>
-        <div class="fee-actions"><input type="text" id="ttNewClass" placeholder="e.g. 9 (A)"><button class="btn-primary" onclick="ttAddClass()">Add Class</button></div>
+        <p class="fs-modal-sub">Add a class (e.g. <code>9</code> or <code>Nursery</code>), then click it to manage its sections. Each section gets its own timetable.</p>
+        <div class="fee-actions"><input type="text" id="ttNewClass" placeholder="e.g. 9"><button class="btn-primary" onclick="ttAddClassGroup()">Add Class</button></div>
         <div id="ttClassList" class="tt-chip-list"></div>
       </div>
       <div class="fee-panel">
@@ -5487,7 +5490,7 @@ async function exportAllWithFiles(){
   }
 }
 /* ============ TIMETABLE & AUTO-SUBSTITUTE ============ */
-let ttClasses = [], ttSubjects = [], ttPeriods = [], ttTimetable = [], ttTeachers = [];
+let ttClassGroups = [], ttClasses = [], ttSubjects = [], ttPeriods = [], ttTimetable = [], ttTeachers = [];
 let ttClassRequirements = [], ttTeacherAssignments = [];
 let ttCurrentView = 'setup';
 const DAY_NAMES = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -5502,7 +5505,8 @@ function ttWeekdayForDate(date){
 
 async function loadTimetable(){
   try{
-    const [classesRes, subjectsRes, periodsRes, timetableRes, teachersRes, requirementsRes, assignmentsRes] = await Promise.all([
+    const [classGroupsRes, classesRes, subjectsRes, periodsRes, timetableRes, teachersRes, requirementsRes, assignmentsRes] = await Promise.all([
+      supabaseClient.from('tt_class_groups').select('*').order('sort_order').order('name'),
       supabaseClient.from('tt_classes').select('*').order('sort_order').order('class_section'),
       supabaseClient.from('tt_subjects').select('*').order('name'),
       supabaseClient.from('tt_periods').select('*').order('period_no'),
@@ -5511,7 +5515,8 @@ async function loadTimetable(){
       supabaseClient.from('tt_class_subject_requirements').select('*'),
       supabaseClient.from('tt_teacher_assignments').select('*')
     ]);
-    for(const r of [classesRes, subjectsRes, periodsRes, timetableRes, teachersRes, requirementsRes, assignmentsRes]) if(r.error) throw r.error;
+    for(const r of [classGroupsRes, classesRes, subjectsRes, periodsRes, timetableRes, teachersRes, requirementsRes, assignmentsRes]) if(r.error) throw r.error;
+    ttClassGroups = classGroupsRes.data || [];
     ttClasses = classesRes.data || []; ttSubjects = subjectsRes.data || []; ttPeriods = periodsRes.data || [];
     ttTimetable = timetableRes.data || []; ttTeachers = teachersRes.data || [];
     ttClassRequirements = requirementsRes.data || []; ttTeacherAssignments = assignmentsRes.data || [];
@@ -5548,28 +5553,72 @@ function switchTTView(view){
   else if(view === 'substitutes'){ loadTTSubsForDate(); }
 }
 
-/* ---- Setup: classes, subjects, periods ---- */
+/* ---- Setup: classes (groups) & their sections, subjects, periods ---- */
 function renderTTClasses(){
-  document.getElementById('ttClassList').innerHTML = ttClasses.length ? ttClasses.map(c => `<div class="tt-chip">${escapeHtml(c.class_section)}<span class="tt-chip-del" onclick="ttDeleteClass(ttDecodeValue('${ttEncodeValue(c.class_section)}'))">&times;</span></div>`).join('') : '<div class="empty">No classes added yet.</div>';
+  document.getElementById('ttClassList').innerHTML = ttClassGroups.length ? ttClassGroups.map(g => {
+    const count = ttClasses.filter(c => c.class_group_id === g.id).length;
+    return `<div class="tt-chip tt-chip-click" onclick="ttOpenClassGroup(${g.id})">${escapeHtml(g.name)} <span class="tt-chip-count">${count} section${count === 1 ? '' : 's'}</span><span class="tt-chip-del" onclick="event.stopPropagation();ttDeleteClassGroup(${g.id})">&times;</span></div>`;
+  }).join('') : '<div class="empty">No classes added yet.</div>';
 }
-async function ttAddClass(){
+async function ttAddClassGroup(){
   const input = document.getElementById('ttNewClass');
   const value = input.value.trim();
   if(!value) return;
   try{
-    const { error } = await supabaseClient.from('tt_classes').insert({ class_section: value });
+    const { error } = await supabaseClient.from('tt_class_groups').insert({ name: value });
     if(error) throw error;
     input.value = '';
     await loadTimetable();
   } catch(err){ alert('Could not add class: ' + errMsg(err)); }
 }
-async function ttDeleteClass(classSection){
-  if(!confirm(`Remove class "${classSection}"? Its timetable entries will also be removed.`)) return;
+async function ttDeleteClassGroup(id){
+  const group = ttClassGroups.find(g => g.id === id);
+  if(!confirm(`Remove class "${group?.name || ''}"? All its sections and their timetable entries will also be removed.`)) return;
+  try{
+    const { error } = await supabaseClient.from('tt_class_groups').delete().eq('id', id);
+    if(error) throw error;
+    await loadTimetable();
+  } catch(err){ alert('Could not remove class: ' + errMsg(err)); }
+}
+function ttClassGroupModalHtml(groupId){
+  const group = ttClassGroups.find(g => g.id === groupId);
+  const sections = ttClasses.filter(c => c.class_group_id === groupId)
+    .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0) || (a.section_name || '').localeCompare(b.section_name || ''));
+  const list = sections.length ? sections.map(c => `<div class="tt-chip">${escapeHtml(c.section_name || 'No section')}<span class="tt-chip-del" onclick="ttDeleteSection(ttDecodeValue('${ttEncodeValue(c.class_section)}'),${groupId})">&times;</span></div>`).join('')
+    : '<div class="empty">No sections yet — add one below, or leave the name blank for a class with no sections.</div>';
+  return `<p class="fs-modal-sub">Sections belonging to <strong>${escapeHtml(group?.name || '')}</strong>. Each section gets its own timetable.</p>
+    <div id="ttSectionList" class="tt-chip-list">${list}</div>
+    <div class="fee-actions" style="margin-top:14px;"><input type="text" id="ttNewSection" placeholder="e.g. A — leave blank for no sections"><button class="btn-primary" onclick="ttAddSection(${groupId})">Add Section</button></div>`;
+}
+function ttOpenClassGroup(groupId){
+  const group = ttClassGroups.find(g => g.id === groupId);
+  if(!group) return;
+  openFeeDialog(`Sections — ${escapeHtml(group.name)}`, ttClassGroupModalHtml(groupId));
+}
+async function ttAddSection(groupId){
+  const group = ttClassGroups.find(g => g.id === groupId);
+  if(!group) return;
+  const input = document.getElementById('ttNewSection');
+  const sectionName = input.value.trim();
+  const classSection = sectionName ? `${group.name} (${sectionName})` : group.name;
+  try{
+    const nextSort = Math.max(0, ...ttClasses.filter(c => c.class_group_id === groupId).map(c => c.sort_order || 0)) + 1;
+    const { error } = await supabaseClient.from('tt_classes').insert({ class_section: classSection, class_group_id: groupId, section_name: sectionName || null, sort_order: nextSort });
+    if(error) throw error;
+    await loadTimetable();
+    closeFeeDialog();
+    ttOpenClassGroup(groupId);
+  } catch(err){ alert('Could not add section: ' + errMsg(err)); }
+}
+async function ttDeleteSection(classSection, groupId){
+  if(!confirm(`Remove section "${classSection}"? Its timetable entries will also be removed.`)) return;
   try{
     const { error } = await supabaseClient.from('tt_classes').delete().eq('class_section', classSection);
     if(error) throw error;
     await loadTimetable();
-  } catch(err){ alert('Could not remove class: ' + errMsg(err)); }
+    closeFeeDialog();
+    if(groupId) ttOpenClassGroup(groupId);
+  } catch(err){ alert('Could not remove section: ' + errMsg(err)); }
 }
 
 function renderTTSubjects(){
