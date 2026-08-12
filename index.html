@@ -1788,7 +1788,7 @@
 
     <div id="feeStudentsView" style="display:none;">
       <div class="fee-actions">
-        <input type="text" id="feeSearchBox" placeholder="Search admission no., student, class, parent or mobile" oninput="renderFeeTable()">
+        <input type="text" id="feeSearchBox" placeholder="Search admission no., student, class, parent or mobile" oninput="debounce('feeSearch', renderFeeTable, 180)">
         <button class="btn-primary" onclick="openFeeStudentDialog()">Add Student</button>
         <button class="btn-secondary" onclick="exportFeeCsv('due')">Export Due Data</button>
         <button class="btn-secondary" onclick="exportFeeCsv('paid')">Export Paid Data</button>
@@ -4848,6 +4848,26 @@ const feeMoney = value => '₹' + Number(value || 0).toLocaleString('en-IN', {ma
 const feeTotal = r => Number(r.q1_fee || 0) + Number(r.q2_fee || 0) + Number(r.q3_fee || 0) + Number(r.q4_fee || 0) + Number(r.bus_fee || 0);
 const feePaid = r => Number(r.q1_paid || 0) + Number(r.q2_paid || 0) + Number(r.q3_paid || 0) + Number(r.q4_paid || 0) + Number(r.bus_fee_paid || 0);
 const feeDue = r => Math.max(0, feeTotal(r) - feePaid(r));
+
+/* Generic debounce keyed by name, so repeated calls (e.g. every keystroke in a search box)
+   collapse into one run after the user pauses instead of re-rendering on every character. */
+const _debounceTimers = {};
+function debounce(key, fn, wait){
+  clearTimeout(_debounceTimers[key]);
+  _debounceTimers[key] = setTimeout(fn, wait);
+}
+
+/* Patches one row into the in-memory feeRecords array (used after a single-student save/payment)
+   and re-renders only the views that depend on it — no network refetch, no full-portal re-render. */
+function patchFeeRecord(updated){
+  if(!updated) return;
+  const idx = feeRecords.findIndex(r => r.id === updated.id);
+  if(idx === -1) feeRecords.push(updated); else feeRecords[idx] = updated;
+  renderFeeKpis();
+  renderFeeTable();
+  renderOnlineFeeReport();
+  if(selectedFeeRecord?.id === updated.id){ selectedFeeRecord = updated; renderFeeStudentDashboard(); }
+}
 function feeComponentDue(r, component){
   const key = component === 'BUS' ? 'bus' : component.toLowerCase();
   return Math.max(0, Number(r[key + '_fee'] || 0) - Number(r[key + '_paid'] || 0));
@@ -4999,9 +5019,11 @@ async function saveFeeStudent(id){
   ['prev_session_fee','q1_fee','q2_fee','q3_fee','q4_fee','bus_fee'].forEach(k => record[k] = Number(record[k] || 0));
   if(!record.reg_no || !record.student_name || !record.class_section){ alert('Admission number, student name and class are required.'); return; }
   try{
-    const result = id ? await supabaseClient.from('student_fees').update(record).eq('id', id) : await supabaseClient.from('student_fees').insert(record);
+    const result = id ? await supabaseClient.from('student_fees').update(record).eq('id', id).select().single() : await supabaseClient.from('student_fees').insert(record).select().single();
     if(result.error) throw result.error;
-    closeFeeDialog(); await loadFeePortal();
+    closeFeeDialog();
+    patchFeeRecord(result.data);
+    populateFeeOnlineClasses();
   } catch(err){ alert('Could not save student: ' + errMsg(err)); }
 }
 
@@ -5025,9 +5047,10 @@ async function saveFeePayment(id){
   if(!(amount > 0)){ alert('Enter a payment amount greater than zero.'); return; }
   if(amount > remaining){ alert(`Amount exceeds the remaining ${component === 'BUS' ? 'Bus Fee' : component} due of ${feeMoney(remaining)}.`); return; }
   const { data: user } = await supabaseClient.auth.getUser();
-  const { error } = await supabaseClient.rpc('record_fee_payment', { p_student_fee_id:id, p_component:component, p_amount:amount, p_payment_date:document.getElementById('fp_date').value, p_mode:document.getElementById('fp_mode').value || null, p_receipt_no:document.getElementById('fp_receipt').value || null, p_remarks:document.getElementById('fp_remarks').value || null, p_recorded_by:user?.user?.email || null });
+  const { data, error } = await supabaseClient.rpc('record_fee_payment', { p_student_fee_id:id, p_component:component, p_amount:amount, p_payment_date:document.getElementById('fp_date').value, p_mode:document.getElementById('fp_mode').value || null, p_receipt_no:document.getElementById('fp_receipt').value || null, p_remarks:document.getElementById('fp_remarks').value || null, p_recorded_by:user?.user?.email || null });
   if(error){ alert('Could not record payment: ' + errMsg(error)); return; }
-  closeFeeDialog(); await loadFeePortal();
+  closeFeeDialog();
+  patchFeeRecord(data);
 }
 
 async function openFeePaymentHistory(id){
@@ -5046,7 +5069,8 @@ async function deleteFeeStudent(id){
     const { error: paymentsError } = await supabaseClient.from('fee_payments').delete().eq('student_fee_id', id); if(paymentsError) throw paymentsError;
     const { error } = await supabaseClient.from('student_fees').delete().eq('id', id); if(error) throw error;
     if(selectedFeeRecord?.id === id) selectedFeeRecord = null;
-    await loadFeePortal();
+    feeRecords = feeRecords.filter(r => r.id !== id);
+    renderFeeKpis(); renderFeeTable(); renderOnlineFeeReport(); renderFeeStudentDashboard();
   } catch(err){ alert('Could not remove student: ' + errMsg(err)); }
 }
 
