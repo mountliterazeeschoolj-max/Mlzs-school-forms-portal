@@ -122,6 +122,36 @@
   .oasis-card .oasis-id-badge .lbl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;}
   .oasis-card .oasis-id-badge .val{font-size:21px;font-weight:800;color:var(--accent);letter-spacing:0.5px;}
   .oasis-card .oasis-note{margin-top:12px;font-size:11.5px;color:var(--muted);line-height:1.5;}
+
+  /* ---- Fee status lookup card (landing page) ---- */
+  .fee-summary-card{
+    margin:0 auto;max-width:460px;text-align:left;border-radius:12px;
+    border:1px solid #cfe0ee;background:linear-gradient(160deg,#eef5fb,#fbfdff);
+    padding:18px 20px;animation:fadeInUp 0.5s ease;
+  }
+  .fee-summary-card.not-found{background:linear-gradient(160deg,#fdf4e9,#fffaf4);border-color:#ecd2a4;}
+  .fee-summary-card .fsc-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px;}
+  .fee-summary-card .fsc-name{font-size:15px;font-weight:800;color:var(--ink);}
+  .fee-summary-card .fsc-meta{font-size:11.5px;color:var(--muted);margin-top:2px;}
+  .fee-summary-card .fsc-status{
+    font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;
+    border-radius:20px;padding:4px 11px;flex-shrink:0;color:#fff;background:var(--accent);
+  }
+  .fee-summary-card .fsc-status.due{background:#c0392b;}
+  .fee-summary-card .fsc-status.paid{background:#1f8a4c;}
+  .fee-summary-card .fsc-status.rte{background:#7a5cc0;}
+  .fee-summary-card table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:6px;}
+  .fee-summary-card th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.4px;color:var(--muted);padding:4px 6px;border-bottom:1px solid #d8e4ee;}
+  .fee-summary-card td{padding:6px 6px;border-bottom:1px solid #e7eef5;color:var(--ink);}
+  .fee-summary-card tr:last-child td{border-bottom:none;}
+  .fee-summary-card .fsc-totals{
+    display:flex;justify-content:space-between;gap:10px;margin-top:14px;
+    background:#fff;border:1.5px solid var(--accent);border-radius:8px;padding:10px 14px;
+  }
+  .fee-summary-card .fsc-totals .lbl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;}
+  .fee-summary-card .fsc-totals .val{font-size:16px;font-weight:800;color:var(--accent);}
+  .fee-summary-card .fsc-totals .val.due-val{color:#c0392b;}
+  .fee-summary-card .fsc-note{margin-top:12px;font-size:11.5px;color:var(--muted);line-height:1.5;}
   @media (max-width:860px){
     .row{grid-template-columns:1fr 1fr;}
   }
@@ -473,6 +503,11 @@
       <div class="icon">🧑‍🏫</div>
       <h3>Staff Data Bank</h3>
       <p>Log in or register, then fill in &amp; update your staff record</p>
+    </div>
+    <div class="card" id="cardFees" onclick="openFeeLookup()">
+      <div class="icon">🧾</div>
+      <h3>Check Fee Status</h3>
+      <p>Parents — view your ward's fee dues by admission no. &amp; date of birth</p>
     </div>
   </div>
   <a class="oasis-lookup-link" onclick="openOasisLookup()">🔍 Staff — Find your CBSE Oasis ID by name &amp; date of birth</a>
@@ -1944,6 +1979,29 @@
   </div>
 </div>
 
+<div class="fs-modal" id="feeLookupModal" style="display:none;">
+  <div class="fs-modal-inner">
+    <h2>Check Fee Status</h2>
+    <p class="fs-modal-sub">Enter your ward's admission/registration number and date of birth. No login required — this only shows that one student's fee summary.</p>
+
+    <div class="field" style="margin-bottom:12px;">
+      <label>Admission / Registration No.</label>
+      <input type="text" id="feeLookupRegNo" placeholder="e.g. 1023">
+    </div>
+    <div class="field" style="margin-bottom:6px;">
+      <label>Student's Date of Birth</label>
+      <input type="text" id="feeLookupDob" placeholder="DD/MM/YYYY" inputmode="numeric" maxlength="10" oninput="formatDateInput(this)">
+    </div>
+
+    <div id="feeLookupResult" style="margin-top:16px;"></div>
+
+    <div class="fs-modal-actions">
+      <button class="btn-secondary" onclick="closeFeeLookup()">Close</button>
+      <button class="btn-primary" id="feeLookupBtn" onclick="performFeeSelfLookup()">Check Fees</button>
+    </div>
+  </div>
+</div>
+
 <div class="site-footer">© <span id="footerYear"></span> Mount Litera Zee School, Jhansi. All rights reserved. &nbsp;|&nbsp; Developed by <span class="credit">Yash Singh</span></div>
 
 <script>
@@ -2434,6 +2492,79 @@ async function performOasisSelfLookup(){
             '<div class="oasis-name">We couldn\'t find an Oasis ID on file for <strong>' + escapeHtml(name) + '</strong> with that date of birth.</div>' +
             '<div class="oasis-note">Double-check the spelling and date, or contact the HR office — your record may not be on file yet.</div>' +
           '</div>' +
+        '</div>';
+    }
+  } catch(err){
+    console.error(err);
+    resultEl.innerHTML = '<div class="note visible">Could not complete the search: ' + errMsg(err) + '</div>';
+  } finally{
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+}
+
+/* Public, no-login fee lookup for parents, shown as a card on the landing page.
+   Backed by public.get_student_fee_summary(reg_no, dob) — a SECURITY DEFINER RPC that
+   returns exactly one matching student's fee summary and nothing else, so no other
+   student's data or the underlying student_fees rows are ever exposed to anon users. */
+function openFeeLookup(){
+  document.getElementById('feeLookupModal').style.display = 'flex';
+  document.getElementById('feeLookupRegNo').value = '';
+  document.getElementById('feeLookupDob').value = '';
+  document.getElementById('feeLookupResult').innerHTML = '';
+}
+function closeFeeLookup(){
+  document.getElementById('feeLookupModal').style.display = 'none';
+}
+
+async function performFeeSelfLookup(){
+  const resultEl = document.getElementById('feeLookupResult');
+  const regNo = document.getElementById('feeLookupRegNo').value.trim();
+  const dobStr = document.getElementById('feeLookupDob').value.trim();
+  if(!regNo || !dobStr || !isValidDate(dobStr)){
+    resultEl.innerHTML = '<div class="note visible">Please enter the admission/registration number and a valid date of birth (DD/MM/YYYY).</div>';
+    return;
+  }
+  const btn = document.getElementById('feeLookupBtn');
+  btn.disabled = true;
+  const originalText = btn.textContent;
+  btn.textContent = 'Checking...';
+  try{
+    const { data, error } = await supabaseClient.rpc('get_student_fee_summary', { p_reg_no: regNo, p_dob: dmyToIso(dobStr) });
+    if(error) throw error;
+    const r = Array.isArray(data) ? data[0] : data;
+    if(r){
+      const totalDue = Number(r.total_due || 0);
+      const statusClass = r.fee_status === 'RTE' ? 'rte' : (totalDue > 0 ? 'due' : 'paid');
+      const statusLabel = r.fee_status === 'RTE' ? 'RTE' : (totalDue > 0 ? 'Due' : 'Paid');
+      const rows = [
+        r.prev_session_fee > 0 ? ['Previous Session', r.prev_session_fee, null] : null,
+        ['Quarter 1', r.q1_fee, r.q1_paid], ['Quarter 2', r.q2_fee, r.q2_paid],
+        ['Quarter 3', r.q3_fee, r.q3_paid], ['Quarter 4', r.q4_fee, r.q4_paid],
+        r.bus_fee > 0 ? ['Bus Fee', r.bus_fee, r.bus_fee_paid] : null
+      ].filter(Boolean);
+      resultEl.innerHTML =
+        '<div class="fee-summary-card">' +
+          '<div class="fsc-head">' +
+            '<div><div class="fsc-name">' + escapeHtml(r.student_name || '') + '</div>' +
+              '<div class="fsc-meta">' + escapeHtml(r.class_section || '') + (r.father_name ? ' &middot; S/o-D/o ' + escapeHtml(r.father_name) : '') + '</div></div>' +
+            '<span class="fsc-status ' + statusClass + '">' + statusLabel + '</span>' +
+          '</div>' +
+          '<table><thead><tr><th>Head</th><th>Fee</th><th>Paid</th></tr></thead><tbody>' +
+            rows.map(row => '<tr><td>' + escapeHtml(row[0]) + '</td><td>' + feeMoney(row[1]) + '</td><td>' + (row[2] === null ? '&mdash;' : feeMoney(row[2])) + '</td></tr>').join('') +
+          '</tbody></table>' +
+          '<div class="fsc-totals">' +
+            '<div><div class="lbl">Total Fee</div><div class="val">' + feeMoney(r.total_fee) + '</div></div>' +
+            '<div><div class="lbl">Total Paid</div><div class="val">' + feeMoney(r.total_paid) + '</div></div>' +
+            '<div><div class="lbl">Balance Due</div><div class="val' + (totalDue > 0 ? ' due-val' : '') + '">' + feeMoney(totalDue) + '</div></div>' +
+          '</div>' +
+          '<div class="fsc-note">For payment modes or a receipt, please contact the school accounts office.</div>' +
+        '</div>';
+    } else {
+      resultEl.innerHTML =
+        '<div class="fee-summary-card not-found">' +
+          '<div class="fsc-name">No Record Found</div>' +
+          '<div class="fsc-note">We couldn\'t find a fee record for admission no. <strong>' + escapeHtml(regNo) + '</strong> with that date of birth. Double-check both fields, or contact the school accounts office.</div>' +
         '</div>';
     }
   } catch(err){
