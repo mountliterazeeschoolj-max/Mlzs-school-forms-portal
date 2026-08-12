@@ -357,6 +357,18 @@
   .fee-dialog-inner h2{margin:0 0 14px;font-size:19px;}
   .fee-form-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
   .fee-form-grid .full{grid-column:1/-1;}
+  .fee-dash-search-wrap{position:relative;margin-bottom:18px;}
+  .fee-dash-search-wrap input{width:100%;border:1px solid #c5d4df;background:#fff;border-radius:7px;padding:11px 14px;font-family:inherit;color:var(--ink);font-size:13.5px;}
+  .fee-dash-search-wrap input:focus{outline:2px solid var(--accent-light);outline-offset:1px;}
+  .fee-dash-search-results{position:absolute;z-index:40;top:calc(100% + 6px);left:0;right:0;max-height:340px;overflow-y:auto;background:#fff;border:1px solid #d6e3ec;border-radius:9px;box-shadow:0 14px 30px rgba(22,58,104,.16);}
+  .fee-dash-result{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;cursor:pointer;border-bottom:1px solid #eef3f7;}
+  .fee-dash-result:last-child{border-bottom:none;}
+  .fee-dash-result:hover{background:#f3f8fc;}
+  .fee-dash-result .fdr-name{font-size:13px;font-weight:700;color:var(--ink);}
+  .fee-dash-result .fdr-meta{font-size:11px;color:var(--muted);margin-top:2px;}
+  .fee-dash-result .fdr-due{font-size:12px;font-weight:800;color:#b1392d;white-space:nowrap;}
+  .fee-dash-result .fdr-due.paid{color:#1f8a4c;}
+  .fee-dash-search-results .empty{padding:14px;font-size:12.5px;}
   @media(max-width:640px){#feeArea{padding:12px;border-radius:8px;}.fee-tabs{overflow-x:auto;flex-wrap:nowrap;}.fee-tabs .tab-btn{min-width:120px;}.fee-summary,.fee-form-grid{grid-template-columns:1fr;}.fee-form-grid .full{grid-column:auto;}.fee-actions input,.fee-actions select{min-width:0;width:100%;}.fee-actions button{flex:1 1 auto;}}
 
   /* ---- Admin: Overview dashboard tab ---- */
@@ -1783,7 +1795,11 @@
     <div id="feeOverviewView">
       <div class="fee-actions"><button class="btn-secondary" onclick="loadFeePortal()">Refresh Fee Data</button></div>
       <div class="fee-kpis" id="feeKpis"></div>
-      <div class="fee-panel" id="feeStudentDashboard"><h2>Student Fee Dashboard</h2><div class="empty">Choose a student from the Students tab to view their fee summary.</div></div>
+      <div class="fee-dash-search-wrap">
+        <input type="text" id="feeDashboardSearch" placeholder="Search a student by admission no., name, class or parent..." oninput="debounce('feeDashSearch', renderFeeDashboardSearch, 180)" onkeydown="if(event.key==='Escape'){this.value='';renderFeeDashboardSearch();}">
+        <div id="feeDashboardSearchResults" class="fee-dash-search-results" style="display:none;"></div>
+      </div>
+      <div class="fee-panel" id="feeStudentDashboard"><h2>Student Fee Dashboard</h2><div class="empty">Search above or choose a student from the Students tab to view their fee summary.</div></div>
     </div>
 
     <div id="feeStudentsView" style="display:none;">
@@ -4986,6 +5002,35 @@ function renderFeeTable(){
 }
 
 function selectFeeStudent(id){ selectedFeeRecord = feeRecords.find(r => r.id === id) || null; switchFeeView('overview'); renderFeeStudentDashboard(); }
+
+/* Live search box on the Fees Overview tab — lets an admin jump straight to a student's
+   dashboard without switching to the Students tab first. Reuses the same match fields as
+   the Students-tab search for consistency. */
+function renderFeeDashboardSearch(){
+  const box = document.getElementById('feeDashboardSearch');
+  const results = document.getElementById('feeDashboardSearchResults');
+  const query = (box.value || '').trim().toLowerCase();
+  if(!query){ results.style.display = 'none'; results.innerHTML = ''; return; }
+  const matches = feeRecords.filter(r => [r.reg_no,r.student_name,r.class_section,r.father_name,r.mother_name,r.mobile_number].some(v => String(v || '').toLowerCase().includes(query))).slice(0, 8);
+  results.style.display = 'block';
+  results.innerHTML = matches.length ? matches.map(r => {
+    const due = feeDue(r);
+    return `<div class="fee-dash-result" onclick="pickFeeDashboardResult(${r.id})">
+      <div><div class="fdr-name">${escapeHtml(r.student_name)}</div><div class="fdr-meta">${escapeHtml(r.reg_no)} &middot; ${escapeHtml(r.class_section)}</div></div>
+      <div class="fdr-due${due > 0 ? '' : ' paid'}">${due > 0 ? feeMoney(due) + ' due' : 'Paid'}</div>
+    </div>`;
+  }).join('') : '<div class="empty">No students match this search.</div>';
+}
+function pickFeeDashboardResult(id){
+  document.getElementById('feeDashboardSearch').value = '';
+  document.getElementById('feeDashboardSearchResults').style.display = 'none';
+  selectedFeeRecord = feeRecords.find(r => r.id === id) || null;
+  renderFeeStudentDashboard();
+}
+document.addEventListener('click', e => {
+  const wrap = document.getElementById('feeDashboardSearch')?.closest('.fee-dash-search-wrap');
+  if(wrap && !wrap.contains(e.target)) document.getElementById('feeDashboardSearchResults').style.display = 'none';
+});
 
 function renderFeeStudentDashboard(){
   const area = document.getElementById('feeStudentDashboard');
