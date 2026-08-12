@@ -1991,6 +1991,16 @@
         </div>
       </div>
       <div class="fee-panel">
+        <h2>Mark Attendance — All Staff</h2>
+        <p class="fs-modal-sub">Everyone defaults to Present. Change status only for staff who are absent, on half-day, or on duty, then create substitutes for all of them in one click.</p>
+        <div class="fee-actions">
+          <input type="date" id="ttBulkAttDate" onchange="renderTTBulkAttendance()">
+          <button class="btn-secondary" onclick="renderTTBulkAttendance()">Refresh</button>
+          <button class="btn-primary" onclick="ttCreateSubstitutesBulk()">Create Substitutes</button>
+        </div>
+        <div class="table-container"><div id="ttBulkAttArea"></div></div>
+      </div>
+      <div class="fee-panel">
         <div class="fee-actions" style="margin-bottom:10px;"><input type="date" id="ttSubsViewDate" onchange="loadTTSubsForDate()"><button class="btn-secondary" onclick="loadTTSubsForDate()">Refresh</button><button class="btn-secondary" onclick="printTTSubs()">Print Substitution Chart</button></div>
         <h2 style="margin-top:0;">Substitution Chart <span id="ttSubsDateLabel" style="font-weight:400;color:var(--muted);font-size:13px;"></span></h2>
         <div class="table-container"><div id="ttSubsArea"><div class="empty">Pick a date above to view its substitution chart.</div></div></div>
@@ -5550,7 +5560,7 @@ function switchTTView(view){
   if(view === 'setup'){ renderTTClasses(); renderTTSubjects(); renderTTPeriods(); renderTTRequirements(); renderTTTeacherAssignmentSubjects(); renderTTTeacherAssignments(); }
   else if(view === 'builder'){ renderTTBuilder(); }
   else if(view === 'teachers'){ renderTTTeacherList(); }
-  else if(view === 'substitutes'){ loadTTSubsForDate(); }
+  else if(view === 'substitutes'){ loadTTSubsForDate(); renderTTBulkAttendance(); }
 }
 
 /* ---- Setup: classes (groups) & their sections, subjects, periods ---- */
@@ -5702,9 +5712,24 @@ function renderTTRequirements(){
   if(!requirements.length){ area.innerHTML = '<div class="empty">No subject-period targets set for this class yet.</div>'; return; }
   const rows = requirements.sort((a,b) => ttSubjectName(a.subject_id).localeCompare(ttSubjectName(b.subject_id))).map(r => {
     const actual = ttTimetable.filter(t => t.class_section === classSection && Number(t.subject_id) === Number(r.subject_id)).length;
-    return `<tr><td>${escapeHtml(ttSubjectName(r.subject_id))}</td><td>${Number(r.periods_per_week)}</td><td>${actual}</td><td><button class="btn-secondary" onclick="ttDeleteRequirement(ttDecodeValue('${ttEncodeValue(r.class_section)}'),${r.subject_id})">Remove</button></td></tr>`;
+    return `<tr><td>${escapeHtml(ttSubjectName(r.subject_id))}</td><td>${Number(r.periods_per_week)}</td><td>${actual}</td><td>
+      <button class="btn-secondary" onclick="ttEditRequirement(ttDecodeValue('${ttEncodeValue(r.class_section)}'),${r.subject_id})">Edit</button>
+      <button class="del-btn" onclick="ttDeleteRequirement(ttDecodeValue('${ttEncodeValue(r.class_section)}'),${r.subject_id})">Remove</button>
+    </td></tr>`;
   }).join('');
   area.innerHTML = `<table class="tt-requirements"><thead><tr><th>Subject</th><th>Target / week</th><th>Scheduled</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+function ttEditRequirement(classSection, subjectId){
+  const req = ttClassRequirements.find(r => r.class_section === classSection && Number(r.subject_id) === Number(subjectId));
+  if(!req) return;
+  const classSelect = document.getElementById('ttReqClass');
+  const subjectSelect = document.getElementById('ttReqSubject');
+  const periodsInput = document.getElementById('ttReqPeriods');
+  if(classSelect) classSelect.value = classSection;
+  if(subjectSelect) subjectSelect.value = String(subjectId);
+  if(periodsInput) periodsInput.value = req.periods_per_week;
+  renderTTRequirements();
+  periodsInput?.scrollIntoView({ behavior:'smooth', block:'center' });
 }
 async function ttSaveRequirement(){
   const classSection = document.getElementById('ttReqClass').value;
@@ -5777,10 +5802,31 @@ function renderTTTeacherAssignments(){
     if(!groups.has(key)) groups.set(key, { teacherId:a.teacher_id, classSection:a.class_section, subjectIds:[] });
     groups.get(key).subjectIds.push(a.subject_id);
   });
-  const rows = [...groups.values()].sort((a,b) => ttTeacherName(a.teacherId).localeCompare(ttTeacherName(b.teacherId))).map(g =>
-    `<tr><td>${escapeHtml(ttTeacherName(g.teacherId))}</td><td>${escapeHtml(g.classSection)}</td><td>${escapeHtml(g.subjectIds.map(ttSubjectName).filter(Boolean).join(', '))}</td></tr>`
+  const rows = [...groups.values()].sort((a,b) => ttTeacherName(a.teacherId).localeCompare(ttTeacherName(b.teacherId)) || a.classSection.localeCompare(b.classSection)).map(g =>
+    `<tr><td>${escapeHtml(ttTeacherName(g.teacherId))}</td><td>${escapeHtml(g.classSection)}</td><td>${escapeHtml(g.subjectIds.map(ttSubjectName).filter(Boolean).join(', '))}</td><td>
+      <button class="btn-secondary" onclick="ttEditTeacherAssignment('${g.teacherId}',ttDecodeValue('${ttEncodeValue(g.classSection)}'))">Edit</button>
+      <button class="del-btn" onclick="ttRemoveTeacherAssignment('${g.teacherId}',ttDecodeValue('${ttEncodeValue(g.classSection)}'))">Remove</button>
+    </td></tr>`
   ).join('');
-  area.innerHTML = `<table><thead><tr><th>Teacher</th><th>Class</th><th>Subjects</th></tr></thead><tbody>${rows}</tbody></table>`;
+  area.innerHTML = `<table><thead><tr><th>Teacher</th><th>Class</th><th>Subjects</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+function ttEditTeacherAssignment(teacherId, classSection){
+  const teacherSelect = document.getElementById('ttAssignmentTeacher');
+  const classSelect = document.getElementById('ttAssignmentClass');
+  if(teacherSelect) teacherSelect.value = teacherId;
+  if(classSelect) classSelect.value = classSection;
+  renderTTTeacherAssignmentSubjects();
+  document.getElementById('ttAssignmentSubjects')?.scrollIntoView({ behavior:'smooth', block:'center' });
+}
+async function ttRemoveTeacherAssignment(teacherId, classSection){
+  if(!confirm(`Remove all timetable subject allocations for ${ttTeacherName(teacherId)} in ${classSection}?`)) return;
+  try{
+    const { error } = await supabaseClient.rpc('replace_teacher_class_subjects', {
+      p_teacher_id: teacherId, p_class_section: classSection, p_subject_ids: []
+    });
+    if(error) throw error;
+    await loadTimetable();
+  } catch(err){ alert('Could not remove this class allocation: ' + errMsg(err)); }
 }
 
 /* ---- Dedicated timetable teacher directory ---- */
@@ -6168,6 +6214,98 @@ async function ttMarkAttendanceAndFill(){
   } catch(err){ alert('Could not save attendance: ' + errMsg(err)); }
 }
 async function ttMarkAbsentAndFill(){ return ttMarkAttendanceAndFill(); }
+
+/* ---- Mark attendance for every staff member at once, then create all substitutes together ---- */
+let ttBulkAttRows = new Map(); // teacherId -> {status, reason, onDutyStart, onDutyEnd, hadRecord}
+const TT_ATTENDANCE_LABELS = { PRESENT:'Present', ABSENT:'Absent', HALF_DAY_FIRST:'Half day — 1st', HALF_DAY_SECOND:'Half day — 2nd', ON_DUTY:'On duty' };
+async function renderTTBulkAttendance(){
+  const dateInput = document.getElementById('ttBulkAttDate');
+  if(!dateInput) return;
+  if(!dateInput.value) dateInput.value = document.getElementById('ttAbsentDate')?.value || new Date().toISOString().slice(0,10);
+  const date = dateInput.value;
+  const area = document.getElementById('ttBulkAttArea');
+  if(!area) return;
+  if(!ttWeekdayForDate(date)){ area.innerHTML = '<div class="empty">Attendance is available for Monday through Saturday only.</div>'; return; }
+  if(!ttTeachers.length){ area.innerHTML = '<div class="empty">No staff records found.</div>'; return; }
+  area.innerHTML = '<div class="loading">Loading...</div>';
+  try{
+    const { data, error } = await supabaseClient.from('tt_absences').select('*').eq('absence_date', date);
+    if(error) throw error;
+    const existing = new Map((data || []).map(a => [a.teacher_id, a]));
+    ttBulkAttRows = new Map(ttTeachers.map(t => {
+      const a = existing.get(t.id);
+      return [t.id, {
+        status: a?.attendance_status || 'PRESENT',
+        reason: a?.reason || '',
+        onDutyStart: a?.on_duty_start_time || '',
+        onDutyEnd: a?.on_duty_end_time || '',
+        hadRecord: !!a
+      }];
+    }));
+    renderTTBulkAttendanceTable();
+  } catch(err){ area.innerHTML = '<div class="empty">Could not load attendance: ' + escapeHtml(errMsg(err)) + '</div>'; }
+}
+function renderTTBulkAttendanceTable(){
+  const area = document.getElementById('ttBulkAttArea');
+  if(!area) return;
+  const rows = ttTeachers.map(t => {
+    const row = ttBulkAttRows.get(t.id) || { status:'PRESENT', reason:'', onDutyStart:'', onDutyEnd:'' };
+    const isOnDuty = row.status === 'ON_DUTY';
+    return `<tr>
+      <td>${escapeHtml(t.full_name?.trim() || '')}</td>
+      <td><select onchange="ttBulkAttSetField('${t.id}','status',this.value)">${Object.entries(TT_ATTENDANCE_LABELS).map(([value, label]) => `<option value="${value}" ${row.status === value ? 'selected' : ''}>${label}</option>`).join('')}</select></td>
+      <td><input type="time" value="${row.onDutyStart || ''}" style="${isOnDuty ? '' : 'display:none;'}" onchange="ttBulkAttSetField('${t.id}','onDutyStart',this.value)"></td>
+      <td><input type="time" value="${row.onDutyEnd || ''}" style="${isOnDuty ? '' : 'display:none;'}" onchange="ttBulkAttSetField('${t.id}','onDutyEnd',this.value)"></td>
+      <td><input type="text" value="${escapeHtml(row.reason || '')}" placeholder="Reason (optional)" onchange="ttBulkAttSetField('${t.id}','reason',this.value)"></td>
+    </tr>`;
+  }).join('');
+  area.innerHTML = `<table class="tt-subs-table"><thead><tr><th>Teacher</th><th>Status</th><th>On-duty start</th><th>On-duty end</th><th>Reason</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+function ttBulkAttSetField(teacherId, field, value){
+  const row = ttBulkAttRows.get(teacherId) || { status:'PRESENT', reason:'', onDutyStart:'', onDutyEnd:'' };
+  row[field] = value;
+  ttBulkAttRows.set(teacherId, row);
+  if(field === 'status') renderTTBulkAttendanceTable();
+}
+async function ttCreateSubstitutesBulk(){
+  const date = document.getElementById('ttBulkAttDate')?.value;
+  if(!date){ alert('Pick a date first.'); return; }
+  if(!ttWeekdayForDate(date)){ alert('Attendance is available for Monday through Saturday only.'); return; }
+  const toProcess = [...ttBulkAttRows.entries()].filter(([, row]) => row.status !== 'PRESENT' || row.hadRecord);
+  if(!toProcess.length){ alert('Nothing to process — everyone is Present with no existing record for this date.'); return; }
+  for(const [, row] of toProcess){
+    if(row.status === 'ON_DUTY' && (!row.onDutyStart || !row.onDutyEnd || row.onDutyStart >= row.onDutyEnd)){
+      alert('One or more "On duty" rows are missing a valid start/end time. Fix those before creating substitutes.');
+      return;
+    }
+  }
+  if(!confirm(`Create substitutes for ${toProcess.length} staff member(s) on ${date}?`)) return;
+  /* Processed one at a time (not in parallel) so each teacher's substitute picks see the
+     assignments already made earlier in this same batch, and to avoid two absences racing
+     for the same substitute slot. */
+  const results = { created: 0, unassigned: 0, cleared: 0, errors: [] };
+  for(const [teacherId, row] of toProcess){
+    try{
+      const { data, error } = await supabaseClient.rpc('auto_fill_substitutes', {
+        p_teacher_id: teacherId,
+        p_absence_date: date,
+        p_reason: row.reason.trim() || null,
+        p_attendance_status: row.status,
+        p_on_duty_start: row.status === 'ON_DUTY' ? row.onDutyStart : null,
+        p_on_duty_end: row.status === 'ON_DUTY' ? row.onDutyEnd : null
+      });
+      if(error) throw error;
+      const rows = data || [];
+      if(row.status === 'PRESENT') results.cleared++;
+      else { results.created += rows.length; results.unassigned += rows.filter(r => r.status === 'UNASSIGNED').length; }
+    } catch(err){ results.errors.push(`${ttTeacherName(teacherId)}: ${errMsg(err)}`); }
+  }
+  document.getElementById('ttSubsViewDate').value = date;
+  await loadTTSubsForDate();
+  await renderTTBulkAttendance();
+  const summary = `Processed ${toProcess.length} staff member(s). Created ${results.created} substitution(s)${results.unassigned ? ` (${results.unassigned} still need a manual pick)` : ''}.${results.cleared ? ` ${results.cleared} marked present.` : ''}` + (results.errors.length ? `\n\nCouldn't process:\n${results.errors.join('\n')}` : '');
+  alert(summary);
+}
 async function renderTTSubsTable(){
   const area = document.getElementById('ttSubsArea');
   const dayOfWeek = ttWeekdayForDate(ttSubsRows[0]?.absence_date || '');
