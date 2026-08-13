@@ -1956,11 +1956,11 @@
       </div>
       <div class="fee-panel">
         <h2>Teacher Class &amp; Subject Details</h2>
-        <p class="fs-modal-sub">Select a class, then tick the subjects taught there. Section is optional — leave it on "All Sections" to apply the assignment to every section of that class, or pick one section to set that section only. This guides the timetable picker and auto-substitution ranking.</p>
+        <p class="fs-modal-sub">Select a class, then tick the subjects taught there. Sections are optional and multi-selectable (ctrl/cmd-click, or tap to multi-select on mobile) — leave none selected to apply to every section of that class, or pick one or more sections to target just those. This guides the timetable picker and auto-substitution ranking.</p>
         <div class="fee-actions">
           <select id="ttAssignmentTeacher" onchange="renderTTTeacherAssignmentSubjects()"></select>
           <select id="ttAssignmentClass" onchange="ttPopulateAssignmentSectionOptions();renderTTTeacherAssignmentSubjects()"></select>
-          <select id="ttAssignmentSection" onchange="renderTTTeacherAssignmentSubjects()"></select>
+          <select id="ttAssignmentSection" multiple size="4" style="min-width:140px;" onchange="renderTTTeacherAssignmentSubjects()"></select>
           <button class="btn-primary" onclick="ttSaveTeacherAssignments()">Save Teacher Details</button>
         </div>
         <div id="ttAssignmentSubjects" class="tt-check-grid"></div>
@@ -5971,36 +5971,47 @@ function ttClassScopeLabel(scope){
   return scope ? scope.name : '';
 }
 function ttSubjectsAssignedAcrossScope(teacherId, scope){
-  if(!scope?.sections.length) return new Set();
-  const perSection = scope.sections.map(section => new Set(ttTeacherAssignments
+  return ttSubjectsAssignedAcrossSections(teacherId, scope?.sections || []);
+}
+function ttSubjectsAssignedAcrossSections(teacherId, sections){
+  if(!sections?.length) return new Set();
+  const perSection = sections.map(section => new Set(ttTeacherAssignments
     .filter(assignment => assignment.teacher_id === teacherId && assignment.class_section === section)
     .map(assignment => Number(assignment.subject_id))));
   return new Set([...perSection[0]].filter(subjectId => perSection.every(subjects => subjects.has(subjectId))));
 }
-/* Section is optional: when omitted an assignment is mirrored to every section of the
-   class (as before); when given, it is written to that section only. */
-function ttSectionSelectOptions(scope, selected){
-  const options = ['<option value="">All Sections</option>']
-    .concat((scope?.sections || []).map(section => `<option value="${escapeHtml(section)}" ${section === selected ? 'selected' : ''}>${escapeHtml(section)}</option>`));
-  return options.join('');
+/* Sections are optional and multi-selectable: when none are picked an assignment is
+   mirrored to every section of the class (as before); when one or more are picked,
+   it is written to only those sections. */
+function ttSectionSelectOptions(scope, selectedSections){
+  const selected = new Set(selectedSections || []);
+  return (scope?.sections || []).map(section => `<option value="${escapeHtml(section)}" ${selected.has(section) ? 'selected' : ''}>${escapeHtml(section)}</option>`).join('');
+}
+function ttSelectedSections(selectEl){
+  return selectEl ? [...selectEl.selectedOptions].map(o => o.value) : [];
+}
+function ttSetSelectedSections(selectEl, sections){
+  if(!selectEl) return;
+  const wanted = new Set(sections || []);
+  [...selectEl.options].forEach(o => { o.selected = wanted.has(o.value); });
 }
 function ttPopulateAssignmentSectionOptions(){
   const classSelect = document.getElementById('ttAssignmentClass');
   const sectionSelect = document.getElementById('ttAssignmentSection');
   if(!classSelect || !sectionSelect) return;
-  const oldSection = sectionSelect.value;
+  const oldSections = ttSelectedSections(sectionSelect);
   const scope = ttClassScopeFromKey(classSelect.value);
-  sectionSelect.innerHTML = ttSectionSelectOptions(scope, oldSection);
-  if(scope?.sections.includes(oldSection)) sectionSelect.value = oldSection;
+  sectionSelect.innerHTML = ttSectionSelectOptions(scope, oldSections);
+  ttSetSelectedSections(sectionSelect, oldSections.filter(s => scope?.sections.includes(s)));
 }
 function ttPopulateTeacherDialogSectionOptions(){
   const classSelect = document.getElementById('ttTeacherDialogClass');
   const sectionSelect = document.getElementById('ttTeacherDialogSection');
   if(!classSelect || !sectionSelect) return;
-  const oldSection = sectionSelect.value;
+  const oldSections = ttSelectedSections(sectionSelect);
   const scope = ttClassScopeFromKey(classSelect.value);
-  sectionSelect.innerHTML = ttSectionSelectOptions(scope, oldSection);
-  if(scope?.sections.includes(oldSection)) sectionSelect.value = oldSection;
+  sectionSelect.innerHTML = ttSectionSelectOptions(scope, oldSections);
+  ttSetSelectedSections(sectionSelect, oldSections.filter(s => scope?.sections.includes(s)));
 }
 /* Breakdown of a teacher's subjects across a class's sections: uniform when every
    section carries the same set (the normal "All Sections" case), otherwise per-section. */
@@ -6015,11 +6026,13 @@ function ttTeacherClassBreakdown(teacherId, scope){
   const uniform = sets.every(s => s.size === first.size && [...s].every(id => first.has(id)));
   return { uniform, subjectIds: uniform ? first : new Set(), perSection, hasAny:true };
 }
-async function ttReplaceTeacherClassSubjects(teacherId, scopeKey, subjectIds, section){
+async function ttReplaceTeacherClassSubjects(teacherId, scopeKey, subjectIds, sections){
   const scope = ttClassScopeFromKey(scopeKey);
   if(!scope?.sections.length) throw new Error('Add at least one section to this class before saving teacher details.');
-  if(section && !scope.sections.includes(section)) throw new Error('That section does not belong to the selected class.');
-  const targetSections = section ? [section] : scope.sections;
+  const picked = (sections || []).filter(Boolean);
+  const invalid = picked.filter(section => !scope.sections.includes(section));
+  if(invalid.length) throw new Error(`These sections don't belong to the selected class: ${invalid.join(', ')}`);
+  const targetSections = picked.length ? picked : scope.sections;
   const results = await Promise.all(targetSections.map(classSection => supabaseClient.rpc('replace_teacher_class_subjects', {
     p_teacher_id: teacherId, p_class_section: classSection, p_subject_ids: subjectIds
   })));
@@ -6115,23 +6128,23 @@ function renderTTTeacherAssignmentSubjects(){
   const area = document.getElementById('ttAssignmentSubjects');
   const teacherId = document.getElementById('ttAssignmentTeacher')?.value;
   const scope = ttClassScopeFromKey(document.getElementById('ttAssignmentClass')?.value || '');
-  const section = document.getElementById('ttAssignmentSection')?.value || null;
+  const sections = ttSelectedSections(document.getElementById('ttAssignmentSection'));
   if(!area) return;
   if(!teacherId || !scope?.sections.length){ area.innerHTML = '<div class="empty">Add a teacher, class section, and subjects first.</div>'; return; }
-  const selected = section
-    ? new Set(ttTeacherAssignments.filter(a => a.teacher_id === teacherId && a.class_section === section).map(a => Number(a.subject_id)))
+  const selected = sections.length
+    ? ttSubjectsAssignedAcrossSections(teacherId, sections)
     : ttSubjectsAssignedAcrossScope(teacherId, scope);
   area.innerHTML = ttSubjects.length ? ttSubjects.map(s => `<label><input class="tt-assignment-subject" type="checkbox" value="${s.id}" ${selected.has(Number(s.id)) ? 'checked' : ''}>${escapeHtml(s.name)}</label>`).join('') : '<div class="empty">Add subjects first.</div>';
 }
 async function ttSaveTeacherAssignments(){
   const teacherId = document.getElementById('ttAssignmentTeacher').value;
   const scopeKey = document.getElementById('ttAssignmentClass').value;
-  const section = document.getElementById('ttAssignmentSection')?.value || null;
+  const sections = ttSelectedSections(document.getElementById('ttAssignmentSection'));
   const scope = ttClassScopeFromKey(scopeKey);
   const subjectIds = [...document.querySelectorAll('.tt-assignment-subject:checked')].map(input => Number(input.value));
   if(!teacherId || !scope?.sections.length){ alert('Choose a teacher and a class with at least one section.'); return; }
   try{
-    await ttReplaceTeacherClassSubjects(teacherId, scopeKey, subjectIds, section);
+    await ttReplaceTeacherClassSubjects(teacherId, scopeKey, subjectIds, sections);
     await loadTimetable();
   } catch(err){ alert('Could not save teacher details: ' + errMsg(err)); }
 }
@@ -6173,8 +6186,7 @@ function ttEditTeacherAssignment(teacherId, scopeKey, section){
   if(teacherSelect) teacherSelect.value = teacherId;
   if(classSelect) classSelect.value = scopeKey;
   ttPopulateAssignmentSectionOptions();
-  const sectionSelect = document.getElementById('ttAssignmentSection');
-  if(sectionSelect) sectionSelect.value = section || '';
+  ttSetSelectedSections(document.getElementById('ttAssignmentSection'), section ? [section] : []);
   renderTTTeacherAssignmentSubjects();
   document.getElementById('ttAssignmentSubjects')?.scrollIntoView({ behavior:'smooth', block:'center' });
 }
@@ -6184,7 +6196,7 @@ async function ttRemoveTeacherAssignment(teacherId, scopeKey, section){
   const label = section ? `${scope.name} — ${section}` : `${scope.name} (all sections)`;
   if(!confirm(`Remove all timetable subject allocations for ${ttTeacherName(teacherId)} in ${label}?`)) return;
   try{
-    await ttReplaceTeacherClassSubjects(teacherId, scopeKey, [], section || null);
+    await ttReplaceTeacherClassSubjects(teacherId, scopeKey, [], section ? [section] : null);
     await loadTimetable();
   } catch(err){ alert('Could not remove this class allocation: ' + errMsg(err)); }
 }
@@ -6236,11 +6248,11 @@ function renderTTTeacherList(){
 }
 function renderTTTeacherDialogSubjects(teacherId){
   const scope = ttClassScopeFromKey(document.getElementById('ttTeacherDialogClass')?.value || '');
-  const section = document.getElementById('ttTeacherDialogSection')?.value || null;
+  const sections = ttSelectedSections(document.getElementById('ttTeacherDialogSection'));
   const area = document.getElementById('ttTeacherDialogSubjects');
   if(!area) return;
-  const selected = section
-    ? new Set(ttTeacherAssignments.filter(a => a.teacher_id === teacherId && a.class_section === section).map(a => Number(a.subject_id)))
+  const selected = sections.length
+    ? ttSubjectsAssignedAcrossSections(teacherId, sections)
     : ttSubjectsAssignedAcrossScope(teacherId, scope);
   area.innerHTML = ttSubjects.length
     ? ttSubjects.map(subject => `<label><input class="tt-dialog-assignment-subject" type="checkbox" value="${subject.id}" ${selected.has(Number(subject.id)) ? 'checked' : ''}>${escapeHtml(subject.name)}</label>`).join('')
@@ -6262,9 +6274,9 @@ function openTTTeacherAllocationDialog(teacherId){
     <div class="field full"><label>Subjects in staff record</label><input value="${escapeHtml(teacher.subjects_taught || 'Not listed')}" disabled></div>
   </div>
   <h3 style="margin:18px 0 6px;">Allocate Class &amp; Subjects</h3>
-  <p class="fs-modal-sub">Choose a class, then tick all subjects this teacher teaches. Section is optional — leave it on "All Sections" to apply to every section in that class, or pick one section to set that section only.</p>
+  <p class="fs-modal-sub">Choose a class, then tick all subjects this teacher teaches. Sections are optional and multi-selectable (ctrl/cmd-click, or tap to multi-select on mobile) — leave none selected to apply to every section in that class, or pick one or more to target just those.</p>
   <div class="fee-actions"><select id="ttTeacherDialogClass" onchange="ttPopulateTeacherDialogSectionOptions();renderTTTeacherDialogSubjects('${teacherId}')">${ttClassScopeOptions(defaultClass)}</select>
-    <select id="ttTeacherDialogSection" onchange="renderTTTeacherDialogSubjects('${teacherId}')"></select>
+    <select id="ttTeacherDialogSection" multiple size="4" style="min-width:140px;" onchange="renderTTTeacherDialogSubjects('${teacherId}')"></select>
     <button class="btn-primary" onclick="ttSaveTeacherDialogAllocation('${teacherId}')">Save This Class</button></div>
   <div id="ttTeacherDialogSubjects" class="tt-check-grid"></div>
   <h3 style="margin:18px 0 6px;">Current Timetable Allocations</h3>
@@ -6278,19 +6290,18 @@ function ttSelectTeacherDialogClass(teacherId, scopeKey, section){
   if(select){
     select.value = scopeKey;
     ttPopulateTeacherDialogSectionOptions();
-    const sectionSelect = document.getElementById('ttTeacherDialogSection');
-    if(sectionSelect) sectionSelect.value = section || '';
+    ttSetSelectedSections(document.getElementById('ttTeacherDialogSection'), section ? [section] : []);
     renderTTTeacherDialogSubjects(teacherId);
   }
 }
 async function ttSaveTeacherDialogAllocation(teacherId){
   const scopeKey = document.getElementById('ttTeacherDialogClass').value;
-  const section = document.getElementById('ttTeacherDialogSection')?.value || null;
+  const sections = ttSelectedSections(document.getElementById('ttTeacherDialogSection'));
   const scope = ttClassScopeFromKey(scopeKey);
   const subjectIds = [...document.querySelectorAll('.tt-dialog-assignment-subject:checked')].map(input => Number(input.value));
   if(!scope?.sections.length){ alert('Choose a class with at least one section.'); return; }
   try{
-    await ttReplaceTeacherClassSubjects(teacherId, scopeKey, subjectIds, section);
+    await ttReplaceTeacherClassSubjects(teacherId, scopeKey, subjectIds, sections);
     await loadTimetable();
     closeFeeDialog();
     openTTTeacherAllocationDialog(teacherId);
@@ -6302,7 +6313,7 @@ async function ttRemoveTeacherDialogClass(teacherId, scopeKey, section){
   const label = section ? `${scope.name} — ${section}` : `${scope.name} (all sections)`;
   if(!confirm(`Remove all timetable subject allocations for ${ttTeacherName(teacherId)} in ${label}?`)) return;
   try{
-    await ttReplaceTeacherClassSubjects(teacherId, scopeKey, [], section || null);
+    await ttReplaceTeacherClassSubjects(teacherId, scopeKey, [], section ? [section] : null);
     await loadTimetable();
     closeFeeDialog();
     openTTTeacherAllocationDialog(teacherId);
@@ -6311,7 +6322,7 @@ async function ttRemoveTeacherDialogClass(teacherId, scopeKey, section){
 
 /* ---- Bulk import: classes, subjects, teaching details and targets ---- */
 function openTTBulkImportDialog(){
-  openFeeDialog('Bulk Upload Timetable Setup', `<p class="fs-modal-sub">Upload a CSV or paste its content. For <strong>Class Subject Period Targets</strong> and <strong>Teacher Class &amp; Subject Details</strong>, enter the class name only (for example, <code>9</code>) — all sections receive the same setup. Teachers must already exist in Staff records.</p>
+  openFeeDialog('Bulk Upload Timetable Setup', `<p class="fs-modal-sub">Upload a CSV or paste its content. For <strong>Class Subject Period Targets</strong>, enter the class name only (for example, <code>9</code>) — all sections receive the same setup. For <strong>Teacher Class &amp; Subject Details</strong>, the <code>section</code> column is optional: leave it blank to apply to every section of the class, or list one or more sections separated by <code>;</code> to target just those. Teachers must already exist in Staff records.</p>
     <div class="field"><label>Import type</label><select id="ttBulkType" onchange="renderTTBulkImportForm()">
       <option value="classes">Classes</option><option value="subjects">Subjects</option>
       <option value="teachers">Teacher class-subject details</option><option value="requirements">Class subject-period targets</option>
@@ -6324,7 +6335,7 @@ function ttBulkExample(type){
   return {
     classes:'class_section,sort_order\n9 (A),1\n9 (B),2',
     subjects:'name\nMathematics\nEnglish',
-    teachers:'teacher_name,class,subjects\nAnita Sharma,9,Mathematics;Science\nRahul Verma,10,English',
+    teachers:'teacher_name,class,section,subjects\nAnita Sharma,9,,Mathematics;Science\nRahul Verma,10,B,English\nSunita Rao,10,A;C,English',
     requirements:'class,subject,periods_per_week\n9,Mathematics,6\n9,English,5'
   }[type];
 }
@@ -6403,23 +6414,29 @@ async function ttRunBulkImport(){
       const teacherRaw = ttBulkCell(headers,row,['teacher_name','teacher','full name']);
       const classRaw = ttBulkCell(headers,row,['class_section','class','class section','class/section']);
       const subjectsRaw = ttBulkCell(headers,row,['subjects','subject']);
+      const sectionsRaw = ttBulkCell(headers,row,['section','sections','section(s)']);
       const teacherId = teachersByName.get((teacherRaw || '').toLowerCase());
       const scope = classScopesByName.get((classRaw || '').toLowerCase());
       const subjectIds = String(subjectsRaw || '').split(';').map(s => subjectsByName.get(s.trim().toLowerCase())).filter(Boolean);
       if(!teacherId || !scope?.sections.length || !subjectIds.length){
         skipped.push(`Row ${index + 2}: teacher, class, or subject is not recognised`); return;
       }
-      const key = teacherId + '\u0000' + scope.key;
-      if(!grouped.has(key)) grouped.set(key, {teacherId, scopeKey:scope.key, scopeName:scope.name, subjectIds:new Set()});
+      const sections = String(sectionsRaw || '').split(';').map(s => s.trim()).filter(Boolean);
+      if(sections.length){
+        const invalid = sections.filter(s => !scope.sections.includes(s));
+        if(invalid.length){ skipped.push(`Row ${index + 2}: section(s) not found in ${scope.name}: ${invalid.join(', ')}`); return; }
+      }
+      const key = teacherId + '\u0000' + scope.key + '\u0000' + [...sections].sort().join('\u0001');
+      if(!grouped.has(key)) grouped.set(key, {teacherId, scopeKey:scope.key, scopeName:scope.name, sections:sections.length ? sections : null, subjectIds:new Set()});
       subjectIds.forEach(id => grouped.get(key).subjectIds.add(id));
     });
     let saved = 0;
     for(const group of grouped.values()){
-      try{ await ttReplaceTeacherClassSubjects(group.teacherId, group.scopeKey, [...group.subjectIds]); saved++; }
-      catch(error){ skipped.push(`${ttTeacherName(group.teacherId)} / ${group.scopeName}: ${errMsg(error)}`); }
+      try{ await ttReplaceTeacherClassSubjects(group.teacherId, group.scopeKey, [...group.subjectIds], group.sections); saved++; }
+      catch(error){ skipped.push(`${ttTeacherName(group.teacherId)} / ${group.scopeName}${group.sections ? ' / ' + group.sections.join(', ') : ''}: ${errMsg(error)}`); }
     }
     await loadTimetable();
-    closeFeeDialog(); alert(`Imported ${saved} teacher class-subject assignment(s), applied to all matching sections.${skipped.length ? '\nSkipped:\n' + skipped.join('\n') : ''}`);
+    closeFeeDialog(); alert(`Imported ${saved} teacher class-subject assignment(s).${skipped.length ? '\nSkipped:\n' + skipped.join('\n') : ''}`);
   } catch(err){ alert('Could not import timetable setup: ' + errMsg(err)); }
 }
 
