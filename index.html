@@ -392,6 +392,7 @@
   .tt-cell{min-height:56px;padding:7px 8px;cursor:pointer;}
   .tt-cell:hover{background:#f3f8fc;}
   .tt-cell.brk{background:#fbf6ec;cursor:default;color:var(--muted);text-align:center;font-size:11px;}
+  .tt-cell.na{background:#f7f7f7;cursor:default;color:#c3ccd3;text-align:center;}
   .tt-cell .subj{font-weight:800;color:var(--accent);}
   .tt-cell .teach{color:var(--ink);font-size:11.5px;margin-top:2px;}
   .tt-cell .empty-slot{color:#a9b8c4;font-size:11px;}
@@ -1904,17 +1905,26 @@
         <div id="ttSubjectList" class="tt-chip-list"></div>
       </div>
       <div class="fee-panel">
-        <h2>Periods</h2>
-        <p class="fs-modal-sub">The daily period structure — same every weekday (Mon–Sat). Mark assemblies/lunch as a break so substitutes are never assigned to them.</p>
+        <h2>Period Templates</h2>
+        <p class="fs-modal-sub">A period template is a daily structure (period numbers, labels, timings, breaks). Add a template, click it to manage its periods, then map it to days below — e.g. one template for Mon–Fri and a different one for Saturday. You can also add extra templates for special days (half days, exam schedules, events).</p>
+        <div class="fee-actions"><input type="text" id="ttNewPeriodTemplate" placeholder="e.g. Weekday (Mon–Fri)"><button class="btn-primary" onclick="ttAddPeriodTemplate()">Add Template</button></div>
+        <div id="ttPeriodTemplateList" class="tt-chip-list"></div>
+      </div>
+      <div class="fee-panel">
+        <h2>Day → Template</h2>
+        <p class="fs-modal-sub">Which period template applies to each day of the week.</p>
+        <div class="table-container"><div id="ttPeriodDayMapList"></div></div>
+      </div>
+      <div class="fee-panel">
+        <h2>Special Days</h2>
+        <p class="fs-modal-sub">One-off calendar dates that use a different period template than their usual weekday (e.g. Sports Day, an exam day, a half day).</p>
         <div class="fee-actions">
-          <input type="number" id="ttNewPeriodNo" placeholder="Period no." style="min-width:110px;">
-          <input type="text" id="ttNewPeriodLabel" placeholder="Label, e.g. Period 1 or Lunch">
-          <input type="time" id="ttNewPeriodStart">
-          <input type="time" id="ttNewPeriodEnd">
-          <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);"><input type="checkbox" id="ttNewPeriodBreak" style="width:15px;height:15px;">Break (no classes)</label>
-          <button class="btn-primary" onclick="ttAddPeriod()">Add Period</button>
+          <input type="date" id="ttNewSpecialDate">
+          <select id="ttNewSpecialTemplate"></select>
+          <input type="text" id="ttNewSpecialLabel" placeholder="Label, e.g. Sports Day">
+          <button class="btn-primary" onclick="ttAddSpecialDay()">Add Special Day</button>
         </div>
-        <div class="table-container"><div id="ttPeriodList"></div></div>
+        <div class="table-container"><div id="ttSpecialDayList"></div></div>
       </div>
       <div class="fee-panel">
         <h2>Class Subject Period Targets</h2>
@@ -5526,6 +5536,7 @@ async function exportAllWithFiles(){
 /* ============ TIMETABLE & AUTO-SUBSTITUTE ============ */
 let ttClassGroups = [], ttClasses = [], ttSubjects = [], ttPeriods = [], ttTimetable = [], ttTeachers = [];
 let ttClassRequirements = [], ttTeacherAssignments = [];
+let ttPeriodTemplates = [], ttPeriodTemplateDays = [], ttSpecialDays = [];
 let ttCurrentView = 'setup';
 const DAY_NAMES = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 /* Values passed through inline handlers must not be interpolated as raw text:
@@ -5539,7 +5550,7 @@ function ttWeekdayForDate(date){
 
 async function loadTimetable(){
   try{
-    const [classGroupsRes, classesRes, subjectsRes, periodsRes, timetableRes, teachersRes, requirementsRes, assignmentsRes] = await Promise.all([
+    const [classGroupsRes, classesRes, subjectsRes, periodsRes, timetableRes, teachersRes, requirementsRes, assignmentsRes, templatesRes, templateDaysRes, specialDaysRes] = await Promise.all([
       supabaseClient.from('tt_class_groups').select('*').order('sort_order').order('name'),
       supabaseClient.from('tt_classes').select('*').order('sort_order').order('class_section'),
       supabaseClient.from('tt_subjects').select('*').order('name'),
@@ -5547,12 +5558,16 @@ async function loadTimetable(){
       supabaseClient.from('tt_timetable').select('*'),
       supabaseClient.from('staff_records').select('id,full_name,designation,subjects_taught').order('full_name'),
       supabaseClient.from('tt_class_subject_requirements').select('*'),
-      supabaseClient.from('tt_teacher_assignments').select('*')
+      supabaseClient.from('tt_teacher_assignments').select('*'),
+      supabaseClient.from('tt_period_templates').select('*').order('sort_order').order('name'),
+      supabaseClient.from('tt_period_template_days').select('*'),
+      supabaseClient.from('tt_special_days').select('*').order('special_date')
     ]);
-    for(const r of [classGroupsRes, classesRes, subjectsRes, periodsRes, timetableRes, teachersRes, requirementsRes, assignmentsRes]) if(r.error) throw r.error;
+    for(const r of [classGroupsRes, classesRes, subjectsRes, periodsRes, timetableRes, teachersRes, requirementsRes, assignmentsRes, templatesRes, templateDaysRes, specialDaysRes]) if(r.error) throw r.error;
     ttClassGroups = classGroupsRes.data || [];
     ttClasses = classesRes.data || []; ttSubjects = subjectsRes.data || []; ttPeriods = periodsRes.data || [];
     ttTimetable = timetableRes.data || []; ttTeachers = teachersRes.data || [];
+    ttPeriodTemplates = templatesRes.data || []; ttPeriodTemplateDays = templateDaysRes.data || []; ttSpecialDays = specialDaysRes.data || [];
     ttClassRequirements = requirementsRes.data || []; ttTeacherAssignments = assignmentsRes.data || [];
     document.getElementById('ttLoadError')?.remove();
     populateTTBuilderClassSelect();
@@ -5583,7 +5598,7 @@ function switchTTView(view){
   document.getElementById('ttTeachersView').style.display = view === 'teachers' ? 'block' : 'none';
   document.getElementById('ttSubsView').style.display = view === 'substitutes' ? 'block' : 'none';
   document.getElementById('ttReportsView').style.display = view === 'reports' ? 'block' : 'none';
-  if(view === 'setup'){ renderTTClasses(); renderTTSubjects(); renderTTPeriods(); renderTTRequirements(); renderTTTeacherAssignmentSubjects(); renderTTTeacherAssignments(); }
+  if(view === 'setup'){ renderTTClasses(); renderTTSubjects(); renderTTPeriodTemplates(); renderTTPeriodTemplateDays(); renderTTSpecialDays(); renderTTRequirements(); renderTTTeacherAssignmentSubjects(); renderTTTeacherAssignments(); }
   else if(view === 'builder'){ renderTTBuilder(); }
   else if(view === 'teachers'){ renderTTTeacherList(); }
   else if(view === 'substitutes'){ loadTTSubsForDate(); renderTTBulkAttendance(); }
@@ -5681,36 +5696,167 @@ async function ttDeleteSubject(id){
   } catch(err){ alert('Could not remove subject: ' + errMsg(err)); }
 }
 
-function renderTTPeriods(){
-  const area = document.getElementById('ttPeriodList');
-  area.innerHTML = ttPeriods.length ? ttPeriods.map(p => `<div class="tt-period-row${p.is_break ? ' brk' : ''}">
-    <span class="no">${p.period_no}</span><span class="lbl">${escapeHtml(p.label)}${p.is_break ? ' (Break)' : ''}</span>
-    <span class="time">${p.start_time ? p.start_time.slice(0,5) : ''}${p.start_time && p.end_time ? ' – ' : ''}${p.end_time ? p.end_time.slice(0,5) : ''}</span>
-    <span class="tt-chip-del" onclick="ttDeletePeriod(${p.id})">&times;</span>
-  </div>`).join('') : '<div class="empty">No periods added yet.</div>';
+/* ---- Period Templates (a template = one day's period structure) ---- */
+function ttTemplateForDay(day){
+  const row = ttPeriodTemplateDays.find(d => d.day_of_week === day);
+  return row ? row.template_id : (ttPeriodTemplates[0]?.id ?? null);
 }
-async function ttAddPeriod(){
-  const periodNo = Number(document.getElementById('ttNewPeriodNo').value);
-  const label = document.getElementById('ttNewPeriodLabel').value.trim();
-  const start = document.getElementById('ttNewPeriodStart').value || null;
-  const end = document.getElementById('ttNewPeriodEnd').value || null;
-  const isBreak = document.getElementById('ttNewPeriodBreak').checked;
-  if(!periodNo || !label){ alert('Enter a period number and a label.'); return; }
+function ttPeriodsForDay(day){
+  const templateId = ttTemplateForDay(day);
+  return ttPeriods.filter(p => p.template_id === templateId).sort((a, b) => a.period_no - b.period_no);
+}
+function ttUnionPeriodNos(days){
+  const nos = new Set();
+  days.forEach(d => ttPeriodsForDay(d).forEach(p => nos.add(p.period_no)));
+  return [...nos].sort((a, b) => a - b);
+}
+function renderTTPeriodTemplates(){
+  document.getElementById('ttPeriodTemplateList').innerHTML = ttPeriodTemplates.length ? ttPeriodTemplates.map(tpl => {
+    const count = ttPeriods.filter(p => p.template_id === tpl.id).length;
+    return `<div class="tt-chip tt-chip-click" onclick="ttOpenPeriodTemplate(${tpl.id})">${escapeHtml(tpl.name)} <span class="tt-chip-count">${count} period${count === 1 ? '' : 's'}</span><span class="tt-chip-del" onclick="event.stopPropagation();ttDeletePeriodTemplate(${tpl.id})">&times;</span></div>`;
+  }).join('') : '<div class="empty">No period templates yet.</div>';
+  const templateOptions = ttPeriodTemplates.map(tpl => `<option value="${tpl.id}">${escapeHtml(tpl.name)}</option>`).join('');
+  const specialSelect = document.getElementById('ttNewSpecialTemplate');
+  if(specialSelect) specialSelect.innerHTML = templateOptions || '<option value="">Add a template first</option>';
+}
+async function ttAddPeriodTemplate(){
+  const input = document.getElementById('ttNewPeriodTemplate');
+  const value = input.value.trim();
+  if(!value) return;
   try{
-    const { error } = await supabaseClient.from('tt_periods').insert({ period_no: periodNo, label, start_time: start, end_time: end, is_break: isBreak });
+    const { error } = await supabaseClient.from('tt_period_templates').insert({ name: value });
     if(error) throw error;
-    document.getElementById('ttNewPeriodNo').value = ''; document.getElementById('ttNewPeriodLabel').value = '';
-    document.getElementById('ttNewPeriodStart').value = ''; document.getElementById('ttNewPeriodEnd').value = ''; document.getElementById('ttNewPeriodBreak').checked = false;
+    input.value = '';
     await loadTimetable();
-  } catch(err){ alert('Could not add period: ' + errMsg(err)); }
+  } catch(err){ alert('Could not add template: ' + errMsg(err)); }
 }
-async function ttDeletePeriod(id){
+async function ttDeletePeriodTemplate(id){
+  const tpl = ttPeriodTemplates.find(t => t.id === id);
+  if(!confirm(`Remove template "${tpl?.name || ''}"? Its periods, any days mapped to it, and matching timetable entries will also be removed.`)) return;
+  try{
+    const { error } = await supabaseClient.from('tt_period_templates').delete().eq('id', id);
+    if(error) throw error;
+    await loadTimetable();
+  } catch(err){ alert('Could not remove template: ' + errMsg(err)); }
+}
+let ttEditingPeriodId = null;
+function ttPeriodTemplateModalHtml(templateId){
+  const tpl = ttPeriodTemplates.find(t => t.id === templateId);
+  const periods = ttPeriods.filter(p => p.template_id === templateId).sort((a, b) => a.period_no - b.period_no);
+  const rows = periods.length ? periods.map(p => `<tr><td>${p.period_no}</td><td>${escapeHtml(p.label)}${p.is_break ? ' <em>(Break)</em>' : ''}</td><td>${p.start_time ? p.start_time.slice(0, 5) : ''}${p.start_time && p.end_time ? ' – ' : ''}${p.end_time ? p.end_time.slice(0, 5) : ''}</td><td>
+      <button class="btn-secondary" onclick="ttEditPeriod(${p.id})">Edit</button>
+      <button class="del-btn" onclick="ttDeletePeriod(${p.id},${templateId})">Remove</button>
+    </td></tr>`).join('') : '<tr><td colspan="4" class="empty">No periods in this template yet.</td></tr>';
+  return `<p class="fs-modal-sub">Periods in <strong>${escapeHtml(tpl?.name || '')}</strong>. Mark assemblies/lunch as a break so substitutes are never assigned to them.</p>
+    <table class="tt-requirements"><thead><tr><th>No.</th><th>Label</th><th>Time</th><th></th></tr></thead><tbody id="ttPeriodRows">${rows}</tbody></table>
+    <div class="fee-form-grid" style="margin-top:14px;">
+      <div class="field"><label>Period no.</label><input type="number" id="ttPeriodNo"></div>
+      <div class="field"><label>Label</label><input type="text" id="ttPeriodLabel" placeholder="Period 1 or Lunch"></div>
+      <div class="field"><label>Start</label><input type="time" id="ttPeriodStart"></div>
+      <div class="field"><label>End</label><input type="time" id="ttPeriodEnd"></div>
+      <div class="field"><label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="ttPeriodBreak" style="width:15px;height:15px;">Break (no classes)</label></div>
+    </div>
+    <div class="actions">
+      <button class="btn-secondary" id="ttPeriodCancelEdit" style="display:none;" onclick="ttResetPeriodForm(${templateId})">Cancel Edit</button>
+      <button class="btn-primary" id="ttPeriodSaveBtn" onclick="ttSavePeriod(${templateId})">Add Period</button>
+    </div>`;
+}
+function ttOpenPeriodTemplate(templateId){
+  const tpl = ttPeriodTemplates.find(t => t.id === templateId);
+  if(!tpl) return;
+  ttEditingPeriodId = null;
+  openFeeDialog(`Periods — ${escapeHtml(tpl.name)}`, ttPeriodTemplateModalHtml(templateId));
+}
+function ttEditPeriod(periodId){
+  const p = ttPeriods.find(x => x.id === periodId);
+  if(!p) return;
+  ttEditingPeriodId = periodId;
+  document.getElementById('ttPeriodNo').value = p.period_no;
+  document.getElementById('ttPeriodLabel').value = p.label;
+  document.getElementById('ttPeriodStart').value = p.start_time ? p.start_time.slice(0, 5) : '';
+  document.getElementById('ttPeriodEnd').value = p.end_time ? p.end_time.slice(0, 5) : '';
+  document.getElementById('ttPeriodBreak').checked = !!p.is_break;
+  document.getElementById('ttPeriodSaveBtn').textContent = 'Save Changes';
+  document.getElementById('ttPeriodCancelEdit').style.display = '';
+}
+function ttResetPeriodForm(templateId){
+  ttEditingPeriodId = null;
+  closeFeeDialog();
+  ttOpenPeriodTemplate(templateId);
+}
+async function ttSavePeriod(templateId){
+  const periodNo = Number(document.getElementById('ttPeriodNo').value);
+  const label = document.getElementById('ttPeriodLabel').value.trim();
+  const start = document.getElementById('ttPeriodStart').value || null;
+  const end = document.getElementById('ttPeriodEnd').value || null;
+  const isBreak = document.getElementById('ttPeriodBreak').checked;
+  if(!periodNo || !label){ alert('Enter a period number and a label.'); return; }
+  const record = { template_id: templateId, period_no: periodNo, label, start_time: start, end_time: end, is_break: isBreak };
+  try{
+    const result = ttEditingPeriodId
+      ? await supabaseClient.from('tt_periods').update(record).eq('id', ttEditingPeriodId)
+      : await supabaseClient.from('tt_periods').insert(record);
+    if(result.error) throw result.error;
+    ttEditingPeriodId = null;
+    await loadTimetable();
+    closeFeeDialog();
+    ttOpenPeriodTemplate(templateId);
+  } catch(err){ alert('Could not save this period: ' + errMsg(err)); }
+}
+async function ttDeletePeriod(id, templateId){
   if(!confirm('Remove this period? Its timetable entries will also be removed.')) return;
   try{
     const { error } = await supabaseClient.from('tt_periods').delete().eq('id', id);
     if(error) throw error;
     await loadTimetable();
+    closeFeeDialog();
+    if(templateId) ttOpenPeriodTemplate(templateId);
   } catch(err){ alert('Could not remove period: ' + errMsg(err)); }
+}
+
+/* ---- Day → Template mapping ---- */
+function renderTTPeriodTemplateDays(){
+  const area = document.getElementById('ttPeriodDayMapList');
+  if(!ttPeriodTemplates.length){ area.innerHTML = '<div class="empty">Add a period template first.</div>'; return; }
+  const rows = [1, 2, 3, 4, 5, 6].map(day => {
+    const current = ttTemplateForDay(day);
+    const options = ttPeriodTemplates.map(tpl => `<option value="${tpl.id}" ${Number(current) === Number(tpl.id) ? 'selected' : ''}>${escapeHtml(tpl.name)}</option>`).join('');
+    return `<tr><td>${DAY_NAMES[day]}</td><td><select onchange="ttSetPeriodTemplateDay(${day},this.value)">${options}</select></td></tr>`;
+  }).join('');
+  area.innerHTML = `<table class="tt-requirements"><thead><tr><th>Day</th><th>Template</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+async function ttSetPeriodTemplateDay(day, templateId){
+  try{
+    const { error } = await supabaseClient.from('tt_period_template_days').upsert({ day_of_week: day, template_id: templateId });
+    if(error) throw error;
+    await loadTimetable();
+  } catch(err){ alert('Could not update this mapping: ' + errMsg(err)); }
+}
+
+/* ---- Special Days ---- */
+function renderTTSpecialDays(){
+  const area = document.getElementById('ttSpecialDayList');
+  area.innerHTML = ttSpecialDays.length ? `<table class="tt-requirements"><thead><tr><th>Date</th><th>Label</th><th>Template</th><th></th></tr></thead><tbody>${ttSpecialDays.map(d => `<tr><td>${escapeHtml(d.special_date)}</td><td>${escapeHtml(d.label)}</td><td>${escapeHtml(ttPeriodTemplates.find(t => t.id === d.template_id)?.name || '')}</td><td><button class="del-btn" onclick="ttDeleteSpecialDay('${d.special_date}')">Remove</button></td></tr>`).join('')}</tbody></table>` : '<div class="empty">No special days added yet.</div>';
+}
+async function ttAddSpecialDay(){
+  const date = document.getElementById('ttNewSpecialDate').value;
+  const templateId = document.getElementById('ttNewSpecialTemplate').value;
+  const label = document.getElementById('ttNewSpecialLabel').value.trim();
+  if(!date || !templateId || !label){ alert('Pick a date, a template, and enter a label.'); return; }
+  try{
+    const { error } = await supabaseClient.from('tt_special_days').upsert({ special_date: date, template_id: templateId, label });
+    if(error) throw error;
+    document.getElementById('ttNewSpecialDate').value = ''; document.getElementById('ttNewSpecialLabel').value = '';
+    await loadTimetable();
+  } catch(err){ alert('Could not add special day: ' + errMsg(err)); }
+}
+async function ttDeleteSpecialDay(date){
+  if(!confirm('Remove this special day?')) return;
+  try{
+    const { error } = await supabaseClient.from('tt_special_days').delete().eq('special_date', date);
+    if(error) throw error;
+    await loadTimetable();
+  } catch(err){ alert('Could not remove special day: ' + errMsg(err)); }
 }
 
 /* ---- Class requirements and teacher teaching details ---- */
@@ -6117,19 +6263,23 @@ function renderTTBuilder(){
   const classSection = document.getElementById('ttBuilderClass').value;
   const encodedClassSection = ttEncodeValue(classSection);
   if(!classSection){ area.innerHTML = '<div class="empty">Add a class in Setup first.</div>'; return; }
-  const teachingPeriods = ttPeriods.filter(p => !p.is_break);
-  if(!teachingPeriods.length){ area.innerHTML = '<div class="empty">Add at least one non-break period in Setup first.</div>'; return; }
-  const rows = ttPeriods.map(p => {
-    const cells = [1,2,3,4,5,6].map(day => {
+  const days = [1, 2, 3, 4, 5, 6];
+  const periodNos = ttUnionPeriodNos(days);
+  if(!periodNos.length){ area.innerHTML = '<div class="empty">Add at least one period template (with periods) in Setup first.</div>'; return; }
+  const rows = periodNos.map(periodNo => {
+    const cells = days.map(day => {
+      const p = ttPeriodsForDay(day).find(x => x.period_no === periodNo);
+      if(!p) return '<td><div class="tt-cell na">—</div></td>';
       if(p.is_break) return `<td><div class="tt-cell brk">${escapeHtml(p.label)}</div></td>`;
       const entry = ttTimetable.find(t => t.day_of_week === day && t.period_id === p.id && t.class_section === classSection);
       const inner = entry ? `<div class="subj">${escapeHtml(ttSubjectName(entry.subject_id) || '—')}</div><div class="teach">${escapeHtml(ttTeacherName(entry.teacher_id) || 'No teacher set')}</div>` : '<div class="empty-slot">+ Assign</div>';
       return `<td><div class="tt-cell" onclick="openTTCellDialog(${day},${p.id},ttDecodeValue('${encodedClassSection}'))">${inner}</div></td>`;
     }).join('');
-    return `<tr><th style="text-align:left;">${escapeHtml(p.label)}</th>${cells}</tr>`;
+    return `<tr><th style="text-align:left;">Period ${periodNo}</th>${cells}</tr>`;
   }).join('');
   area.innerHTML = `<table class="tt-grid"><thead><tr><th></th>${DAY_NAMES.slice(1).map(d => `<th>${d}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>`;
 }
+
 
 async function saveTTCell(day, periodId, classSection, existingId){
   const subjectId = document.getElementById('tt_cell_subject').value || null;
@@ -6418,11 +6568,11 @@ async function ttRunAutoGenerate(){
   const scopeValue = document.getElementById('ttAutoGenScope').value;
   const mode = document.getElementById('ttAutoGenMode').value;
   const classes = scopeValue === '__ALL__' ? ttClasses.map(c => c.class_section) : [ttDecodeValue(scopeValue)];
-  const teachingPeriods = ttPeriods.filter(p => !p.is_break).sort((a, b) => a.period_no - b.period_no);
-  if(!teachingPeriods.length){ alert('Add at least one non-break period in Setup first.'); return; }
+  const days = [1, 2, 3, 4, 5, 6];
+  const teachingPeriodsByDay = new Map(days.map(d => [d, ttPeriodsForDay(d).filter(p => !p.is_break)]));
+  if(![...teachingPeriodsByDay.values()].some(list => list.length)){ alert('Add at least one non-break period to a template, and map it to a day, in Setup first.'); return; }
   if(mode === 'clear' && !confirm(`This clears and regenerates the timetable for ${classes.length} class(es). Manual edits in scope will be lost. Continue?`)) return;
 
-  const days = [1, 2, 3, 4, 5, 6];
   const teacherBusy = new Map();   // teacherId -> Set("day_periodId") already occupied
   const classSlot = new Map();     // classSection -> Set("day_periodId") already filled
   ttTimetable.forEach(t => {
@@ -6466,7 +6616,7 @@ async function ttRunAutoGenerate(){
     // Pass 1: spread subjects across the week, avoiding repeating a subject on the same day where possible.
     for(const day of days){
       const usedToday = new Set();
-      for(const period of teachingPeriods){
+      for(const period of teachingPeriodsByDay.get(day)){
         const slotKey = `${day}_${period.id}`;
         if(classSlot.get(classSection).has(slotKey)) continue;
         const candidates = [...remaining.entries()].filter(([, count]) => count > 0)
@@ -6482,7 +6632,7 @@ async function ttRunAutoGenerate(){
     }
     // Pass 2: fill anything still empty, relaxing the same-subject-same-day preference.
     for(const day of days){
-      for(const period of teachingPeriods){
+      for(const period of teachingPeriodsByDay.get(day)){
         const slotKey = `${day}_${period.id}`;
         if(classSlot.get(classSection).has(slotKey)) continue;
         const candidates = [...remaining.entries()].filter(([, count]) => count > 0).sort((a, b) => b[1] - a[1]);
@@ -6531,7 +6681,8 @@ function ttRenderReportControls(){
   } else if(type === 'classwise'){
     el.innerHTML = ttClasses.length ? `<select id="ttReportClass" onchange="ttRenderReport()">${ttClasses.map(c => `<option value="${ttEncodeValue(c.class_section)}">${escapeHtml(c.class_section)}</option>`).join('')}</select>` : '';
   } else if(type === 'periodwise'){
-    el.innerHTML = `<select id="ttReportDay" onchange="ttRenderReport()">${[1, 2, 3, 4, 5, 6].map(d => `<option value="${d}">${DAY_NAMES[d]}</option>`).join('')}</select>`;
+    const specialOptions = ttSpecialDays.map(d => `<option value="special:${d.special_date}">${escapeHtml(d.special_date)} — ${escapeHtml(d.label)} (special)</option>`).join('');
+    el.innerHTML = `<select id="ttReportDay" onchange="ttRenderReport()">${[1, 2, 3, 4, 5, 6].map(d => `<option value="${d}">${DAY_NAMES[d]}</option>`).join('')}${specialOptions}</select>`;
   } else if(type === 'substitution'){
     const today = new Date().toISOString().slice(0, 10);
     const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
@@ -6551,15 +6702,19 @@ function ttRenderReport(){
   if(type === 'subjectworkload') return ttRenderSubjectWorkloadReport(area);
   if(type === 'substitution') return ttRenderSubstitutionReport(area);
 }
-function ttReportGridRow(period, cellsForDay){
-  if(period.is_break) return `<tr><th style="text-align:left;">${escapeHtml(period.label)}</th><td colspan="6"><div class="tt-cell brk">${escapeHtml(period.label)}</div></td></tr>`;
-  const cells = [1, 2, 3, 4, 5, 6].map(day => `<td><div class="tt-cell">${cellsForDay(day)}</div></td>`).join('');
-  return `<tr><th style="text-align:left;">${escapeHtml(period.label)}</th>${cells}</tr>`;
+function ttReportGridRowByNo(periodNo, cellForDay){
+  const cells = [1, 2, 3, 4, 5, 6].map(day => {
+    const p = ttPeriodsForDay(day).find(x => x.period_no === periodNo);
+    if(!p) return '<td><div class="tt-cell na">—</div></td>';
+    if(p.is_break) return `<td><div class="tt-cell brk">${escapeHtml(p.label)}</div></td>`;
+    return `<td><div class="tt-cell">${cellForDay(day, p)}</div></td>`;
+  }).join('');
+  return `<tr><th style="text-align:left;">Period ${periodNo}</th>${cells}</tr>`;
 }
 function ttRenderStaffwiseReport(area){
   const teacherId = document.getElementById('ttReportTeacher')?.value;
   if(!teacherId){ area.innerHTML = '<div class="empty">Add staff first.</div>'; return; }
-  const rows = ttPeriods.map(p => ttReportGridRow(p, day => {
+  const rows = ttUnionPeriodNos([1, 2, 3, 4, 5, 6]).map(periodNo => ttReportGridRowByNo(periodNo, (day, p) => {
     const entry = ttTimetable.find(t => t.day_of_week === day && t.period_id === p.id && t.teacher_id === teacherId);
     return entry ? `<div class="subj">${escapeHtml(ttSubjectName(entry.subject_id) || '—')}</div><div class="teach">${escapeHtml(entry.class_section)}</div>` : '<div class="empty-slot">Free</div>';
   })).join('');
@@ -6568,17 +6723,29 @@ function ttRenderStaffwiseReport(area){
 function ttRenderClasswiseReport(area){
   const classSection = ttDecodeValue(document.getElementById('ttReportClass')?.value || '');
   if(!classSection){ area.innerHTML = '<div class="empty">Add a class first.</div>'; return; }
-  const rows = ttPeriods.map(p => ttReportGridRow(p, day => {
+  const rows = ttUnionPeriodNos([1, 2, 3, 4, 5, 6]).map(periodNo => ttReportGridRowByNo(periodNo, (day, p) => {
     const entry = ttTimetable.find(t => t.day_of_week === day && t.period_id === p.id && t.class_section === classSection);
     return entry ? `<div class="subj">${escapeHtml(ttSubjectName(entry.subject_id) || '—')}</div><div class="teach">${escapeHtml(ttTeacherName(entry.teacher_id) || '—')}</div>` : '<div class="empty-slot">Free</div>';
   })).join('');
   area.innerHTML = `<h3 style="margin:0 0 10px;">${escapeHtml(classSection)}</h3><table class="tt-grid"><thead><tr><th></th>${DAY_NAMES.slice(1).map(d => `<th>${d}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>`;
 }
 function ttRenderPeriodwiseReport(area){
-  const day = Number(document.getElementById('ttReportDay')?.value || 1);
+  const rawValue = document.getElementById('ttReportDay')?.value || '1';
   if(!ttClasses.length){ area.innerHTML = '<div class="empty">Add classes first.</div>'; return; }
+  let periods, heading;
+  if(rawValue.startsWith('special:')){
+    const date = rawValue.slice('special:'.length);
+    const special = ttSpecialDays.find(d => d.special_date === date);
+    periods = ttPeriods.filter(p => p.template_id === special?.template_id).sort((a, b) => a.period_no - b.period_no);
+    heading = `${escapeHtml(special?.label || '')} — ${escapeHtml(date)} (structure preview only; not tied to actual class assignments)`;
+    const rows = periods.map(p => `<tr><th style="text-align:left;">${escapeHtml(p.label)}</th><td colspan="${ttClasses.length}"><div class="tt-cell ${p.is_break ? 'brk' : 'na'}">${p.is_break ? escapeHtml(p.label) : 'No timetable data for special days'}</div></td></tr>`).join('');
+    area.innerHTML = `<h3 style="margin:0 0 10px;">${heading}</h3><table class="tt-grid"><thead><tr><th></th>${ttClasses.map(c => `<th>${escapeHtml(c.class_section)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>`;
+    return;
+  }
+  const day = Number(rawValue);
+  periods = ttPeriodsForDay(day);
   const header = ttClasses.map(c => `<th>${escapeHtml(c.class_section)}</th>`).join('');
-  const rows = ttPeriods.map(p => {
+  const rows = periods.map(p => {
     if(p.is_break) return `<tr><th style="text-align:left;">${escapeHtml(p.label)}</th><td colspan="${ttClasses.length}"><div class="tt-cell brk">${escapeHtml(p.label)}</div></td></tr>`;
     const cells = ttClasses.map(c => {
       const entry = ttTimetable.find(t => t.day_of_week === day && t.period_id === p.id && t.class_section === c.class_section);
