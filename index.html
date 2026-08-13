@@ -353,8 +353,11 @@
   .fee-table{border-collapse:separate;border-spacing:0;width:100%;}.fee-table th{background:#edf4f9;color:#38576e;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;padding:11px 10px;}.fee-table td{padding:11px 10px;border-bottom:1px solid #e8eef3;}.fee-table tbody tr:hover{background:#f6faff;}.fee-table td,.fee-table th{white-space:nowrap;}
   #feeOnlineReportArea .table-container{border-radius:7px;border:1px solid #dbe6ed;}#feeOnlineReportArea table th{background:#edf4f9;}
   .fee-dialog{position:fixed;inset:0;background:rgba(20,30,40,.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:16px;}
-  .fee-dialog-inner{width:min(720px,100%);max-height:90vh;overflow:auto;background:var(--paper);border-radius:9px;padding:22px;box-shadow:0 14px 38px rgba(0,0,0,.3);}
+  .fee-dialog-inner{position:relative;width:min(720px,100%);max-height:90vh;overflow:auto;background:var(--paper);border-radius:9px;padding:22px;box-shadow:0 14px 38px rgba(0,0,0,.3);}
   .fee-dialog-inner h2{margin:0 0 14px;font-size:19px;}
+  .modal-close{position:absolute;top:12px;right:12px;width:34px;height:34px;border:0;border-radius:50%;background:#eef3f7;color:#38576e;font-size:24px;line-height:30px;cursor:pointer;display:grid;place-items:center;transition:background .15s,color .15s;}
+  .modal-close:hover,.modal-close:focus-visible{background:#dce8f0;color:var(--ink);outline:2px solid rgba(33,98,140,.35);outline-offset:2px;}
+  .fee-dialog-inner > .modal-close + h2,.fs-modal-inner > .modal-close + h2{padding-right:42px;}
   .fee-form-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
   .fee-form-grid .full{grid-column:1/-1;}
   .fee-dash-search-wrap{position:relative;margin-bottom:18px;}
@@ -1917,7 +1920,7 @@
       </div>
       <div class="fee-panel">
         <h2>Special Days</h2>
-        <p class="fs-modal-sub">One-off calendar dates that use a different period template than their usual weekday (e.g. Sports Day, an exam day, a half day).</p>
+        <p class="fs-modal-sub">One-off calendar dates use their own period template, separate from the normal weekly timetable (e.g. Sports Day, an exam day, or a half day).</p>
         <div class="fee-actions">
           <input type="date" id="ttNewSpecialDate">
           <select id="ttNewSpecialTemplate"></select>
@@ -1928,7 +1931,7 @@
       </div>
       <div class="fee-panel">
         <h2>Class Subject Period Targets</h2>
-        <p class="fs-modal-sub">Set the weekly number of periods for each subject in each class. The Builder shows the actual scheduled total beside this target.</p>
+        <p class="fs-modal-sub">Select a class only — never a section. Each target is applied to all sections of that class; the Builder shows each section's scheduled total separately.</p>
         <div class="fee-actions">
           <select id="ttReqClass" onchange="renderTTRequirements()"></select>
           <select id="ttReqSubject"></select>
@@ -1939,7 +1942,7 @@
       </div>
       <div class="fee-panel">
         <h2>Teacher Class &amp; Subject Details</h2>
-        <p class="fs-modal-sub">For each teacher, select a class and tick every subject they teach there. These assignments guide the timetable picker and auto-substitution ranking.</p>
+        <p class="fs-modal-sub">Select a class only — never a section — then tick the subjects taught there. The assignment is applied to every section of that class and guides the timetable picker and auto-substitution ranking.</p>
         <div class="fee-actions">
           <select id="ttAssignmentTeacher" onchange="renderTTTeacherAssignmentSubjects()"></select>
           <select id="ttAssignmentClass" onchange="renderTTTeacherAssignmentSubjects()"></select>
@@ -5254,11 +5257,40 @@ function renderFeeStudentDashboard(){
 }
 
 function openFeeDialog(title, content){
+  closeFeeDialog();
   const el = document.createElement('div'); el.className = 'fee-dialog'; el.id = 'feeDialog';
-  el.innerHTML = `<div class="fee-dialog-inner"><h2>${title}</h2>${content}</div>`;
+  el.dataset.returnFocusId = document.activeElement?.id || '';
+  el.innerHTML = `<div class="fee-dialog-inner" role="dialog" aria-modal="true" aria-label="${escapeHtml(String(title).replace(/<[^>]*>/g, ''))}" tabindex="-1"><button class="modal-close" type="button" aria-label="Close dialog" title="Close" onclick="closeFeeDialog()">&times;</button><h2>${title}</h2>${content}</div>`;
+  el.addEventListener('mousedown', event => { if(event.target === el) closeFeeDialog(); });
   document.body.appendChild(el);
+  requestAnimationFrame(() => el.querySelector('.modal-close')?.focus());
 }
-function closeFeeDialog(){ const el = document.getElementById('feeDialog'); if(el) el.remove(); }
+function closeFeeDialog(){
+  const el = document.getElementById('feeDialog');
+  if(!el) return;
+  const returnFocus = el.dataset.returnFocusId ? document.getElementById(el.dataset.returnFocusId) : null;
+  el.remove();
+  returnFocus?.focus?.();
+}
+function installModalCloseControls(){
+  document.querySelectorAll('.fs-modal-inner').forEach(inner => {
+    if(inner.querySelector(':scope > .modal-close')) return;
+    const button = document.createElement('button');
+    button.className = 'modal-close'; button.type = 'button'; button.setAttribute('aria-label', 'Close dialog'); button.title = 'Close'; button.innerHTML = '&times;';
+    button.addEventListener('click', () => { const modal = inner.closest('.fs-modal'); if(modal) modal.style.display = 'none'; });
+    inner.prepend(button);
+  });
+}
+document.addEventListener('click', event => {
+  if(event.target.classList?.contains('fs-modal')) event.target.style.display = 'none';
+});
+document.addEventListener('keydown', event => {
+  if(event.key !== 'Escape') return;
+  if(document.getElementById('feeDialog')) { closeFeeDialog(); return; }
+  const modal = [...document.querySelectorAll('.fs-modal')].find(item => getComputedStyle(item).display !== 'none');
+  if(modal) modal.style.display = 'none';
+});
+document.addEventListener('DOMContentLoaded', installModalCloseControls);
 
 function openFeeStudentDialog(id){
   const r = id ? feeRecords.find(x => x.id === id) : {};
@@ -5859,9 +5891,51 @@ async function ttDeleteSpecialDay(date){
   } catch(err){ alert('Could not remove special day: ' + errMsg(err)); }
 }
 
-/* ---- Class requirements and teacher teaching details ---- */
-function ttClassOptions(selected){
-  return ttClasses.map(c => `<option value="${escapeHtml(c.class_section)}" ${c.class_section === selected ? 'selected' : ''}>${escapeHtml(c.class_section)}</option>`).join('');
+/* ---- Class-wide requirements and teacher teaching details ----
+   Class/subject setup is saved once per class group, then mirrored to every
+   section. Timetable entries remain section-specific so each section can have
+   its own weekly timetable. */
+function ttClassScopes(){
+  const grouped = ttClassGroups.map(group => ({
+    key: `group:${group.id}`,
+    name: group.name,
+    sections: ttClasses.filter(item => String(item.class_group_id) === String(group.id)).map(item => item.class_section)
+  }));
+  const groupedSectionNames = new Set(grouped.flatMap(group => group.sections));
+  const legacy = ttClasses.filter(item => !groupedSectionNames.has(item.class_section)).map(item => ({
+    key: `section:${ttEncodeValue(item.class_section)}`,
+    name: item.class_section,
+    sections: [item.class_section]
+  }));
+  return [...grouped, ...legacy];
+}
+function ttClassScopeFromKey(key){
+  return ttClassScopes().find(scope => scope.key === key) || null;
+}
+function ttClassScopeForSection(classSection){
+  return ttClassScopes().find(scope => scope.sections.includes(classSection)) || null;
+}
+function ttClassScopeOptions(selected){
+  return ttClassScopes().map(scope => `<option value="${escapeHtml(scope.key)}" ${scope.key === selected ? 'selected' : ''}>${escapeHtml(scope.name)}</option>`).join('');
+}
+function ttClassScopeLabel(scope){
+  return scope ? scope.name : '';
+}
+function ttSubjectsAssignedAcrossScope(teacherId, scope){
+  if(!scope?.sections.length) return new Set();
+  const perSection = scope.sections.map(section => new Set(ttTeacherAssignments
+    .filter(assignment => assignment.teacher_id === teacherId && assignment.class_section === section)
+    .map(assignment => Number(assignment.subject_id))));
+  return new Set([...perSection[0]].filter(subjectId => perSection.every(subjects => subjects.has(subjectId))));
+}
+async function ttReplaceTeacherClassSubjects(teacherId, scopeKey, subjectIds){
+  const scope = ttClassScopeFromKey(scopeKey);
+  if(!scope?.sections.length) throw new Error('Add at least one section to this class before saving teacher details.');
+  const results = await Promise.all(scope.sections.map(classSection => supabaseClient.rpc('replace_teacher_class_subjects', {
+    p_teacher_id: teacherId, p_class_section: classSection, p_subject_ids: subjectIds
+  })));
+  const failed = results.find(result => result.error);
+  if(failed) throw failed.error;
 }
 function ttSubjectOptions(selected){
   return ttSubjects.map(s => `<option value="${s.id}" ${Number(s.id) === Number(selected) ? 'selected' : ''}>${escapeHtml(s.name)}</option>`).join('');
@@ -5871,61 +5945,67 @@ function populateTTRequirementControls(){
   const subjectSelect = document.getElementById('ttReqSubject');
   if(!classSelect || !subjectSelect) return;
   const oldClass = classSelect.value, oldSubject = subjectSelect.value;
-  classSelect.innerHTML = ttClassOptions(oldClass);
+  classSelect.innerHTML = ttClassScopeOptions(oldClass);
   subjectSelect.innerHTML = ttSubjectOptions(oldSubject);
-  if(ttClasses.some(c => c.class_section === oldClass)) classSelect.value = oldClass;
+  if(ttClassScopeFromKey(oldClass)) classSelect.value = oldClass;
   if(ttSubjects.some(s => String(s.id) === oldSubject)) subjectSelect.value = oldSubject;
 }
 function renderTTRequirements(){
   const area = document.getElementById('ttRequirementList');
-  const classSection = document.getElementById('ttReqClass')?.value;
+  const scope = ttClassScopeFromKey(document.getElementById('ttReqClass')?.value || '');
   if(!area) return;
-  if(!classSection){ area.innerHTML = '<div class="empty">Add a class and subject first.</div>'; return; }
-  const requirements = ttClassRequirements.filter(r => r.class_section === classSection);
+  if(!scope?.sections.length){ area.innerHTML = '<div class="empty">Add a class section and a subject first.</div>'; return; }
+  const requirements = ttClassRequirements.filter(r => scope.sections.includes(r.class_section));
   if(!requirements.length){ area.innerHTML = '<div class="empty">No subject-period targets set for this class yet.</div>'; return; }
-  const rows = requirements.sort((a,b) => ttSubjectName(a.subject_id).localeCompare(ttSubjectName(b.subject_id))).map(r => {
-    const actual = ttTimetable.filter(t => t.class_section === classSection && Number(t.subject_id) === Number(r.subject_id)).length;
-    return `<tr><td>${escapeHtml(ttSubjectName(r.subject_id))}</td><td>${Number(r.periods_per_week)}</td><td>${actual}</td><td>
-      <button class="btn-secondary" onclick="ttEditRequirement(ttDecodeValue('${ttEncodeValue(r.class_section)}'),${r.subject_id})">Edit</button>
-      <button class="del-btn" onclick="ttDeleteRequirement(ttDecodeValue('${ttEncodeValue(r.class_section)}'),${r.subject_id})">Remove</button>
+  const subjectIds = [...new Set(requirements.map(requirement => Number(requirement.subject_id)))];
+  const rows = subjectIds.sort((a,b) => ttSubjectName(a).localeCompare(ttSubjectName(b))).map(subjectId => {
+    const values = scope.sections.map(section => ttClassRequirements.find(requirement => requirement.class_section === section && Number(requirement.subject_id) === subjectId)?.periods_per_week).filter(value => value != null);
+    const target = new Set(values).size === 1 ? Number(values[0]) : 'Needs update';
+    const actual = scope.sections.map(section => `${section}: ${ttTimetable.filter(entry => entry.class_section === section && Number(entry.subject_id) === subjectId).length}`).join(' | ');
+    return `<tr><td>${escapeHtml(ttSubjectName(subjectId))}</td><td>${target}</td><td>${escapeHtml(actual)}</td><td>
+      <button class="btn-secondary" onclick="ttEditRequirement(ttDecodeValue('${ttEncodeValue(scope.key)}'),${subjectId})">Edit</button>
+      <button class="del-btn" onclick="ttDeleteRequirement(ttDecodeValue('${ttEncodeValue(scope.key)}'),${subjectId})">Remove</button>
     </td></tr>`;
   }).join('');
-  area.innerHTML = `<table class="tt-requirements"><thead><tr><th>Subject</th><th>Target / week</th><th>Scheduled</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+  area.innerHTML = `<table class="tt-requirements"><thead><tr><th>Subject</th><th>Target / week</th><th>Scheduled by section</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
 }
-function ttEditRequirement(classSection, subjectId){
-  const req = ttClassRequirements.find(r => r.class_section === classSection && Number(r.subject_id) === Number(subjectId));
+function ttEditRequirement(scopeKey, subjectId){
+  const scope = ttClassScopeFromKey(scopeKey);
+  const req = scope && ttClassRequirements.find(r => scope.sections.includes(r.class_section) && Number(r.subject_id) === Number(subjectId));
   if(!req) return;
   const classSelect = document.getElementById('ttReqClass');
   const subjectSelect = document.getElementById('ttReqSubject');
   const periodsInput = document.getElementById('ttReqPeriods');
-  if(classSelect) classSelect.value = classSection;
+  if(classSelect) classSelect.value = scopeKey;
   if(subjectSelect) subjectSelect.value = String(subjectId);
   if(periodsInput) periodsInput.value = req.periods_per_week;
   renderTTRequirements();
   periodsInput?.scrollIntoView({ behavior:'smooth', block:'center' });
 }
 async function ttSaveRequirement(){
-  const classSection = document.getElementById('ttReqClass').value;
+  const scope = ttClassScopeFromKey(document.getElementById('ttReqClass').value);
   const subjectId = Number(document.getElementById('ttReqSubject').value);
   const periods = Number(document.getElementById('ttReqPeriods').value);
-  if(!classSection || !subjectId || !Number.isInteger(periods) || periods < 1 || periods > 40){
+  if(!scope?.sections.length || !subjectId || !Number.isInteger(periods) || periods < 1 || periods > 40){
     alert('Choose a class and subject, then enter a whole number from 1 to 40.');
     return;
   }
   try{
     const { error } = await supabaseClient.from('tt_class_subject_requirements').upsert(
-      { class_section: classSection, subject_id: subjectId, periods_per_week: periods, updated_at: new Date().toISOString() },
+      scope.sections.map(classSection => ({ class_section: classSection, subject_id: subjectId, periods_per_week: periods, updated_at: new Date().toISOString() })),
       { onConflict:'class_section,subject_id' }
     );
     if(error) throw error;
     await loadTimetable();
   } catch(err){ alert('Could not save the class subject target: ' + errMsg(err)); }
 }
-async function ttDeleteRequirement(classSection, subjectId){
+async function ttDeleteRequirement(scopeKey, subjectId){
+  const scope = ttClassScopeFromKey(scopeKey);
+  if(!scope?.sections.length) return;
   if(!confirm('Remove this weekly subject-period target?')) return;
   try{
     const { error } = await supabaseClient.from('tt_class_subject_requirements').delete()
-      .eq('class_section', classSection).eq('subject_id', subjectId);
+      .in('class_section', scope.sections).eq('subject_id', subjectId);
     if(error) throw error;
     await loadTimetable();
   } catch(err){ alert('Could not remove the target: ' + errMsg(err)); }
@@ -5937,31 +6017,27 @@ function populateTTTeacherAssignmentControls(){
   if(!teacherSelect || !classSelect) return;
   const oldTeacher = teacherSelect.value, oldClass = classSelect.value;
   teacherSelect.innerHTML = ttTeachers.map(t => `<option value="${t.id}">${escapeHtml(t.full_name?.trim() || '')}</option>`).join('');
-  classSelect.innerHTML = ttClassOptions(oldClass);
+  classSelect.innerHTML = ttClassScopeOptions(oldClass);
   if(ttTeachers.some(t => t.id === oldTeacher)) teacherSelect.value = oldTeacher;
-  if(ttClasses.some(c => c.class_section === oldClass)) classSelect.value = oldClass;
+  if(ttClassScopeFromKey(oldClass)) classSelect.value = oldClass;
 }
 function renderTTTeacherAssignmentSubjects(){
   const area = document.getElementById('ttAssignmentSubjects');
   const teacherId = document.getElementById('ttAssignmentTeacher')?.value;
-  const classSection = document.getElementById('ttAssignmentClass')?.value;
+  const scope = ttClassScopeFromKey(document.getElementById('ttAssignmentClass')?.value || '');
   if(!area) return;
-  if(!teacherId || !classSection){ area.innerHTML = '<div class="empty">Add a teacher, class, and subjects first.</div>'; return; }
-  const selected = new Set(ttTeacherAssignments
-    .filter(a => a.teacher_id === teacherId && a.class_section === classSection)
-    .map(a => Number(a.subject_id)));
+  if(!teacherId || !scope?.sections.length){ area.innerHTML = '<div class="empty">Add a teacher, class section, and subjects first.</div>'; return; }
+  const selected = ttSubjectsAssignedAcrossScope(teacherId, scope);
   area.innerHTML = ttSubjects.length ? ttSubjects.map(s => `<label><input class="tt-assignment-subject" type="checkbox" value="${s.id}" ${selected.has(Number(s.id)) ? 'checked' : ''}>${escapeHtml(s.name)}</label>`).join('') : '<div class="empty">Add subjects first.</div>';
 }
 async function ttSaveTeacherAssignments(){
   const teacherId = document.getElementById('ttAssignmentTeacher').value;
-  const classSection = document.getElementById('ttAssignmentClass').value;
+  const scopeKey = document.getElementById('ttAssignmentClass').value;
+  const scope = ttClassScopeFromKey(scopeKey);
   const subjectIds = [...document.querySelectorAll('.tt-assignment-subject:checked')].map(input => Number(input.value));
-  if(!teacherId || !classSection){ alert('Choose a teacher and a class.'); return; }
+  if(!teacherId || !scope?.sections.length){ alert('Choose a teacher and a class with at least one section.'); return; }
   try{
-    const { error } = await supabaseClient.rpc('replace_teacher_class_subjects', {
-      p_teacher_id: teacherId, p_class_section: classSection, p_subject_ids: subjectIds
-    });
-    if(error) throw error;
+    await ttReplaceTeacherClassSubjects(teacherId, scopeKey, subjectIds);
     await loadTimetable();
   } catch(err){ alert('Could not save teacher details: ' + errMsg(err)); }
 }
@@ -5971,33 +6047,33 @@ function renderTTTeacherAssignments(){
   if(!ttTeacherAssignments.length){ area.innerHTML = '<div class="empty">No teacher class-subject details saved yet.</div>'; return; }
   const groups = new Map();
   ttTeacherAssignments.forEach(a => {
-    const key = a.teacher_id + '\u0000' + a.class_section;
-    if(!groups.has(key)) groups.set(key, { teacherId:a.teacher_id, classSection:a.class_section, subjectIds:[] });
-    groups.get(key).subjectIds.push(a.subject_id);
+    const scope = ttClassScopeForSection(a.class_section);
+    if(!scope) return;
+    const key = a.teacher_id + '\u0000' + scope.key;
+    if(!groups.has(key)) groups.set(key, { teacherId:a.teacher_id, scopeKey:scope.key, scope, subjectIds:ttSubjectsAssignedAcrossScope(a.teacher_id, scope) });
   });
-  const rows = [...groups.values()].sort((a,b) => ttTeacherName(a.teacherId).localeCompare(ttTeacherName(b.teacherId)) || a.classSection.localeCompare(b.classSection)).map(g =>
-    `<tr><td>${escapeHtml(ttTeacherName(g.teacherId))}</td><td>${escapeHtml(g.classSection)}</td><td>${escapeHtml(g.subjectIds.map(ttSubjectName).filter(Boolean).join(', '))}</td><td>
-      <button class="btn-secondary" onclick="ttEditTeacherAssignment('${g.teacherId}',ttDecodeValue('${ttEncodeValue(g.classSection)}'))">Edit</button>
-      <button class="del-btn" onclick="ttRemoveTeacherAssignment('${g.teacherId}',ttDecodeValue('${ttEncodeValue(g.classSection)}'))">Remove</button>
+  const rows = [...groups.values()].sort((a,b) => ttTeacherName(a.teacherId).localeCompare(ttTeacherName(b.teacherId)) || a.scope.name.localeCompare(b.scope.name)).map(g =>
+    `<tr><td>${escapeHtml(ttTeacherName(g.teacherId))}</td><td>${escapeHtml(ttClassScopeLabel(g.scope))}</td><td>${escapeHtml([...g.subjectIds].map(ttSubjectName).filter(Boolean).join(', '))}</td><td>
+      <button class="btn-secondary" onclick="ttEditTeacherAssignment('${g.teacherId}',ttDecodeValue('${ttEncodeValue(g.scopeKey)}'))">Edit</button>
+      <button class="del-btn" onclick="ttRemoveTeacherAssignment('${g.teacherId}',ttDecodeValue('${ttEncodeValue(g.scopeKey)}'))">Remove</button>
     </td></tr>`
   ).join('');
   area.innerHTML = `<table><thead><tr><th>Teacher</th><th>Class</th><th>Subjects</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
 }
-function ttEditTeacherAssignment(teacherId, classSection){
+function ttEditTeacherAssignment(teacherId, scopeKey){
   const teacherSelect = document.getElementById('ttAssignmentTeacher');
   const classSelect = document.getElementById('ttAssignmentClass');
   if(teacherSelect) teacherSelect.value = teacherId;
-  if(classSelect) classSelect.value = classSection;
+  if(classSelect) classSelect.value = scopeKey;
   renderTTTeacherAssignmentSubjects();
   document.getElementById('ttAssignmentSubjects')?.scrollIntoView({ behavior:'smooth', block:'center' });
 }
-async function ttRemoveTeacherAssignment(teacherId, classSection){
-  if(!confirm(`Remove all timetable subject allocations for ${ttTeacherName(teacherId)} in ${classSection}?`)) return;
+async function ttRemoveTeacherAssignment(teacherId, scopeKey){
+  const scope = ttClassScopeFromKey(scopeKey);
+  if(!scope?.sections.length) return;
+  if(!confirm(`Remove all timetable subject allocations for ${ttTeacherName(teacherId)} in ${scope.name} (all sections)?`)) return;
   try{
-    const { error } = await supabaseClient.rpc('replace_teacher_class_subjects', {
-      p_teacher_id: teacherId, p_class_section: classSection, p_subject_ids: []
-    });
-    if(error) throw error;
+    await ttReplaceTeacherClassSubjects(teacherId, scopeKey, []);
     await loadTimetable();
   } catch(err){ alert('Could not remove this class allocation: ' + errMsg(err)); }
 }
@@ -6006,11 +6082,11 @@ async function ttRemoveTeacherAssignment(teacherId, classSection){
 function ttTeacherAllocationGroups(teacherId){
   const grouped = new Map();
   ttTeacherAssignments.filter(a => a.teacher_id === teacherId).forEach(a => {
-    if(!grouped.has(a.class_section)) grouped.set(a.class_section, []);
-    grouped.get(a.class_section).push(a.subject_id);
+    const scope = ttClassScopeForSection(a.class_section);
+    if(scope && !grouped.has(scope.key)) grouped.set(scope.key, scope);
   });
-  return [...grouped.entries()].sort(([a],[b]) => a.localeCompare(b))
-    .map(([classSection, subjectIds]) => ({ classSection, subjectIds }));
+  return [...grouped.values()].sort((a,b) => a.name.localeCompare(b.name))
+    .map(scope => ({ scopeKey:scope.key, classSection:scope.name, subjectIds:[...ttSubjectsAssignedAcrossScope(teacherId, scope)] }));
 }
 function ttTeacherAllocationSummary(teacherId){
   const groups = ttTeacherAllocationGroups(teacherId);
@@ -6036,12 +6112,10 @@ function renderTTTeacherList(){
   area.innerHTML = `<table><thead><tr><th>Teacher</th><th>Staff Subjects</th><th>Timetable Classes &amp; Subjects</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 function renderTTTeacherDialogSubjects(teacherId){
-  const classSection = document.getElementById('ttTeacherDialogClass')?.value;
+  const scope = ttClassScopeFromKey(document.getElementById('ttTeacherDialogClass')?.value || '');
   const area = document.getElementById('ttTeacherDialogSubjects');
   if(!area) return;
-  const selected = new Set(ttTeacherAssignments
-    .filter(a => a.teacher_id === teacherId && a.class_section === classSection)
-    .map(a => Number(a.subject_id)));
+  const selected = ttSubjectsAssignedAcrossScope(teacherId, scope);
   area.innerHTML = ttSubjects.length
     ? ttSubjects.map(subject => `<label><input class="tt-dialog-assignment-subject" type="checkbox" value="${subject.id}" ${selected.has(Number(subject.id)) ? 'checked' : ''}>${escapeHtml(subject.name)}</label>`).join('')
     : '<div class="empty">Add timetable subjects first.</div>';
@@ -6052,18 +6126,18 @@ function openTTTeacherAllocationDialog(teacherId){
   const allocationRows = ttTeacherAllocationGroups(teacherId).map(group => `<tr>
     <td>${escapeHtml(group.classSection)}</td>
     <td>${escapeHtml(group.subjectIds.map(ttSubjectName).filter(Boolean).join(', '))}</td>
-    <td><button class="btn-secondary" onclick="ttSelectTeacherDialogClass('${teacherId}',ttDecodeValue('${ttEncodeValue(group.classSection)}'))">Edit</button>
-      <button class="del-btn" onclick="ttRemoveTeacherDialogClass('${teacherId}',ttDecodeValue('${ttEncodeValue(group.classSection)}'))">Remove</button></td>
+    <td><button class="btn-secondary" onclick="ttSelectTeacherDialogClass('${teacherId}',ttDecodeValue('${ttEncodeValue(group.scopeKey)}'))">Edit</button>
+      <button class="del-btn" onclick="ttRemoveTeacherDialogClass('${teacherId}',ttDecodeValue('${ttEncodeValue(group.scopeKey)}'))">Remove</button></td>
   </tr>`).join('');
-  const defaultClass = ttClasses[0]?.class_section || '';
+  const defaultClass = ttClassScopes()[0]?.key || '';
   openFeeDialog('Timetable Teacher Details', `<div class="fee-form-grid">
     <div class="field"><label>Teacher</label><input value="${escapeHtml(teacher.full_name?.trim() || '')}" disabled></div>
     <div class="field"><label>Designation</label><input value="${escapeHtml(teacher.designation || '')}" disabled></div>
     <div class="field full"><label>Subjects in staff record</label><input value="${escapeHtml(teacher.subjects_taught || 'Not listed')}" disabled></div>
   </div>
   <h3 style="margin:18px 0 6px;">Allocate Class &amp; Subjects</h3>
-  <p class="fs-modal-sub">Choose one class, then tick all subjects this teacher teaches in that class. Save each class allocation separately.</p>
-  <div class="fee-actions"><select id="ttTeacherDialogClass" onchange="renderTTTeacherDialogSubjects('${teacherId}')">${ttClassOptions(defaultClass)}</select>
+  <p class="fs-modal-sub">Choose one class, then tick all subjects this teacher teaches in that class. Saving applies the selection to every section in that class.</p>
+  <div class="fee-actions"><select id="ttTeacherDialogClass" onchange="renderTTTeacherDialogSubjects('${teacherId}')">${ttClassScopeOptions(defaultClass)}</select>
     <button class="btn-primary" onclick="ttSaveTeacherDialogAllocation('${teacherId}')">Save This Class</button></div>
   <div id="ttTeacherDialogSubjects" class="tt-check-grid"></div>
   <h3 style="margin:18px 0 6px;">Current Timetable Allocations</h3>
@@ -6071,31 +6145,28 @@ function openTTTeacherAllocationDialog(teacherId){
   <div class="actions"><button class="btn-secondary" onclick="closeFeeDialog()">Close</button></div>`);
   renderTTTeacherDialogSubjects(teacherId);
 }
-function ttSelectTeacherDialogClass(teacherId, classSection){
+function ttSelectTeacherDialogClass(teacherId, scopeKey){
   const select = document.getElementById('ttTeacherDialogClass');
-  if(select){ select.value = classSection; renderTTTeacherDialogSubjects(teacherId); }
+  if(select){ select.value = scopeKey; renderTTTeacherDialogSubjects(teacherId); }
 }
 async function ttSaveTeacherDialogAllocation(teacherId){
-  const classSection = document.getElementById('ttTeacherDialogClass').value;
+  const scopeKey = document.getElementById('ttTeacherDialogClass').value;
+  const scope = ttClassScopeFromKey(scopeKey);
   const subjectIds = [...document.querySelectorAll('.tt-dialog-assignment-subject:checked')].map(input => Number(input.value));
-  if(!classSection){ alert('Choose a class.'); return; }
+  if(!scope?.sections.length){ alert('Choose a class with at least one section.'); return; }
   try{
-    const { error } = await supabaseClient.rpc('replace_teacher_class_subjects', {
-      p_teacher_id: teacherId, p_class_section: classSection, p_subject_ids: subjectIds
-    });
-    if(error) throw error;
+    await ttReplaceTeacherClassSubjects(teacherId, scopeKey, subjectIds);
     await loadTimetable();
     closeFeeDialog();
     openTTTeacherAllocationDialog(teacherId);
   } catch(err){ alert('Could not save this class allocation: ' + errMsg(err)); }
 }
-async function ttRemoveTeacherDialogClass(teacherId, classSection){
-  if(!confirm(`Remove all timetable subject allocations for ${ttTeacherName(teacherId)} in ${classSection}?`)) return;
+async function ttRemoveTeacherDialogClass(teacherId, scopeKey){
+  const scope = ttClassScopeFromKey(scopeKey);
+  if(!scope?.sections.length) return;
+  if(!confirm(`Remove all timetable subject allocations for ${ttTeacherName(teacherId)} in ${scope.name} (all sections)?`)) return;
   try{
-    const { error } = await supabaseClient.rpc('replace_teacher_class_subjects', {
-      p_teacher_id: teacherId, p_class_section: classSection, p_subject_ids: []
-    });
-    if(error) throw error;
+    await ttReplaceTeacherClassSubjects(teacherId, scopeKey, []);
     await loadTimetable();
     closeFeeDialog();
     openTTTeacherAllocationDialog(teacherId);
