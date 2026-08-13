@@ -5796,6 +5796,8 @@ function ttPeriodTemplateModalHtml(templateId){
     </td></tr>`).join('') : '<tr><td colspan="4" class="empty">No periods in this template yet.</td></tr>';
   return `<p class="fs-modal-sub">Periods in <strong>${escapeHtml(tpl?.name || '')}</strong>. Mark assemblies/lunch as a break so substitutes are never assigned to them.</p>
     <table class="tt-requirements"><thead><tr><th>No.</th><th>Label</th><th>Time</th><th></th></tr></thead><tbody id="ttPeriodRows">${rows}</tbody></table>
+    <div class="note" style="margin:14px 0 0;">Need the standard school sequence? Add <strong>Assembly Zero Period, Period 1–3, Break, and Period 4–8</strong> in one click. You can add timings afterwards.</div>
+    <div class="fee-actions" style="margin-top:10px;"><button type="button" class="btn-secondary" onclick="ttAddStandardPeriodSet(${templateId})">Add Standard Period Set</button></div>
     <div class="fee-form-grid" style="margin-top:14px;">
       <div class="field"><label>Period no.</label><input type="number" id="ttPeriodNo"></div>
       <div class="field"><label>Label</label><input type="text" id="ttPeriodLabel" placeholder="Period 1 or Lunch"></div>
@@ -5813,6 +5815,30 @@ function ttOpenPeriodTemplate(templateId){
   if(!tpl) return;
   ttEditingPeriodId = null;
   openFeeDialog(`Periods — ${escapeHtml(tpl.name)}`, ttPeriodTemplateModalHtml(templateId));
+}
+async function ttAddStandardPeriodSet(templateId){
+  const standardPeriods = [
+    { period_no:0, label:'ASSEMBLY ZERO PERIOD', is_break:true },
+    { period_no:1, label:'PERIOD 1', is_break:false },
+    { period_no:2, label:'PERIOD 2', is_break:false },
+    { period_no:3, label:'PERIOD 3', is_break:false },
+    { period_no:4, label:'BREAK', is_break:true },
+    { period_no:5, label:'PERIOD 4', is_break:false },
+    { period_no:6, label:'PERIOD 5', is_break:false },
+    { period_no:7, label:'PERIOD 6', is_break:false },
+    { period_no:8, label:'PERIOD 7', is_break:false },
+    { period_no:9, label:'PERIOD 8', is_break:false }
+  ];
+  const existingNos = new Set(ttPeriods.filter(period => Number(period.template_id) === Number(templateId)).map(period => Number(period.period_no)));
+  const records = standardPeriods.filter(period => !existingNos.has(period.period_no)).map(period => ({ template_id:templateId, ...period }));
+  if(!records.length){ alert('This template already has the complete standard period set.'); return; }
+  try{
+    const { error } = await supabaseClient.from('tt_periods').insert(records);
+    if(error) throw error;
+    await loadTimetable();
+    closeFeeDialog();
+    ttOpenPeriodTemplate(templateId);
+  } catch(err){ alert('Could not add the standard period set: ' + errMsg(err)); }
 }
 function ttEditPeriod(periodId){
   const p = ttPeriods.find(x => x.id === periodId);
