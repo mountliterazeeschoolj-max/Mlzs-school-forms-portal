@@ -480,8 +480,8 @@
   .gate2-field{position:relative;margin-bottom:12px;text-align:left;}
   .gate2-field .ic{position:absolute;left:6px;top:50%;transform:translateY(-50%);width:30px;height:30px;border-radius:50%;background:#eaf1ff;display:flex;align-items:center;justify-content:center;}
   .gate2-field .ic svg{width:15px;height:15px;stroke:#2f6fed;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
-  .gate2-field input{width:100%;padding:13px 42px 13px 46px;border-radius:14px;border:1.5px solid #dfe7f7;background:#fff;font-size:14px;color:#1b2b4b;box-sizing:border-box;transition:border-color .15s ease, box-shadow .15s ease;}
-  .gate2-field input:focus{outline:none;border-color:#8fb1f5;box-shadow:0 0 0 4px rgba(47,111,237,.12);}
+  .gate2 .gate2-field input{width:100%;padding:13px 42px 13px 46px;border-radius:14px;border:1.5px solid #dfe7f7;background:#fff;font-size:14px;color:#1b2b4b;box-sizing:border-box;transition:border-color .15s ease, box-shadow .15s ease;}
+  .gate2 .gate2-field input:focus{outline:none;border-color:#8fb1f5;box-shadow:0 0 0 4px rgba(47,111,237,.12);}
   .gate2-field .eye{position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:#8092b3;display:flex;}
   .gate2-field .eye svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.8;}
   .gate2-field-hint{font-size:11px;color:#8092b3;text-align:left;margin:-7px 0 12px 4px;}
@@ -512,7 +512,7 @@
     .gate2-heading{font-size:20px;margin:12px 0 2px;}
     .gate2-subtitle{font-size:12.5px;margin:0 0 16px;}
     .gate2-field{margin-bottom:10px;}
-    .gate2-field input{padding:12px 38px 12px 42px;font-size:14px;}
+    .gate2 .gate2-field input{padding:12px 38px 12px 42px;font-size:14px;}
     .gate2-field .ic{width:27px;height:27px;left:5px;}
     .gate2-field .ic svg{width:14px;height:14px;}
     .gate2 button.gate2-btn{padding:13px;font-size:14px;}
@@ -5757,6 +5757,13 @@ function ttUnionPeriodNos(days){
   days.forEach(d => ttPeriodsForDay(d).forEach(p => nos.add(p.period_no)));
   return [...nos].sort((a, b) => a - b);
 }
+function ttLabelForPeriodNo(periodNo, days){
+  for(const day of (days || [1, 2, 3, 4, 5, 6])){
+    const p = ttPeriodsForDay(day).find(x => x.period_no === periodNo);
+    if(p && p.label) return p.label;
+  }
+  return `Period ${periodNo}`;
+}
 function renderTTPeriodTemplates(){
   document.getElementById('ttPeriodTemplateList').innerHTML = ttPeriodTemplates.length ? ttPeriodTemplates.map(tpl => {
     const count = ttPeriods.filter(p => p.template_id === tpl.id).length;
@@ -6385,7 +6392,7 @@ function renderTTBuilder(){
       const inner = entry ? `<div class="subj">${escapeHtml(ttSubjectName(entry.subject_id) || '—')}</div><div class="teach">${escapeHtml(ttTeacherName(entry.teacher_id) || 'No teacher set')}</div>` : '<div class="empty-slot">+ Assign</div>';
       return `<td><div class="tt-cell" onclick="openTTCellDialog(${day},${p.id},ttDecodeValue('${encodedClassSection}'))">${inner}</div></td>`;
     }).join('');
-    return `<tr><th style="text-align:left;">Period ${periodNo}</th>${cells}</tr>`;
+    return `<tr><th style="text-align:left;">${escapeHtml(ttLabelForPeriodNo(periodNo, days))}</th>${cells}</tr>`;
   }).join('');
   area.innerHTML = `<table class="tt-grid"><thead><tr><th></th>${DAY_NAMES.slice(1).map(d => `<th>${d}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>`;
 }
@@ -6825,7 +6832,7 @@ function ttReportGridRowByNo(periodNo, cellForDay){
     if(p.is_break) return `<td><div class="tt-cell brk">${escapeHtml(p.label)}</div></td>`;
     return `<td><div class="tt-cell">${cellForDay(day, p)}</div></td>`;
   }).join('');
-  return `<tr><th style="text-align:left;">Period ${periodNo}</th>${cells}</tr>`;
+  return `<tr><th style="text-align:left;">${escapeHtml(ttLabelForPeriodNo(periodNo))}</th>${cells}</tr>`;
 }
 function ttRenderStaffwiseReport(area){
   const teacherId = document.getElementById('ttReportTeacher')?.value;
