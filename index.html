@@ -1967,12 +1967,13 @@
       </div>
       <div class="fee-panel">
         <h2>Bulk Import Timetable Setup</h2>
-        <p class="fs-modal-sub">Import classes, subjects, teacher class-subject assignments, or weekly subject-period targets from CSV. Teachers must already exist in Staff records.</p>
+        <p class="fs-modal-sub">Bulk upload classes, subjects, Class Subject Period Targets, or Teacher Class &amp; Subject Details from CSV. For targets and teacher details, use the class name only; the upload applies each row to every section in that class.</p>
         <div class="fee-actions">
           <button class="btn-primary" onclick="openTTBulkImportDialog()">Bulk Import CSV</button>
           <button class="btn-secondary" onclick="ttDownloadBulkTemplate('classes')">Classes Template</button>
           <button class="btn-secondary" onclick="ttDownloadBulkTemplate('subjects')">Subjects Template</button>
           <button class="btn-secondary" onclick="ttDownloadBulkTemplate('teachers')">Teachers Template</button>
+          <button class="btn-secondary" onclick="ttDownloadBulkTemplate('requirements')">Targets Template</button>
         </div>
       </div>
     </div>
@@ -6189,7 +6190,7 @@ async function ttRemoveTeacherDialogClass(teacherId, scopeKey){
 
 /* ---- Bulk import: classes, subjects, teaching details and targets ---- */
 function openTTBulkImportDialog(){
-  openFeeDialog('Bulk Import Timetable Setup', `<p class="fs-modal-sub">Choose what to import, upload a CSV or paste its content, then review the format shown below. Imports only add or update timetable setup; they never create staff login accounts.</p>
+  openFeeDialog('Bulk Upload Timetable Setup', `<p class="fs-modal-sub">Upload a CSV or paste its content. For <strong>Class Subject Period Targets</strong> and <strong>Teacher Class &amp; Subject Details</strong>, enter the class name only (for example, <code>9</code>) — all sections receive the same setup. Teachers must already exist in Staff records.</p>
     <div class="field"><label>Import type</label><select id="ttBulkType" onchange="renderTTBulkImportForm()">
       <option value="classes">Classes</option><option value="subjects">Subjects</option>
       <option value="teachers">Teacher class-subject details</option><option value="requirements">Class subject-period targets</option>
@@ -6202,8 +6203,8 @@ function ttBulkExample(type){
   return {
     classes:'class_section,sort_order\n9 (A),1\n9 (B),2',
     subjects:'name\nMathematics\nEnglish',
-    teachers:'teacher_name,class_section,subjects\nAnita Sharma,9 (A),Mathematics;Science\nRahul Verma,9 (B),English',
-    requirements:'class_section,subject,periods_per_week\n9 (A),Mathematics,6\n9 (A),English,5'
+    teachers:'teacher_name,class,subjects\nAnita Sharma,9,Mathematics;Science\nRahul Verma,10,English',
+    requirements:'class,subject,periods_per_week\n9,Mathematics,6\n9,English,5'
   }[type];
 }
 function renderTTBulkImportForm(){
@@ -6257,22 +6258,22 @@ async function ttRunBulkImport(){
       closeFeeDialog(); alert(`Imported ${records.length} subject(s).${skipped.length ? '\nSkipped:\n' + skipped.join('\n') : ''}`);
       return;
     }
-    const classesByName = new Map(ttClasses.map(c => [c.class_section.trim().toLowerCase(), c.class_section]));
+    const classScopesByName = new Map(ttClassScopes().map(scope => [scope.name.trim().toLowerCase(), scope]));
     const subjectsByName = new Map(ttSubjects.map(s => [s.name.trim().toLowerCase(), Number(s.id)]));
     if(type === 'requirements'){
       const records = rows.map((row, index) => {
         const classRaw = ttBulkCell(headers,row,['class_section','class','class section','class/section']);
         const subjectRaw = ttBulkCell(headers,row,['subject','subject name','name']);
         const periods = Number(ttBulkCell(headers,row,['periods_per_week','periods per week','periods/week']));
-        const class_section = classesByName.get(classRaw.toLowerCase()), subject_id = subjectsByName.get(subjectRaw.toLowerCase());
-        if(!class_section || !subject_id || !Number.isInteger(periods) || periods < 1 || periods > 40){
+        const scope = classScopesByName.get((classRaw || '').toLowerCase()), subject_id = subjectsByName.get((subjectRaw || '').toLowerCase());
+        if(!scope?.sections.length || !subject_id || !Number.isInteger(periods) || periods < 1 || periods > 40){
           skipped.push(`Row ${index + 2}: unknown class/subject or invalid weekly periods`); return null;
         }
-        return { class_section, subject_id, periods_per_week:periods, updated_at:new Date().toISOString() };
-      }).filter(Boolean);
+        return scope.sections.map(class_section => ({ class_section, subject_id, periods_per_week:periods, updated_at:new Date().toISOString() }));
+      }).filter(Boolean).flat();
       if(records.length){ const { error } = await supabaseClient.from('tt_class_subject_requirements').upsert(records, {onConflict:'class_section,subject_id'}); if(error) throw error; }
       await loadTimetable();
-      closeFeeDialog(); alert(`Imported ${records.length} class subject target(s).${skipped.length ? '\nSkipped:\n' + skipped.join('\n') : ''}`);
+      closeFeeDialog(); alert(`Imported ${records.length} section target(s) from ${rows.length - skipped.length} class row(s).${skipped.length ? '\nSkipped:\n' + skipped.join('\n') : ''}`);
       return;
     }
     const teachersByName = new Map(ttTeachers.map(t => [(t.full_name || '').trim().toLowerCase(), t.id]));
@@ -6281,25 +6282,23 @@ async function ttRunBulkImport(){
       const teacherRaw = ttBulkCell(headers,row,['teacher_name','teacher','full name']);
       const classRaw = ttBulkCell(headers,row,['class_section','class','class section','class/section']);
       const subjectsRaw = ttBulkCell(headers,row,['subjects','subject']);
-      const teacherId = teachersByName.get(teacherRaw.toLowerCase());
-      const classSection = classesByName.get(classRaw.toLowerCase());
-      const subjectIds = subjectsRaw.split(';').map(s => subjectsByName.get(s.trim().toLowerCase())).filter(Boolean);
-      if(!teacherId || !classSection || !subjectIds.length){
+      const teacherId = teachersByName.get((teacherRaw || '').toLowerCase());
+      const scope = classScopesByName.get((classRaw || '').toLowerCase());
+      const subjectIds = String(subjectsRaw || '').split(';').map(s => subjectsByName.get(s.trim().toLowerCase())).filter(Boolean);
+      if(!teacherId || !scope?.sections.length || !subjectIds.length){
         skipped.push(`Row ${index + 2}: teacher, class, or subject is not recognised`); return;
       }
-      const key = teacherId + '\u0000' + classSection;
-      if(!grouped.has(key)) grouped.set(key, {teacherId, classSection, subjectIds:new Set()});
+      const key = teacherId + '\u0000' + scope.key;
+      if(!grouped.has(key)) grouped.set(key, {teacherId, scopeKey:scope.key, scopeName:scope.name, subjectIds:new Set()});
       subjectIds.forEach(id => grouped.get(key).subjectIds.add(id));
     });
     let saved = 0;
     for(const group of grouped.values()){
-      const { error } = await supabaseClient.rpc('replace_teacher_class_subjects', {
-        p_teacher_id:group.teacherId, p_class_section:group.classSection, p_subject_ids:[...group.subjectIds]
-      });
-      if(error) skipped.push(`${ttTeacherName(group.teacherId)} / ${group.classSection}: ${errMsg(error)}`); else saved++;
+      try{ await ttReplaceTeacherClassSubjects(group.teacherId, group.scopeKey, [...group.subjectIds]); saved++; }
+      catch(error){ skipped.push(`${ttTeacherName(group.teacherId)} / ${group.scopeName}: ${errMsg(error)}`); }
     }
     await loadTimetable();
-    closeFeeDialog(); alert(`Imported ${saved} teacher class-subject assignment group(s).${skipped.length ? '\nSkipped:\n' + skipped.join('\n') : ''}`);
+    closeFeeDialog(); alert(`Imported ${saved} teacher class-subject assignment(s), applied to all matching sections.${skipped.length ? '\nSkipped:\n' + skipped.join('\n') : ''}`);
   } catch(err){ alert('Could not import timetable setup: ' + errMsg(err)); }
 }
 
