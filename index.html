@@ -533,6 +533,20 @@
   @media print{
     .site-footer{display:none;}
   }
+  /* ---- 2026 portal refresh: shared visual system ---- */
+  :root{--ink:#13253d;--line:#d8e2ec;--accent:#174a7c;--accent-light:#287fae;--paper:#fff;--field:#f7f9fc;--muted:#65758a;}
+  body{min-height:100vh;padding:22px 16px 40px;background:linear-gradient(145deg,#eaf1f7 0%,#f7fafc 50%,#e6eef5 100%);font-family:Inter,"Segoe UI",Arial,sans-serif;line-height:1.45;}
+  .sheet{border:1px solid rgba(205,218,230,.9);border-radius:18px;overflow:hidden;box-shadow:0 24px 60px rgba(20,48,76,.12);}
+  .header{padding:26px 30px 21px;background:linear-gradient(135deg,#fff 0%,#f3f8fc 100%);border-bottom:1px solid #d8e5ef;border-image:none;}.header::after{content:"";position:absolute;left:0;bottom:0;width:100%;height:4px;background:linear-gradient(90deg,#174a7c,#3d96bd,#b9dce9);}.header .school-name{font-size:17px;letter-spacing:.15px;}.header .eyebrow{font-size:10px;color:#287fae;letter-spacing:1.6px;}.header h1{font-size:25px;letter-spacing:-.35px;}.admin-link{top:18px;right:20px;padding:6px 9px;border-radius:7px;background:#f2f6fa;opacity:1;font-weight:700;}.admin-link:hover{background:#e3edf4;color:var(--accent);}
+  form{padding:28px 32px 36px;}.section-title{margin:28px 0 14px;padding-bottom:8px;border-bottom-color:#dce6ef;font-size:12px;letter-spacing:.85px;}label,legend{font-size:10.5px;letter-spacing:.6px;color:#566a80;}
+  input[type=text],input[type=number],input[type=tel],input[type=password],input[type=date],input[type=time],input[type=datetime-local],select,textarea{min-height:43px;border-color:#d5e0ea;background:#f9fbfd;border-radius:8px;padding:10px 12px;font-size:14px;box-shadow:inset 0 1px 1px rgba(20,45,70,.02);}textarea{min-height:88px;}input:focus,select:focus,textarea:focus{outline:0;border-color:#287fae;box-shadow:0 0 0 4px rgba(40,127,174,.14);background:#fff;}fieldset{border-color:#dbe5ee;border-radius:10px;padding:15px 16px 16px;}.subject-item,.doc-item{border-color:#dbe5ee;border-radius:9px;background:#fbfcfe;}.subject-item:hover,.doc-item:hover{border-color:#9fc4d7;background:#f4f9fc;}
+  button{min-height:40px;border-radius:8px;padding:9px 16px;font-size:13px;letter-spacing:.1px;box-shadow:0 1px 2px rgba(18,46,75,.06);}.btn-primary{background:linear-gradient(135deg,#174a7c,#287fae);border-color:#174a7c;box-shadow:0 7px 16px rgba(23,74,124,.18);}.btn-primary:hover{background:#123b64;transform:translateY(-1px);}.btn-secondary{border-color:#cbd9e4;background:#fff;color:#174a7c;}.btn-secondary:hover{background:#edf5f9;border-color:#97bcd1;}.status.visible,.note{border-radius:9px;border-left-width:4px;}.upload-label{border-radius:7px;border-color:#a7bfce;background:#fff;}.photo-preview{border-radius:10px;border-color:#b9cbd8;background:#f8fbfd;}
+  .cards{gap:18px;padding:30px 32px 38px;}.card{position:relative;overflow:hidden;border-color:#d6e2eb;border-radius:14px;padding:28px 20px;background:linear-gradient(160deg,#fff,#f5f9fc);box-shadow:0 6px 14px rgba(19,58,90,.05);}.card::before{content:"";position:absolute;left:0;top:0;width:100%;height:4px;background:linear-gradient(90deg,#174a7c,#46a0bf);transform:scaleX(0);transform-origin:left;transition:transform .2s ease;}.card:hover::before{transform:scaleX(1);}.card:hover{border-color:#9ec1d4;background:#fff;box-shadow:0 16px 28px rgba(19,58,90,.12);}.card .icon{font-size:34px;}.card h3{font-size:17px;}.card p{line-height:1.5;}
+  .wrap{max-width:1380px;padding:4px 0 24px;}.admin-header{padding:22px 24px;background:linear-gradient(135deg,#fff,#f4f8fb);border:1px solid #d8e3ec;border-radius:16px;box-shadow:0 10px 25px rgba(19,58,90,.07);}.admin-header h1{font-size:24px;letter-spacing:-.3px;}.toolbar{gap:8px;}.tabs{gap:6px;padding:6px;margin:16px 0;background:rgba(232,240,246,.82);border:1px solid #d9e4ed;border-radius:12px;width:max-content;max-width:100%;}.tab-btn{border:0;border-radius:8px;background:transparent;color:#52677c;padding:10px 15px;box-shadow:none;}.tab-btn:hover{background:#f8fbfd;color:#174a7c;}.tab-btn.active{background:#fff;color:#174a7c;border:0;box-shadow:0 3px 10px rgba(18,53,81,.12);}
+  .stats{gap:14px;}.stat{border:1px solid #d9e5ee;border-radius:13px;background:linear-gradient(155deg,#fff,#f6f9fc);box-shadow:0 6px 14px rgba(19,58,90,.05);}.table-container{border-color:#d9e4ed;border-radius:12px;box-shadow:0 4px 10px rgba(19,58,90,.035);}.table-container table th,.fee-table th,.tt-grid th,.tt-subs-table th{background:#edf4f8;color:#466176;}.table-container table td{border-bottom-color:#e8eef3;}
+  #feeArea{padding:22px;border:1px solid #d9e4ed;border-radius:16px;background:rgba(255,255,255,.82);box-shadow:0 12px 28px rgba(19,58,90,.06);}.fee-panel{border-color:#d9e4ed;border-radius:13px;box-shadow:0 7px 18px rgba(19,58,90,.05);}.fee-kpi{border-radius:12px;}.fee-dash-search-wrap input{border-radius:10px;}.fee-dash-search-results{border-radius:10px;box-shadow:0 14px 30px rgba(19,58,90,.16);}.tt-chip{border-color:#cddde8;border-radius:10px;padding:8px 10px 8px 13px;background:#fff;}.tt-check-grid label{border-color:#d6e3ec;border-radius:9px;padding:10px 11px;}.tt-check-grid label:hover{border-color:#9fc4d7;background:#f5fafe;}.tt-cell{min-height:62px;padding:9px;}.tt-cell:hover{background:#eef7fb;}.tt-grid td{border-color:#e0e8ee;}
+  .fee-dialog-inner,.fs-modal-inner{border:1px solid #d7e2eb;border-radius:16px;box-shadow:0 28px 70px rgba(10,35,58,.24);}.modal-close{top:16px;right:16px;background:#eef4f8;}.fs-modal{background:rgba(12,33,52,.58);backdrop-filter:blur(3px);}
+  @media(max-width:640px){body{padding:10px 8px 28px;}.sheet{border-radius:13px;}.header{padding:21px 17px 18px;}.header h1{font-size:21px;}form{padding:22px 17px 28px;}.cards{padding:22px 17px 28px;gap:12px;}.card{padding:22px 18px;}.admin-header{padding:18px 16px;border-radius:13px;}.toolbar button{width:100%;}.tabs{width:100%;overflow-x:auto;}.tab-btn{white-space:nowrap;}.wrap{padding:0;}.fee-dialog-inner,.fs-modal-inner{border-radius:13px;padding:20px 16px;}.modal-close{top:10px;right:10px;}}
 </style>
 </head>
 <body>
@@ -6619,15 +6633,18 @@ function printTTSubs(){
 /* ---- Auto-Create Timetable ---- */
 function ttOpenAutoGenerateDialog(){
   if(!ttClasses.length){ alert('Add at least one class in Setup first.'); return; }
-  const classOptions = '<option value="__ALL__">All classes</option>' + ttClasses.map(c => `<option value="${ttEncodeValue(c.class_section)}">${escapeHtml(c.class_section)}</option>`).join('');
+  const classChoices = ttClasses.map(c => `<label><input class="tt-autogen-class" type="checkbox" value="${ttEncodeValue(c.class_section)}" checked> ${escapeHtml(c.class_section)}</label>`).join('');
   openFeeDialog('Auto-Create Timetable', `
-    <p class="fs-modal-sub">Fills periods using each class's <strong>Class Subject Period Targets</strong> and each teacher's <strong>Teacher Class &amp; Subject Details</strong> — set those up first for best results. Teachers already busy elsewhere at a slot are automatically skipped.</p>
+    <p class="fs-modal-sub">Select every class to generate in this run. The generator schedules all selected classes together, so a teacher is never assigned to two selected classes in the same period.</p>
     <div class="fee-form-grid">
-      <div class="field"><label>Scope</label><select id="ttAutoGenScope">${classOptions}</select></div>
       <div class="field"><label>Mode</label><select id="ttAutoGenMode">
         <option value="fill">Fill empty periods only (keeps existing entries)</option>
         <option value="clear">Clear &amp; regenerate all periods in scope</option>
       </select></div>
+    </div>
+    <div class="field" style="margin-top:14px;"><label>Classes to generate</label>
+      <div class="fee-actions" style="margin:7px 0 2px;"><button type="button" class="btn-secondary" onclick="ttToggleAutoGenClasses(true)">Select all</button><button type="button" class="btn-secondary" onclick="ttToggleAutoGenClasses(false)">Clear selection</button></div>
+      <div class="tt-check-grid" id="ttAutoGenClasses">${classChoices}</div>
     </div>
     <div class="actions">
       <button class="btn-secondary" onclick="closeFeeDialog()">Cancel</button>
@@ -6635,10 +6652,13 @@ function ttOpenAutoGenerateDialog(){
     </div>
   `);
 }
+function ttToggleAutoGenClasses(checked){
+  document.querySelectorAll('.tt-autogen-class').forEach(input => { input.checked = checked; });
+}
 async function ttRunAutoGenerate(){
-  const scopeValue = document.getElementById('ttAutoGenScope').value;
   const mode = document.getElementById('ttAutoGenMode').value;
-  const classes = scopeValue === '__ALL__' ? ttClasses.map(c => c.class_section) : [ttDecodeValue(scopeValue)];
+  const classes = [...document.querySelectorAll('.tt-autogen-class:checked')].map(input => ttDecodeValue(input.value));
+  if(!classes.length){ alert('Select at least one class to generate.'); return; }
   const days = [1, 2, 3, 4, 5, 6];
   const teachingPeriodsByDay = new Map(days.map(d => [d, ttPeriodsForDay(d).filter(p => !p.is_break)]));
   if(![...teachingPeriodsByDay.values()].some(list => list.length)){ alert('Add at least one non-break period to a template, and map it to a day, in Setup first.'); return; }
