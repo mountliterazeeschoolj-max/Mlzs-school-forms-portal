@@ -2005,25 +2005,6 @@
 
     <div id="ttSubsView" style="display:none;">
       <div class="fee-panel">
-        <h2>Record Teacher Attendance &amp; Auto-Assign Substitutes</h2>
-        <p class="fs-modal-sub">Record present, absent, half-day leave (first or second half), or on-duty time. Substitutes are created only for periods the teacher is unavailable. Suggestions prioritize the same class and subject, then teachers with the lightest day.</p>
-        <div class="fee-actions">
-          <select id="ttAbsentTeacher"></select>
-          <input type="date" id="ttAbsentDate">
-          <select id="ttAttendanceStatus" onchange="ttToggleOnDutyFields()">
-            <option value="PRESENT">Present (clear substitutions)</option>
-            <option value="ABSENT" selected>Absent (full day)</option>
-            <option value="HALF_DAY_FIRST">Half day — absent first half</option>
-            <option value="HALF_DAY_SECOND">Half day — absent second half</option>
-            <option value="ON_DUTY">On duty (specific time)</option>
-          </select>
-          <input type="time" id="ttOnDutyStart" style="display:none;" aria-label="On-duty start time">
-          <input type="time" id="ttOnDutyEnd" style="display:none;" aria-label="On-duty end time">
-          <input type="text" id="ttAbsentReason" placeholder="Reason (optional)">
-          <button class="btn-primary" onclick="ttMarkAttendanceAndFill()">Save Attendance &amp; Auto-Assign</button>
-        </div>
-      </div>
-      <div class="fee-panel">
         <h2>Mark Attendance — All Staff</h2>
         <p class="fs-modal-sub">Everyone defaults to Present. Change status only for staff who are absent, on half-day, or on duty, then create substitutes for all of them in one click.</p>
         <div class="fee-actions">
@@ -5619,10 +5600,8 @@ async function loadTimetable(){
     ttClassRequirements = requirementsRes.data || []; ttTeacherAssignments = assignmentsRes.data || [];
     document.getElementById('ttLoadError')?.remove();
     populateTTBuilderClassSelect();
-    populateTTAbsentTeacherSelect();
     populateTTRequirementControls();
     populateTTTeacherAssignmentControls();
-    if(!document.getElementById('ttAbsentDate').value) document.getElementById('ttAbsentDate').value = new Date().toISOString().slice(0,10);
     if(!document.getElementById('ttSubsViewDate').value) document.getElementById('ttSubsViewDate').value = new Date().toISOString().slice(0,10);
     switchTTView(ttCurrentView);
   } catch(err){
@@ -6549,12 +6528,6 @@ function openTTCellDialog(day, periodId, classSection){
 }
 
 /* ---- Substitutes: mark absent, auto-assign, review/override ---- */
-function populateTTAbsentTeacherSelect(){
-  const select = document.getElementById('ttAbsentTeacher');
-  const previous = select.value;
-  select.innerHTML = ttTeachers.map(t => `<option value="${t.id}">${escapeHtml(t.full_name?.trim() || '')}</option>`).join('');
-  if(ttTeachers.some(t => t.id === previous)) select.value = previous;
-}
 
 let ttSubsRows = [];
 async function loadTTSubsForDate(){
@@ -6572,55 +6545,13 @@ async function loadTTSubsForDate(){
     await renderTTSubsTable();
   } catch(err){ area.innerHTML = '<div class="empty">Could not load substitutions: ' + escapeHtml(errMsg(err)) + '</div>'; }
 }
-/* ---- Attendance-aware substitutions and safe manual override ---- */
-function ttToggleOnDutyFields(){
-  const isOnDuty = document.getElementById('ttAttendanceStatus')?.value === 'ON_DUTY';
-  ['ttOnDutyStart','ttOnDutyEnd'].forEach(id => {
-    const input = document.getElementById(id);
-    if(input) { input.style.display = isOnDuty ? '' : 'none'; input.required = isOnDuty; }
-  });
-}
-async function ttMarkAttendanceAndFill(){
-  const teacherId = document.getElementById('ttAbsentTeacher').value;
-  const date = document.getElementById('ttAbsentDate').value;
-  const status = document.getElementById('ttAttendanceStatus').value;
-  const reason = document.getElementById('ttAbsentReason').value.trim() || null;
-  const onDutyStart = document.getElementById('ttOnDutyStart').value || null;
-  const onDutyEnd = document.getElementById('ttOnDutyEnd').value || null;
-  if(!teacherId || !date){ alert('Choose a teacher and a date.'); return; }
-  if(!ttWeekdayForDate(date)){ alert('Attendance substitution is available for Monday through Saturday only.'); return; }
-  if(status === 'ON_DUTY' && (!onDutyStart || !onDutyEnd || onDutyStart >= onDutyEnd)){
-    alert('For on-duty attendance, enter a valid start and end time.');
-    return;
-  }
-  try{
-    const { data, error } = await supabaseClient.rpc('auto_fill_substitutes', {
-      p_teacher_id: teacherId,
-      p_absence_date: date,
-      p_reason: reason,
-      p_attendance_status: status,
-      p_on_duty_start: onDutyStart,
-      p_on_duty_end: onDutyEnd
-    });
-    if(error) throw error;
-    document.getElementById('ttAbsentReason').value = '';
-    document.getElementById('ttSubsViewDate').value = date;
-    await loadTTSubsForDate();
-    const rows = data || [];
-    const unassigned = rows.filter(row => row.status === 'UNASSIGNED').length;
-    const action = status === 'PRESENT' ? 'Attendance saved; any substitutions for this teacher were cleared.' : `Created ${rows.length} required substitution(s).`;
-    alert(action + (unassigned ? ` ${unassigned} still need a manual substitute.` : ''));
-  } catch(err){ alert('Could not save attendance: ' + errMsg(err)); }
-}
-async function ttMarkAbsentAndFill(){ return ttMarkAttendanceAndFill(); }
-
 /* ---- Mark attendance for every staff member at once, then create all substitutes together ---- */
 let ttBulkAttRows = new Map(); // teacherId -> {status, reason, onDutyStart, onDutyEnd, hadRecord}
 const TT_ATTENDANCE_LABELS = { PRESENT:'Present', ABSENT:'Absent', HALF_DAY_FIRST:'Half day — 1st', HALF_DAY_SECOND:'Half day — 2nd', ON_DUTY:'On duty' };
 async function renderTTBulkAttendance(){
   const dateInput = document.getElementById('ttBulkAttDate');
   if(!dateInput) return;
-  if(!dateInput.value) dateInput.value = document.getElementById('ttAbsentDate')?.value || new Date().toISOString().slice(0,10);
+  if(!dateInput.value) dateInput.value = new Date().toISOString().slice(0,10);
   const date = dateInput.value;
   const area = document.getElementById('ttBulkAttArea');
   if(!area) return;
