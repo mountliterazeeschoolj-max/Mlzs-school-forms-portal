@@ -2152,7 +2152,7 @@
     <div id="attMarkEmployeeView" style="display:none;">
       <div class="fee-panel">
         <h2>Mark Employee Attendance</h2>
-        <p class="fs-modal-sub">Everyone defaults to Present. This is the single place staff attendance is recorded — the Timetable module's substitution chart is generated automatically from what you save here. On-duty covers every class the teacher has that day; the start/end time is just a record of their duty hours and is optional.</p>
+        <p class="fs-modal-sub">Everyone defaults to Present. This is the single place staff attendance is recorded — the Timetable module's substitution chart is generated automatically from what you save here. On-duty only substitutes the periods that fall within the start–end time you enter — periods outside that window stay with the teacher as normal. Both start and end time are required for On-duty.</p>
         <div class="fee-actions">
           <input type="date" id="attEmpDate" onchange="attLoadEmployeeRoster()">
           <button class="btn-secondary" onclick="attLoadEmployeeRoster()">Load</button>
@@ -7093,8 +7093,8 @@ let attRosterState = {};       // prefix ('attMS' | 'attCor') -> { classSection,
 let attEmpRosterState = null;  // { date, rows: Map(teacherIdStr -> {...}) }
 let attSelectedTrackStudent = null;
 let attReportRows = [], attReportHeaders = [];
-const ATT_STATUS_LABELS = { PRESENT:'Present', ABSENT:'Absent', HALF_DAY:'Half-day', LEAVE:'Leave', LATE:'Late' };
-const ATT_STATUS_SHORT = { PRESENT:'P', ABSENT:'A', HALF_DAY:'H', LEAVE:'LV', LATE:'LT' };
+const ATT_STATUS_LABELS = { PRESENT:'Present', ABSENT:'Absent', HALF_DAY:'Half-day' };
+const ATT_STATUS_SHORT = { PRESENT:'P', ABSENT:'A', HALF_DAY:'H' };
 /* Employee attendance is the single source of truth for the Timetable module's
    substitution engine too, so it carries two extra statuses (On-duty, and a
    1st/2nd-half split instead of a single Half-day) that the substitute picker
@@ -7360,8 +7360,6 @@ function attKpiBlock(counts, total, pct){
     <div class="fee-kpi"><div class="label">% Present</div><div class="value">${pct}%</div></div>
     <div class="fee-kpi"><div class="label">Absent</div><div class="value">${counts.ABSENT}</div></div>
     <div class="fee-kpi"><div class="label">Half-day</div><div class="value">${counts.HALF_DAY}</div></div>
-    <div class="fee-kpi"><div class="label">Leave</div><div class="value">${counts.LEAVE}</div></div>
-    <div class="fee-kpi"><div class="label">Late</div><div class="value">${counts.LATE}</div></div>
   </div>`;
 }
 function attEmpKpiBlock(counts, total, pct){
@@ -7388,10 +7386,10 @@ async function attLoadStudentTracker(){
     const { data, error } = await supabaseClient.from('att_student_attendance').select('*').eq('student_fee_id', attSelectedTrackStudent).gte('attendance_date', from).lte('attendance_date', to).order('attendance_date', { ascending:false });
     if(error) throw error;
     const rows = data || [];
-    const counts = { PRESENT:0, ABSENT:0, HALF_DAY:0, LEAVE:0, LATE:0 };
+    const counts = { PRESENT:0, ABSENT:0, HALF_DAY:0 };
     rows.forEach(r => counts[r.status]++);
     const total = rows.length;
-    const pct = total ? (((counts.PRESENT + counts.LATE) / total) * 100).toFixed(1) : '0.0';
+    const pct = total ? ((counts.PRESENT / total) * 100).toFixed(1) : '0.0';
     summary.innerHTML = attKpiBlock(counts, total, pct);
     area.innerHTML = rows.length
       ? `<table class="tt-subs-table"><thead><tr><th>Date</th><th>Status</th><th>Remarks</th></tr></thead><tbody>${rows.map(r => `<tr><td>${escapeHtml(r.attendance_date)}</td><td>${escapeHtml(ATT_STATUS_LABELS[r.status]||r.status)}</td><td>${escapeHtml(r.remarks||'')}</td></tr>`).join('')}</tbody></table>`
@@ -7476,8 +7474,8 @@ function renderAttEmployeeRosterTable(){
     <td>${escapeHtml(row.name)}</td>
     <td>${escapeHtml(row.designation)}</td>
     <td><select onchange="attSetEmployeeField('${id}','status',this.value)">${attEmpStatusOptions(row.status)}</select></td>
-    <td><input type="time" value="${escapeHtml(row.onDutyStart || '')}" style="${isOnDuty ? '' : 'display:none;'}" placeholder="Optional" onchange="attSetEmployeeField('${id}','onDutyStart',this.value)"></td>
-    <td><input type="time" value="${escapeHtml(row.onDutyEnd || '')}" style="${isOnDuty ? '' : 'display:none;'}" placeholder="Optional" onchange="attSetEmployeeField('${id}','onDutyEnd',this.value)"></td>
+    <td><input type="time" value="${escapeHtml(row.onDutyStart || '')}" style="${isOnDuty ? '' : 'display:none;'}" placeholder="Start (required)" ${isOnDuty ? 'required' : ''} onchange="attSetEmployeeField('${id}','onDutyStart',this.value)"></td>
+    <td><input type="time" value="${escapeHtml(row.onDutyEnd || '')}" style="${isOnDuty ? '' : 'display:none;'}" placeholder="End (required)" ${isOnDuty ? 'required' : ''} onchange="attSetEmployeeField('${id}','onDutyEnd',this.value)"></td>
     <td><input type="text" value="${escapeHtml(row.remarks || '')}" placeholder="Remarks" onchange="attSetEmployeeField('${id}','remarks',this.value)"></td>
   </tr>`; }).join('');
   area.innerHTML = `<table class="tt-subs-table"><thead><tr><th>Staff</th><th>Designation</th><th>Status</th><th>On-duty start</th><th>On-duty end</th><th>Remarks</th></tr></thead><tbody>${trs}</tbody></table>`;
@@ -7495,8 +7493,8 @@ async function attSaveEmployeeAttendance(){
   const state = attEmpRosterState;
   if(!state || !state.rows.size){ alert('Load a date first.'); return; }
   for(const [, row] of state.rows){
-    if(row.status === 'ON_DUTY' && ((row.onDutyStart && !row.onDutyEnd) || (!row.onDutyStart && row.onDutyEnd) || (row.onDutyStart && row.onDutyEnd && row.onDutyStart >= row.onDutyEnd))){
-      alert('One or more "On-duty" rows have an incomplete or invalid start/end time. Fill both or leave both blank.');
+    if(row.status === 'ON_DUTY' && (!row.onDutyStart || !row.onDutyEnd || row.onDutyStart >= row.onDutyEnd)){
+      alert('One or more "On-duty" rows is missing a valid start/end time. Both are required — only periods inside that window will get a substitute.');
       return;
     }
   }
@@ -7572,15 +7570,15 @@ async function attRunReport(){
       if(error) throw error;
       const byStudent = new Map();
       (data || []).forEach(r => {
-        if(!byStudent.has(r.student_fee_id)) byStudent.set(r.student_fee_id, { reg_no:r.reg_no, name:r.student_name, class_section:r.class_section, counts:{PRESENT:0,ABSENT:0,HALF_DAY:0,LEAVE:0,LATE:0} });
+        if(!byStudent.has(r.student_fee_id)) byStudent.set(r.student_fee_id, { reg_no:r.reg_no, name:r.student_name, class_section:r.class_section, counts:{PRESENT:0,ABSENT:0,HALF_DAY:0} });
         byStudent.get(r.student_fee_id).counts[r.status]++;
       });
       const rows = [...byStudent.values()].sort((a,b) => a.class_section.localeCompare(b.class_section) || a.name.localeCompare(b.name));
-      attReportHeaders = ['Admission No','Student','Class','Present','Absent','Half-day','Leave','Late','Marked Days','% Present'];
+      attReportHeaders = ['Admission No','Student','Class','Present','Absent','Half-day','Marked Days','% Present'];
       attReportRows = rows.map(r => {
         const total = Object.values(r.counts).reduce((a,b) => a+b, 0);
-        const pct = total ? (((r.counts.PRESENT + r.counts.LATE) / total) * 100).toFixed(1) : '0.0';
-        return [r.reg_no, r.name, r.class_section, r.counts.PRESENT, r.counts.ABSENT, r.counts.HALF_DAY, r.counts.LEAVE, r.counts.LATE, total, pct + '%'];
+        const pct = total ? ((r.counts.PRESENT / total) * 100).toFixed(1) : '0.0';
+        return [r.reg_no, r.name, r.class_section, r.counts.PRESENT, r.counts.ABSENT, r.counts.HALF_DAY, total, pct + '%'];
       });
     } else if(type === 'student_register'){
       const classSection = document.getElementById('attReportClass')?.value || '';
