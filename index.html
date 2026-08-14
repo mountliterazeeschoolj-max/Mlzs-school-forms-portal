@@ -2152,7 +2152,7 @@
     <div id="attMarkEmployeeView" style="display:none;">
       <div class="fee-panel">
         <h2>Mark Employee Attendance</h2>
-        <p class="fs-modal-sub">Everyone defaults to Present. This is the single place staff attendance is recorded — the Timetable module's substitution chart is generated automatically from what you save here.</p>
+        <p class="fs-modal-sub">Everyone defaults to Present. This is the single place staff attendance is recorded — the Timetable module's substitution chart is generated automatically from what you save here. On-duty covers every class the teacher has that day; the start/end time is just a record of their duty hours and is optional.</p>
         <div class="fee-actions">
           <input type="date" id="attEmpDate" onchange="attLoadEmployeeRoster()">
           <button class="btn-secondary" onclick="attLoadEmployeeRoster()">Load</button>
@@ -7099,7 +7099,7 @@ const ATT_STATUS_SHORT = { PRESENT:'P', ABSENT:'A', HALF_DAY:'H', LEAVE:'LV', LA
    substitution engine too, so it carries two extra statuses (On-duty, and a
    1st/2nd-half split instead of a single Half-day) that the substitute picker
    needs. Marking any of these here automatically creates/clears substitutes. */
-const ATT_EMP_STATUS_LABELS = { PRESENT:'Present', ABSENT:'Absent', HALF_DAY_FIRST:'Half-day — 1st', HALF_DAY_SECOND:'Half-day — 2nd', LEAVE:'Leave', LATE:'Late', ON_DUTY:'On-duty' };
+const ATT_EMP_STATUS_LABELS = { PRESENT:'Present', ABSENT:'Absent', HALF_DAY_FIRST:'Half-day — 1st', HALF_DAY_SECOND:'Half-day — 2nd', LEAVE:'Leave', LATE:'Late', ON_DUTY:'On-duty (full day)' };
 const ATT_EMP_STATUS_SHORT = { PRESENT:'P', ABSENT:'A', HALF_DAY_FIRST:'H1', HALF_DAY_SECOND:'H2', LEAVE:'LV', LATE:'LT', ON_DUTY:'OD' };
 function attStatusOptions(selected){
   return Object.entries(ATT_STATUS_LABELS).map(([v,l]) => `<option value="${v}" ${selected===v?'selected':''}>${l}</option>`).join('');
@@ -7476,8 +7476,8 @@ function renderAttEmployeeRosterTable(){
     <td>${escapeHtml(row.name)}</td>
     <td>${escapeHtml(row.designation)}</td>
     <td><select onchange="attSetEmployeeField('${id}','status',this.value)">${attEmpStatusOptions(row.status)}</select></td>
-    <td><input type="time" value="${escapeHtml(row.onDutyStart || '')}" style="${isOnDuty ? '' : 'display:none;'}" onchange="attSetEmployeeField('${id}','onDutyStart',this.value)"></td>
-    <td><input type="time" value="${escapeHtml(row.onDutyEnd || '')}" style="${isOnDuty ? '' : 'display:none;'}" onchange="attSetEmployeeField('${id}','onDutyEnd',this.value)"></td>
+    <td><input type="time" value="${escapeHtml(row.onDutyStart || '')}" style="${isOnDuty ? '' : 'display:none;'}" placeholder="Optional" onchange="attSetEmployeeField('${id}','onDutyStart',this.value)"></td>
+    <td><input type="time" value="${escapeHtml(row.onDutyEnd || '')}" style="${isOnDuty ? '' : 'display:none;'}" placeholder="Optional" onchange="attSetEmployeeField('${id}','onDutyEnd',this.value)"></td>
     <td><input type="text" value="${escapeHtml(row.remarks || '')}" placeholder="Remarks" onchange="attSetEmployeeField('${id}','remarks',this.value)"></td>
   </tr>`; }).join('');
   area.innerHTML = `<table class="tt-subs-table"><thead><tr><th>Staff</th><th>Designation</th><th>Status</th><th>On-duty start</th><th>On-duty end</th><th>Remarks</th></tr></thead><tbody>${trs}</tbody></table>`;
@@ -7495,8 +7495,8 @@ async function attSaveEmployeeAttendance(){
   const state = attEmpRosterState;
   if(!state || !state.rows.size){ alert('Load a date first.'); return; }
   for(const [, row] of state.rows){
-    if(row.status === 'ON_DUTY' && (!row.onDutyStart || !row.onDutyEnd || row.onDutyStart >= row.onDutyEnd)){
-      alert('One or more "On-duty" rows are missing a valid start/end time.');
+    if(row.status === 'ON_DUTY' && ((row.onDutyStart && !row.onDutyEnd) || (!row.onDutyStart && row.onDutyEnd) || (row.onDutyStart && row.onDutyEnd && row.onDutyStart >= row.onDutyEnd))){
+      alert('One or more "On-duty" rows have an incomplete or invalid start/end time. Fill both or leave both blank.');
       return;
     }
   }
