@@ -1843,6 +1843,7 @@
     <button class="tab-btn" id="tabStaff" onclick="switchTab('staff')">Staff</button>
     <button class="tab-btn" id="tabFees" onclick="switchTab('fees')">Fees Portal</button>
     <button class="tab-btn" id="tabTimetable" onclick="switchTab('timetable')">Timetable</button>
+    <button class="tab-btn" id="tabAttendance" onclick="switchTab('attendance')">Attendance</button>
   </div>
 
   <div id="overviewArea" style="display:none;"></div>
@@ -1901,6 +1902,7 @@
   </div>
 
   <div id="ttArea" style="display:none;">
+    <div class="fs-modal-sub" style="margin:0 0 10px;">Need to mark or review attendance instead? <a href="javascript:void(0)" onclick="switchTab('attendance')" style="color:var(--accent);font-weight:600;">Go to Attendance →</a></div>
     <div class="tabs fee-tabs">
       <button class="tab-btn active" id="ttViewSetup" onclick="switchTTView('setup')">Setup</button>
       <button class="tab-btn" id="ttViewBuilder" onclick="switchTTView('builder')">Timetable Builder</button>
@@ -2005,12 +2007,12 @@
 
     <div id="ttSubsView" style="display:none;">
       <div class="fee-panel">
-        <h2>Mark Attendance — All Staff</h2>
-        <p class="fs-modal-sub">Everyone defaults to Present. Change status only for staff who are absent, on half-day, or on duty, then create substitutes for all of them in one click.</p>
+        <h2>Staff Attendance</h2>
+        <p class="fs-modal-sub">Read-only — fetched live from the Attendance portal. To change anyone's status, <a href="javascript:void(0)" onclick="switchTab('attendance')" style="color:var(--accent);font-weight:600;">go to Attendance → Mark Employee Attendance</a>; substitutes are created automatically the moment you save there. Use Sync below only to rebuild this date's substitution chart from current attendance (e.g. after a bulk correction).</p>
         <div class="fee-actions">
           <input type="date" id="ttBulkAttDate" onchange="renderTTBulkAttendance()">
           <button class="btn-secondary" onclick="renderTTBulkAttendance()">Refresh</button>
-          <button class="btn-primary" onclick="ttCreateSubstitutesBulk()">Create Substitutes</button>
+          <button class="btn-primary" onclick="ttSyncSubstitutesForDate()">Sync Substitutes For This Date</button>
         </div>
         <div class="table-container"><div id="ttBulkAttArea"></div></div>
       </div>
@@ -2038,6 +2040,158 @@
           <button class="btn-secondary" onclick="ttPrintReport()">Print</button>
         </div>
         <div class="table-container"><div id="ttReportArea"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="attArea" style="display:none;">
+    <div class="fs-modal-sub" style="margin:0 0 10px;">Need to build or check the class schedule instead? <a href="javascript:void(0)" onclick="switchTab('timetable')" style="color:var(--accent);font-weight:600;">Go to Timetable →</a></div>
+    <div class="tabs fee-tabs">
+      <button class="tab-btn active" id="attViewSetup" onclick="switchAttView('setup')">Setup</button>
+      <button class="tab-btn" id="attViewMarkStudent" onclick="switchAttView('markstudent')">Mark Student</button>
+      <button class="tab-btn" id="attViewCorrection" onclick="switchAttView('correction')">Correction</button>
+      <button class="tab-btn" id="attViewStudentTracker" onclick="switchAttView('studenttracker')">Student Tracker</button>
+      <button class="tab-btn" id="attViewMonthwise" onclick="switchAttView('monthwise')">Month-wise</button>
+      <button class="tab-btn" id="attViewMarkEmployee" onclick="switchAttView('markemployee')">Mark Employee</button>
+      <button class="tab-btn" id="attViewEmployeeTracker" onclick="switchAttView('employeetracker')">Employee Tracker</button>
+      <button class="tab-btn" id="attViewReports" onclick="switchAttView('reports')">Reports</button>
+    </div>
+
+    <div id="attSetupView">
+      <div class="fee-panel">
+        <h2>Attendance Master Setup &amp; Shift Timings</h2>
+        <p class="fs-modal-sub">One shift, school-wide. Statuses are fixed: Present, Absent, Half-day, Leave, Late.</p>
+        <div class="fee-actions">
+          <label style="display:flex;align-items:center;gap:6px;">Shift start <input type="time" id="attShiftStart"></label>
+          <label style="display:flex;align-items:center;gap:6px;">Shift end <input type="time" id="attShiftEnd"></label>
+          <label style="display:flex;align-items:center;gap:6px;">Late grace (min) <input type="number" id="attLateGrace" min="0" style="width:70px;"></label>
+          <button class="btn-primary" onclick="attSaveSettings()">Save Shift Timing</button>
+        </div>
+      </div>
+      <div class="fee-panel">
+        <h2>Holiday Calendar</h2>
+        <p class="fs-modal-sub">Non-working days for attendance purposes. (Separate from the Timetable module's special-day templates, which control the class schedule itself.)</p>
+        <div class="fee-actions">
+          <input type="date" id="attHolidayDate">
+          <input type="text" id="attHolidayLabel" placeholder="Label (e.g. Diwali)">
+          <select id="attHolidayAppliesTo">
+            <option value="BOTH">Students &amp; Staff</option>
+            <option value="STUDENTS">Students only</option>
+            <option value="STAFF">Staff only</option>
+          </select>
+          <button class="btn-primary" onclick="attAddHoliday()">Add Holiday</button>
+        </div>
+        <div class="table-container"><div id="attHolidayList"></div></div>
+      </div>
+    </div>
+
+    <div id="attMarkStudentView" style="display:none;">
+      <div class="fee-panel">
+        <h2>Mark Student Attendance</h2>
+        <p class="fs-modal-sub">Pick a class and date, then mark each student. Everyone defaults to Present.</p>
+        <div class="fee-actions">
+          <select id="attMSClass" onchange="attLoadStudentRoster('attMS')"></select>
+          <input type="date" id="attMSDate" onchange="attLoadStudentRoster('attMS')">
+          <button class="btn-secondary" onclick="attLoadStudentRoster('attMS')">Load Roster</button>
+          <button class="btn-secondary" onclick="attSetAllStudentStatus('attMS','PRESENT')">Mark All Present</button>
+          <button class="btn-primary" onclick="attSaveStudentAttendance('attMS')">Save Attendance</button>
+        </div>
+        <div class="table-container"><div id="attMSArea"><div class="empty">Pick a class and date, then Load Roster.</div></div></div>
+      </div>
+    </div>
+
+    <div id="attCorrectionView" style="display:none;">
+      <div class="fee-panel">
+        <h2>Student Attendance Correction</h2>
+        <p class="fs-modal-sub">Load a past date, change any student's status, and give a reason. Every change is logged below.</p>
+        <div class="fee-actions">
+          <select id="attCorClass" onchange="attLoadStudentRoster('attCor')"></select>
+          <input type="date" id="attCorDate" onchange="attLoadStudentRoster('attCor')">
+          <button class="btn-secondary" onclick="attLoadStudentRoster('attCor')">Load</button>
+          <input type="text" id="attCorReason" placeholder="Reason for correction (recommended)" style="min-width:220px;">
+          <button class="btn-primary" onclick="attSaveStudentAttendance('attCor')">Save Correction</button>
+        </div>
+        <div class="table-container"><div id="attCorArea"><div class="empty">Pick a class and date, then Load.</div></div></div>
+      </div>
+      <div class="fee-panel">
+        <h2>Recent Corrections</h2>
+        <div class="table-container"><div id="attCorLogArea"><div class="empty">Load a class and date above to see its correction history.</div></div></div>
+      </div>
+    </div>
+
+    <div id="attStudentTrackerView" style="display:none;">
+      <div class="fee-panel">
+        <h2>Student Attendance Tracker</h2>
+        <p class="fs-modal-sub">Search a student and pick a date range to see their attendance history and percentage.</p>
+        <div class="fee-actions">
+          <input type="text" id="attTrackStudentSearch" placeholder="Search admission no. or student name" oninput="debounce('attTrackSearch', attRenderStudentSearchResults, 180)">
+          <input type="date" id="attTrackFrom">
+          <input type="date" id="attTrackTo">
+          <button class="btn-primary" onclick="attLoadStudentTracker()">Load</button>
+        </div>
+        <div id="attTrackStudentResults" class="fee-dash-search-results" style="display:none;position:relative;"></div>
+        <div id="attTrackSummary"></div>
+        <div class="table-container"><div id="attTrackArea"><div class="empty">Search for a student above.</div></div></div>
+      </div>
+    </div>
+
+    <div id="attMonthwiseView" style="display:none;">
+      <div class="fee-panel">
+        <h2>Online — Month-wise Student Attendance</h2>
+        <p class="fs-modal-sub">A calendar-style register: one row per student, one column per day of the month.</p>
+        <div class="fee-actions">
+          <select id="attMonthClass" onchange="attLoadMonthwise()"></select>
+          <input type="month" id="attMonthPicker" onchange="attLoadMonthwise()">
+          <button class="btn-secondary" onclick="attLoadMonthwise()">Load</button>
+          <button class="btn-secondary" onclick="attPrintMonthwise()">Print</button>
+        </div>
+        <div class="table-container"><div id="attMonthArea"><div class="empty">Pick a class and month.</div></div></div>
+      </div>
+    </div>
+
+    <div id="attMarkEmployeeView" style="display:none;">
+      <div class="fee-panel">
+        <h2>Mark Employee Attendance</h2>
+        <p class="fs-modal-sub">Everyone defaults to Present. This is the single place staff attendance is recorded — the Timetable module's substitution chart is generated automatically from what you save here.</p>
+        <div class="fee-actions">
+          <input type="date" id="attEmpDate" onchange="attLoadEmployeeRoster()">
+          <button class="btn-secondary" onclick="attLoadEmployeeRoster()">Load</button>
+          <button class="btn-secondary" onclick="attSetAllEmployeeStatus('PRESENT')">Mark All Present</button>
+          <button class="btn-primary" onclick="attSaveEmployeeAttendance()">Save Attendance</button>
+        </div>
+        <div class="table-container"><div id="attEmpArea"><div class="empty">Pick a date, then Load.</div></div></div>
+      </div>
+    </div>
+
+    <div id="attEmployeeTrackerView" style="display:none;">
+      <div class="fee-panel">
+        <h2>Employee Attendance Tracker</h2>
+        <p class="fs-modal-sub">Search a staff member and pick a date range to see their attendance history and percentage.</p>
+        <div class="fee-actions">
+          <select id="attEmpTrackStaff"></select>
+          <input type="date" id="attEmpTrackFrom">
+          <input type="date" id="attEmpTrackTo">
+          <button class="btn-primary" onclick="attLoadEmployeeTracker()">Load</button>
+        </div>
+        <div id="attEmpTrackSummary"></div>
+        <div class="table-container"><div id="attEmpTrackArea"><div class="empty">Pick a staff member above.</div></div></div>
+      </div>
+    </div>
+
+    <div id="attReportsView" style="display:none;">
+      <div class="fee-panel">
+        <h2>Attendance Reports</h2>
+        <div class="fee-actions">
+          <select id="attReportType" onchange="attRenderReportControls()">
+            <option value="student_summary">Student Class Summary</option>
+            <option value="student_register">Student Daily Register</option>
+            <option value="employee_summary">Employee Summary</option>
+            <option value="employee_register">Employee Daily Register</option>
+          </select>
+          <span id="attReportControls"></span>
+          <button class="btn-secondary" onclick="attExportReport()">Export CSV</button>
+        </div>
+        <div class="table-container"><div id="attReportArea"></div></div>
       </div>
     </div>
   </div>
@@ -4548,15 +4702,18 @@ async function switchTab(tab){
   document.getElementById('tabStaff').classList.toggle('active', tab === 'staff');
   document.getElementById('tabFees').classList.toggle('active', tab === 'fees');
   document.getElementById('tabTimetable').classList.toggle('active', tab === 'timetable');
+  document.getElementById('tabAttendance').classList.toggle('active', tab === 'attendance');
   document.getElementById('searchBox').value = '';
 
   const isOverview = tab === 'overview';
   const isFees = tab === 'fees';
   const isTimetable = tab === 'timetable';
-  const isSpecial = isOverview || isFees || isTimetable;
+  const isAttendance = tab === 'attendance';
+  const isSpecial = isOverview || isFees || isTimetable || isAttendance;
   document.getElementById('overviewArea').style.display = isOverview ? 'block' : 'none';
   document.getElementById('feeArea').style.display = isFees ? 'block' : 'none';
   document.getElementById('ttArea').style.display = isTimetable ? 'block' : 'none';
+  document.getElementById('attArea').style.display = isAttendance ? 'block' : 'none';
   document.getElementById('statsRow').style.display = isSpecial ? 'none' : '';
   document.querySelector('#mainPanel > .table-container').style.display = isSpecial ? 'none' : '';
   document.getElementById('pageControls').style.display = isSpecial ? 'none' : 'flex';
@@ -4570,6 +4727,8 @@ async function switchTab(tab){
     await loadFeePortal();
   } else if(isTimetable){
     await loadTimetable();
+  } else if(isAttendance){
+    await loadAttendance();
   } else {
     await loadAll();
   }
@@ -4580,6 +4739,7 @@ function refreshCurrentTab(){
   if(currentTab === 'overview') loadOverview();
   else if(currentTab === 'fees') loadFeePortal();
   else if(currentTab === 'timetable') loadTimetable();
+  else if(currentTab === 'attendance') loadAttendance();
   else loadAll();
 }
 
@@ -6545,9 +6705,11 @@ async function loadTTSubsForDate(){
     await renderTTSubsTable();
   } catch(err){ area.innerHTML = '<div class="empty">Could not load substitutions: ' + escapeHtml(errMsg(err)) + '</div>'; }
 }
-/* ---- Mark attendance for every staff member at once, then create all substitutes together ---- */
-let ttBulkAttRows = new Map(); // teacherId -> {status, reason, onDutyStart, onDutyEnd, hadRecord}
-const TT_ATTENDANCE_LABELS = { PRESENT:'Present', ABSENT:'Absent', HALF_DAY_FIRST:'Half day — 1st', HALF_DAY_SECOND:'Half day — 2nd', ON_DUTY:'On duty' };
+/* ---- Staff attendance display (read-only — fetched live from att_employee_attendance,
+   the single source of truth). Marking happens only in the Attendance portal, which
+   automatically syncs substitutes via att_mark_employee_attendance_bulk. The Sync
+   button here just re-derives this date's substitution chart from current attendance,
+   for backfills or after a bulk correction. ---- */
 async function renderTTBulkAttendance(){
   const dateInput = document.getElementById('ttBulkAttDate');
   if(!dateInput) return;
@@ -6559,82 +6721,31 @@ async function renderTTBulkAttendance(){
   if(!ttTeachers.length){ area.innerHTML = '<div class="empty">No staff records found.</div>'; return; }
   area.innerHTML = '<div class="loading">Loading...</div>';
   try{
-    const { data, error } = await supabaseClient.from('tt_absences').select('*').eq('absence_date', date);
+    const { data, error } = await supabaseClient.from('att_employee_attendance').select('*').eq('attendance_date', date);
     if(error) throw error;
     const existing = new Map((data || []).map(a => [a.teacher_id, a]));
-    ttBulkAttRows = new Map(ttTeachers.map(t => {
+    const rows = ttTeachers.map(t => {
       const a = existing.get(t.id);
-      return [t.id, {
-        status: a?.attendance_status || 'PRESENT',
-        reason: a?.reason || '',
-        onDutyStart: a?.on_duty_start_time || '',
-        onDutyEnd: a?.on_duty_end_time || '',
-        hadRecord: !!a
-      }];
-    }));
-    renderTTBulkAttendanceTable();
+      const status = a?.status || 'PRESENT';
+      const label = ATT_EMP_STATUS_LABELS[status] || status;
+      const times = status === 'ON_DUTY' && a ? ` (${a.on_duty_start_time || '?'}–${a.on_duty_end_time || '?'})` : '';
+      return `<tr><td>${escapeHtml(t.full_name?.trim() || '')}</td><td>${escapeHtml(label + times)}</td><td>${escapeHtml(a?.remarks || '')}</td></tr>`;
+    }).join('');
+    area.innerHTML = `<table class="tt-subs-table"><thead><tr><th>Teacher</th><th>Status</th><th>Remarks</th></tr></thead><tbody>${rows}</tbody></table>`;
   } catch(err){ area.innerHTML = '<div class="empty">Could not load attendance: ' + escapeHtml(errMsg(err)) + '</div>'; }
 }
-function renderTTBulkAttendanceTable(){
-  const area = document.getElementById('ttBulkAttArea');
-  if(!area) return;
-  const rows = ttTeachers.map(t => {
-    const row = ttBulkAttRows.get(t.id) || { status:'PRESENT', reason:'', onDutyStart:'', onDutyEnd:'' };
-    const isOnDuty = row.status === 'ON_DUTY';
-    return `<tr>
-      <td>${escapeHtml(t.full_name?.trim() || '')}</td>
-      <td><select onchange="ttBulkAttSetField('${t.id}','status',this.value)">${Object.entries(TT_ATTENDANCE_LABELS).map(([value, label]) => `<option value="${value}" ${row.status === value ? 'selected' : ''}>${label}</option>`).join('')}</select></td>
-      <td><input type="time" value="${row.onDutyStart || ''}" style="${isOnDuty ? '' : 'display:none;'}" onchange="ttBulkAttSetField('${t.id}','onDutyStart',this.value)"></td>
-      <td><input type="time" value="${row.onDutyEnd || ''}" style="${isOnDuty ? '' : 'display:none;'}" onchange="ttBulkAttSetField('${t.id}','onDutyEnd',this.value)"></td>
-      <td><input type="text" value="${escapeHtml(row.reason || '')}" placeholder="Reason (optional)" onchange="ttBulkAttSetField('${t.id}','reason',this.value)"></td>
-    </tr>`;
-  }).join('');
-  area.innerHTML = `<table class="tt-subs-table"><thead><tr><th>Teacher</th><th>Status</th><th>On-duty start</th><th>On-duty end</th><th>Reason</th></tr></thead><tbody>${rows}</tbody></table>`;
-}
-function ttBulkAttSetField(teacherId, field, value){
-  const row = ttBulkAttRows.get(teacherId) || { status:'PRESENT', reason:'', onDutyStart:'', onDutyEnd:'' };
-  row[field] = value;
-  ttBulkAttRows.set(teacherId, row);
-  if(field === 'status') renderTTBulkAttendanceTable();
-}
-async function ttCreateSubstitutesBulk(){
+async function ttSyncSubstitutesForDate(){
   const date = document.getElementById('ttBulkAttDate')?.value;
   if(!date){ alert('Pick a date first.'); return; }
   if(!ttWeekdayForDate(date)){ alert('Attendance is available for Monday through Saturday only.'); return; }
-  const toProcess = [...ttBulkAttRows.entries()].filter(([, row]) => row.status !== 'PRESENT' || row.hadRecord);
-  if(!toProcess.length){ alert('Nothing to process — everyone is Present with no existing record for this date.'); return; }
-  for(const [, row] of toProcess){
-    if(row.status === 'ON_DUTY' && (!row.onDutyStart || !row.onDutyEnd || row.onDutyStart >= row.onDutyEnd)){
-      alert('One or more "On duty" rows are missing a valid start/end time. Fix those before creating substitutes.');
-      return;
-    }
-  }
-  if(!confirm(`Create substitutes for ${toProcess.length} staff member(s) on ${date}?`)) return;
-  /* Processed one at a time (not in parallel) so each teacher's substitute picks see the
-     assignments already made earlier in this same batch, and to avoid two absences racing
-     for the same substitute slot. */
-  const results = { created: 0, unassigned: 0, cleared: 0, errors: [] };
-  for(const [teacherId, row] of toProcess){
-    try{
-      const { data, error } = await supabaseClient.rpc('auto_fill_substitutes', {
-        p_teacher_id: teacherId,
-        p_absence_date: date,
-        p_reason: row.reason.trim() || null,
-        p_attendance_status: row.status,
-        p_on_duty_start: row.status === 'ON_DUTY' ? row.onDutyStart : null,
-        p_on_duty_end: row.status === 'ON_DUTY' ? row.onDutyEnd : null
-      });
-      if(error) throw error;
-      const rows = data || [];
-      if(row.status === 'PRESENT') results.cleared++;
-      else { results.created += rows.length; results.unassigned += rows.filter(r => r.status === 'UNASSIGNED').length; }
-    } catch(err){ results.errors.push(`${ttTeacherName(teacherId)}: ${errMsg(err)}`); }
-  }
-  document.getElementById('ttSubsViewDate').value = date;
-  await loadTTSubsForDate();
-  await renderTTBulkAttendance();
-  const summary = `Processed ${toProcess.length} staff member(s). Created ${results.created} substitution(s)${results.unassigned ? ` (${results.unassigned} still need a manual pick)` : ''}.${results.cleared ? ` ${results.cleared} marked present.` : ''}` + (results.errors.length ? `\n\nCouldn't process:\n${results.errors.join('\n')}` : '');
-  alert(summary);
+  if(!confirm(`Rebuild the substitution chart for ${date} from current attendance?`)) return;
+  try{
+    const { data, error } = await supabaseClient.rpc('tt_sync_substitutes_for_date', { p_date: date });
+    if(error) throw error;
+    document.getElementById('ttSubsViewDate').value = date;
+    await loadTTSubsForDate();
+    alert(`Synced ${((data || []).length)} staff member(s) with a non-present or changed status.`);
+  } catch(err){ alert('Could not sync substitutes: ' + errMsg(err)); }
 }
 async function renderTTSubsTable(){
   const area = document.getElementById('ttSubsArea');
@@ -6960,6 +7071,555 @@ function ttPrintReport(){
   document.body.appendChild(wrap);
   window.print();
   wrap.remove();
+}
+
+/* ============================================================
+   ATTENDANCE MODULE
+   Student roster comes from student_fees (the enrolled-student master).
+   Staff roster comes from staff_records.
+   Employee attendance (att_employee_attendance) is the single source of
+   truth for staff status school-wide: saving it here also drives the
+   Timetable module's substitution chart automatically (see
+   att_mark_employee_attendance_bulk / auto_fill_substitutes in Supabase).
+   The Timetable → Substitutes tab only displays that same data read-only
+   and lets you re-sync it; it never writes attendance itself.
+   ============================================================ */
+let attSettings = { shift_start:'08:00:00', shift_end:'14:00:00', late_grace_minutes:10 };
+let attHolidays = [];
+let attStudents = [];
+let attStaff = [];
+let attCurrentView = 'setup';
+let attRosterState = {};       // prefix ('attMS' | 'attCor') -> { classSection, date, rows: Map(studentFeeIdStr -> {...}) }
+let attEmpRosterState = null;  // { date, rows: Map(teacherIdStr -> {...}) }
+let attSelectedTrackStudent = null;
+let attReportRows = [], attReportHeaders = [];
+const ATT_STATUS_LABELS = { PRESENT:'Present', ABSENT:'Absent', HALF_DAY:'Half-day', LEAVE:'Leave', LATE:'Late' };
+const ATT_STATUS_SHORT = { PRESENT:'P', ABSENT:'A', HALF_DAY:'H', LEAVE:'LV', LATE:'LT' };
+/* Employee attendance is the single source of truth for the Timetable module's
+   substitution engine too, so it carries two extra statuses (On-duty, and a
+   1st/2nd-half split instead of a single Half-day) that the substitute picker
+   needs. Marking any of these here automatically creates/clears substitutes. */
+const ATT_EMP_STATUS_LABELS = { PRESENT:'Present', ABSENT:'Absent', HALF_DAY_FIRST:'Half-day — 1st', HALF_DAY_SECOND:'Half-day — 2nd', LEAVE:'Leave', LATE:'Late', ON_DUTY:'On-duty' };
+const ATT_EMP_STATUS_SHORT = { PRESENT:'P', ABSENT:'A', HALF_DAY_FIRST:'H1', HALF_DAY_SECOND:'H2', LEAVE:'LV', LATE:'LT', ON_DUTY:'OD' };
+function attStatusOptions(selected){
+  return Object.entries(ATT_STATUS_LABELS).map(([v,l]) => `<option value="${v}" ${selected===v?'selected':''}>${l}</option>`).join('');
+}
+function attEmpStatusOptions(selected){
+  return Object.entries(ATT_EMP_STATUS_LABELS).map(([v,l]) => `<option value="${v}" ${selected===v?'selected':''}>${l}</option>`).join('');
+}
+function attStaffName(teacherId){
+  const s = attStaff.find(t => String(t.id) === String(teacherId));
+  return s ? (s.full_name || '').trim() : '(unknown)';
+}
+function attClassList(){
+  const sortMap = new Map((ttClasses || []).map(c => [c.class_section, c.sort_order]));
+  const set = new Set(attStudents.map(s => s.class_section).filter(Boolean));
+  return [...set].sort((a,b) => {
+    const sa = sortMap.get(a), sb = sortMap.get(b);
+    if(sa != null && sb != null) return sa - sb;
+    return a.localeCompare(b);
+  });
+}
+function attPopulateClassSelects(){
+  const options = attClassList().map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  ['attMSClass','attCorClass','attMonthClass'].forEach(id => {
+    const select = document.getElementById(id);
+    if(!select) return;
+    const prev = select.value;
+    select.innerHTML = options;
+    if([...select.options].some(o => o.value === prev)) select.value = prev;
+  });
+}
+function attPopulateEmployeeTrackerSelect(){
+  const select = document.getElementById('attEmpTrackStaff');
+  if(!select) return;
+  const prev = select.value;
+  select.innerHTML = [...attStaff].sort((a,b) => (a.full_name||'').localeCompare(b.full_name||''))
+    .map(s => `<option value="${s.id}">${escapeHtml((s.full_name||'').trim())}</option>`).join('');
+  if(attStaff.some(s => String(s.id) === prev)) select.value = prev;
+}
+
+async function loadAttendance(){
+  try{
+    const [settingsRes, holidaysRes, studentsRes, staffRes] = await Promise.all([
+      supabaseClient.from('att_settings').select('*').eq('id', 1).maybeSingle(),
+      supabaseClient.from('att_holidays').select('*').order('holiday_date'),
+      supabaseClient.from('student_fees').select('id,reg_no,student_name,class_section').order('class_section'),
+      supabaseClient.from('staff_records').select('id,full_name,designation').order('full_name')
+    ]);
+    if(settingsRes.error) throw settingsRes.error;
+    if(holidaysRes.error) throw holidaysRes.error;
+    if(studentsRes.error) throw studentsRes.error;
+    if(staffRes.error) throw staffRes.error;
+    if(settingsRes.data) attSettings = settingsRes.data;
+    attHolidays = holidaysRes.data || [];
+    attStudents = studentsRes.data || [];
+    attStaff = staffRes.data || [];
+
+    attPopulateClassSelects();
+    attPopulateEmployeeTrackerSelect();
+
+    document.getElementById('attShiftStart').value = (attSettings.shift_start || '08:00').slice(0,5);
+    document.getElementById('attShiftEnd').value = (attSettings.shift_end || '14:00').slice(0,5);
+    document.getElementById('attLateGrace').value = attSettings.late_grace_minutes ?? 10;
+
+    const today = new Date().toISOString().slice(0,10);
+    const monthStart = today.slice(0,7) + '-01';
+    if(!document.getElementById('attMSDate').value) document.getElementById('attMSDate').value = today;
+    if(!document.getElementById('attCorDate').value) document.getElementById('attCorDate').value = today;
+    if(!document.getElementById('attEmpDate').value) document.getElementById('attEmpDate').value = today;
+    if(!document.getElementById('attMonthPicker').value) document.getElementById('attMonthPicker').value = today.slice(0,7);
+    if(!document.getElementById('attTrackFrom').value) document.getElementById('attTrackFrom').value = monthStart;
+    if(!document.getElementById('attTrackTo').value) document.getElementById('attTrackTo').value = today;
+    if(!document.getElementById('attEmpTrackFrom').value) document.getElementById('attEmpTrackFrom').value = monthStart;
+    if(!document.getElementById('attEmpTrackTo').value) document.getElementById('attEmpTrackTo').value = today;
+
+    switchAttView(attCurrentView || 'setup');
+  } catch(err){
+    alert('Could not load attendance data: ' + errMsg(err));
+  }
+}
+
+function switchAttView(view){
+  attCurrentView = view;
+  document.getElementById('attViewSetup').classList.toggle('active', view === 'setup');
+  document.getElementById('attViewMarkStudent').classList.toggle('active', view === 'markstudent');
+  document.getElementById('attViewCorrection').classList.toggle('active', view === 'correction');
+  document.getElementById('attViewStudentTracker').classList.toggle('active', view === 'studenttracker');
+  document.getElementById('attViewMonthwise').classList.toggle('active', view === 'monthwise');
+  document.getElementById('attViewMarkEmployee').classList.toggle('active', view === 'markemployee');
+  document.getElementById('attViewEmployeeTracker').classList.toggle('active', view === 'employeetracker');
+  document.getElementById('attViewReports').classList.toggle('active', view === 'reports');
+  document.getElementById('attSetupView').style.display = view === 'setup' ? 'block' : 'none';
+  document.getElementById('attMarkStudentView').style.display = view === 'markstudent' ? 'block' : 'none';
+  document.getElementById('attCorrectionView').style.display = view === 'correction' ? 'block' : 'none';
+  document.getElementById('attStudentTrackerView').style.display = view === 'studenttracker' ? 'block' : 'none';
+  document.getElementById('attMonthwiseView').style.display = view === 'monthwise' ? 'block' : 'none';
+  document.getElementById('attMarkEmployeeView').style.display = view === 'markemployee' ? 'block' : 'none';
+  document.getElementById('attEmployeeTrackerView').style.display = view === 'employeetracker' ? 'block' : 'none';
+  document.getElementById('attReportsView').style.display = view === 'reports' ? 'block' : 'none';
+  if(view === 'setup') renderAttHolidays();
+  else if(view === 'markstudent' && document.getElementById('attMSClass').value) attLoadStudentRoster('attMS');
+  else if(view === 'markemployee') attLoadEmployeeRoster();
+  else if(view === 'reports') attRenderReportControls();
+}
+
+/* ---- Master Setup & Shift Timings ---- */
+async function attSaveSettings(){
+  const start = document.getElementById('attShiftStart').value;
+  const end = document.getElementById('attShiftEnd').value;
+  const grace = Number(document.getElementById('attLateGrace').value || 10);
+  if(!start || !end){ alert('Enter both shift start and end time.'); return; }
+  try{
+    const { data, error } = await supabaseClient.rpc('att_update_settings', { p_shift_start: start, p_shift_end: end, p_late_grace_minutes: grace });
+    if(error) throw error;
+    attSettings = data;
+    alert('Shift timing saved.');
+  } catch(err){ alert('Could not save shift timing: ' + errMsg(err)); }
+}
+
+/* ---- Holiday calendar ---- */
+async function attAddHoliday(){
+  const date = document.getElementById('attHolidayDate').value;
+  const label = document.getElementById('attHolidayLabel').value.trim();
+  const appliesTo = document.getElementById('attHolidayAppliesTo').value;
+  if(!date || !label){ alert('Enter a date and a label.'); return; }
+  try{
+    const { error } = await supabaseClient.from('att_holidays').upsert({ holiday_date: date, label, applies_to: appliesTo });
+    if(error) throw error;
+    document.getElementById('attHolidayDate').value = '';
+    document.getElementById('attHolidayLabel').value = '';
+    const { data, error: err2 } = await supabaseClient.from('att_holidays').select('*').order('holiday_date');
+    if(err2) throw err2;
+    attHolidays = data || [];
+    renderAttHolidays();
+  } catch(err){ alert('Could not add holiday: ' + errMsg(err)); }
+}
+async function attDeleteHoliday(date){
+  if(!confirm('Remove this holiday?')) return;
+  try{
+    const { error } = await supabaseClient.from('att_holidays').delete().eq('holiday_date', date);
+    if(error) throw error;
+    attHolidays = attHolidays.filter(h => h.holiday_date !== date);
+    renderAttHolidays();
+  } catch(err){ alert('Could not remove holiday: ' + errMsg(err)); }
+}
+function renderAttHolidays(){
+  const area = document.getElementById('attHolidayList');
+  if(!attHolidays.length){ area.innerHTML = '<div class="empty">No holidays added yet.</div>'; return; }
+  const rows = attHolidays.map(h => `<tr><td>${escapeHtml(h.holiday_date)}</td><td>${escapeHtml(h.label)}</td><td>${escapeHtml(h.applies_to)}</td><td><button class="del-btn" onclick="attDeleteHoliday('${h.holiday_date}')">Remove</button></td></tr>`).join('');
+  area.innerHTML = `<table><thead><tr><th>Date</th><th>Label</th><th>Applies To</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+/* ---- Mark Student Attendance + Correction (shared roster engine) ---- */
+async function attLoadStudentRoster(prefix){
+  const classSection = document.getElementById(prefix + 'Class').value;
+  const date = document.getElementById(prefix + 'Date').value;
+  const area = document.getElementById(prefix + 'Area');
+  if(!classSection || !date){ area.innerHTML = '<div class="empty">Pick a class and date.</div>'; return; }
+  area.innerHTML = '<div class="loading">Loading...</div>';
+  try{
+    const { data, error } = await supabaseClient.from('att_student_attendance').select('*').eq('class_section', classSection).eq('attendance_date', date);
+    if(error) throw error;
+    const existing = new Map((data || []).map(r => [String(r.student_fee_id), r]));
+    const roster = attStudents.filter(s => s.class_section === classSection).sort((a,b) => (a.student_name||'').localeCompare(b.student_name||''));
+    const rows = new Map(roster.map(s => {
+      const key = String(s.id);
+      const rec = existing.get(key);
+      return [key, { status: rec?.status || 'PRESENT', remarks: rec?.remarks || '', attendanceId: rec?.id || null, name: s.student_name, regNo: s.reg_no, studentFeeId: s.id }];
+    }));
+    attRosterState[prefix] = { classSection, date, rows };
+    renderAttStudentRosterTable(prefix);
+    if(prefix === 'attCor') await attLoadCorrectionLog();
+  } catch(err){ area.innerHTML = '<div class="empty">Could not load roster: ' + escapeHtml(errMsg(err)) + '</div>'; }
+}
+function renderAttStudentRosterTable(prefix){
+  const area = document.getElementById(prefix + 'Area');
+  const state = attRosterState[prefix];
+  if(!area || !state) return;
+  if(!state.rows.size){ area.innerHTML = '<div class="empty">No students found for this class.</div>'; return; }
+  const trs = [...state.rows.entries()].map(([id, row]) => `<tr>
+    <td>${escapeHtml(row.regNo)}</td>
+    <td>${escapeHtml(row.name)}</td>
+    <td><select onchange="attSetStudentField('${prefix}','${id}','status',this.value)">${attStatusOptions(row.status)}</select></td>
+    <td><input type="text" value="${escapeHtml(row.remarks || '')}" placeholder="Remarks" onchange="attSetStudentField('${prefix}','${id}','remarks',this.value)"></td>
+  </tr>`).join('');
+  area.innerHTML = `<table class="tt-subs-table"><thead><tr><th>Adm. No.</th><th>Student</th><th>Status</th><th>Remarks</th></tr></thead><tbody>${trs}</tbody></table>`;
+}
+function attSetStudentField(prefix, studentFeeId, field, value){
+  const row = attRosterState[prefix]?.rows.get(studentFeeId);
+  if(row) row[field] = value;
+}
+function attSetAllStudentStatus(prefix, status){
+  const state = attRosterState[prefix];
+  if(!state) return;
+  state.rows.forEach(row => { row.status = status; });
+  renderAttStudentRosterTable(prefix);
+}
+async function attSaveStudentAttendance(prefix){
+  const state = attRosterState[prefix];
+  if(!state || !state.rows.size){ alert('Load a class and date first.'); return; }
+  const reason = prefix === 'attCor' ? (document.getElementById('attCorReason').value.trim() || null) : null;
+  const entries = [...state.rows.values()].map(row => ({ student_fee_id: row.studentFeeId, status: row.status, remarks: row.remarks || null }));
+  try{
+    const { data, error } = await supabaseClient.rpc('att_mark_student_attendance_bulk', {
+      p_class_section: state.classSection,
+      p_attendance_date: state.date,
+      p_entries: entries,
+      p_reason: reason
+    });
+    if(error) throw error;
+    const changed = (data || []).filter(r => r.out_changed).length;
+    alert(`Saved attendance for ${entries.length} student(s). ${changed} record(s) changed.`);
+    if(prefix === 'attCor') document.getElementById('attCorReason').value = '';
+    await attLoadStudentRoster(prefix);
+  } catch(err){ alert('Could not save attendance: ' + errMsg(err)); }
+}
+async function attLoadCorrectionLog(){
+  const state = attRosterState['attCor'];
+  const area = document.getElementById('attCorLogArea');
+  if(!state){ area.innerHTML = '<div class="empty">Load a class and date above to see its correction history.</div>'; return; }
+  const attendanceIds = [...state.rows.values()].map(r => r.attendanceId).filter(Boolean);
+  if(!attendanceIds.length){ area.innerHTML = '<div class="empty">No correction history yet for this class and date.</div>'; return; }
+  area.innerHTML = '<div class="loading">Loading...</div>';
+  try{
+    const { data, error } = await supabaseClient.from('att_student_attendance_log').select('*').in('attendance_id', attendanceIds).order('changed_at', { ascending:false }).limit(100);
+    if(error) throw error;
+    if(!data.length){ area.innerHTML = '<div class="empty">No correction history yet for this class and date.</div>'; return; }
+    const nameByStudentFeeId = new Map([...state.rows.values()].map(r => [String(r.studentFeeId), r.name]));
+    const rows = data.map(r => `<tr><td>${escapeHtml(nameByStudentFeeId.get(String(r.student_fee_id)) || r.student_fee_id)}</td><td>${escapeHtml(ATT_STATUS_LABELS[r.old_status] || r.old_status || '(new)')}</td><td>${escapeHtml(ATT_STATUS_LABELS[r.new_status] || r.new_status)}</td><td>${escapeHtml(r.reason || '')}</td><td>${escapeHtml(r.changed_by || '')}</td><td>${escapeHtml(new Date(r.changed_at).toLocaleString('en-IN'))}</td></tr>`).join('');
+    area.innerHTML = `<table class="tt-subs-table"><thead><tr><th>Student</th><th>Old Status</th><th>New Status</th><th>Reason</th><th>Changed By</th><th>When</th></tr></thead><tbody>${rows}</tbody></table>`;
+  } catch(err){ area.innerHTML = '<div class="empty">Could not load correction history: ' + escapeHtml(errMsg(err)) + '</div>'; }
+}
+
+/* ---- Student Attendance Tracker ---- */
+function attRenderStudentSearchResults(){
+  const q = document.getElementById('attTrackStudentSearch').value.trim().toLowerCase();
+  const box = document.getElementById('attTrackStudentResults');
+  if(!q){ box.style.display = 'none'; box.innerHTML = ''; return; }
+  const matches = attStudents.filter(s => (s.reg_no||'').toLowerCase().includes(q) || (s.student_name||'').toLowerCase().includes(q)).slice(0, 8);
+  box.style.display = 'block';
+  box.innerHTML = matches.length ? matches.map(s => `<div class="fee-dash-result" onclick="attPickTrackStudent(${s.id})">
+      <div><div class="fdr-name">${escapeHtml(s.student_name)}</div><div class="fdr-meta">${escapeHtml(s.reg_no)} &middot; ${escapeHtml(s.class_section)}</div></div>
+    </div>`).join('') : '<div class="empty">No students match this search.</div>';
+}
+function attPickTrackStudent(studentFeeId){
+  attSelectedTrackStudent = studentFeeId;
+  const s = attStudents.find(x => x.id === studentFeeId);
+  document.getElementById('attTrackStudentSearch').value = s ? `${s.student_name} — ${s.reg_no}` : '';
+  document.getElementById('attTrackStudentResults').style.display = 'none';
+}
+document.addEventListener('click', e => {
+  const input = document.getElementById('attTrackStudentSearch');
+  const box = document.getElementById('attTrackStudentResults');
+  if(input && box && !input.contains(e.target) && !box.contains(e.target)) box.style.display = 'none';
+});
+function attKpiBlock(counts, total, pct){
+  return `<div class="fee-kpis">
+    <div class="fee-kpi"><div class="label">Marked Days</div><div class="value">${total}</div></div>
+    <div class="fee-kpi"><div class="label">% Present</div><div class="value">${pct}%</div></div>
+    <div class="fee-kpi"><div class="label">Absent</div><div class="value">${counts.ABSENT}</div></div>
+    <div class="fee-kpi"><div class="label">Half-day</div><div class="value">${counts.HALF_DAY}</div></div>
+    <div class="fee-kpi"><div class="label">Leave</div><div class="value">${counts.LEAVE}</div></div>
+    <div class="fee-kpi"><div class="label">Late</div><div class="value">${counts.LATE}</div></div>
+  </div>`;
+}
+function attEmpKpiBlock(counts, total, pct){
+  return `<div class="fee-kpis">
+    <div class="fee-kpi"><div class="label">Marked Days</div><div class="value">${total}</div></div>
+    <div class="fee-kpi"><div class="label">% Present</div><div class="value">${pct}%</div></div>
+    <div class="fee-kpi"><div class="label">Absent</div><div class="value">${counts.ABSENT}</div></div>
+    <div class="fee-kpi"><div class="label">Half-day 1st</div><div class="value">${counts.HALF_DAY_FIRST}</div></div>
+    <div class="fee-kpi"><div class="label">Half-day 2nd</div><div class="value">${counts.HALF_DAY_SECOND}</div></div>
+    <div class="fee-kpi"><div class="label">Leave</div><div class="value">${counts.LEAVE}</div></div>
+    <div class="fee-kpi"><div class="label">Late</div><div class="value">${counts.LATE}</div></div>
+    <div class="fee-kpi"><div class="label">On-duty</div><div class="value">${counts.ON_DUTY}</div></div>
+  </div>`;
+}
+async function attLoadStudentTracker(){
+  const area = document.getElementById('attTrackArea');
+  const summary = document.getElementById('attTrackSummary');
+  if(!attSelectedTrackStudent){ alert('Search and pick a student first.'); return; }
+  const from = document.getElementById('attTrackFrom').value;
+  const to = document.getElementById('attTrackTo').value;
+  if(!from || !to){ alert('Pick a date range.'); return; }
+  area.innerHTML = '<div class="loading">Loading...</div>';
+  try{
+    const { data, error } = await supabaseClient.from('att_student_attendance').select('*').eq('student_fee_id', attSelectedTrackStudent).gte('attendance_date', from).lte('attendance_date', to).order('attendance_date', { ascending:false });
+    if(error) throw error;
+    const rows = data || [];
+    const counts = { PRESENT:0, ABSENT:0, HALF_DAY:0, LEAVE:0, LATE:0 };
+    rows.forEach(r => counts[r.status]++);
+    const total = rows.length;
+    const pct = total ? (((counts.PRESENT + counts.LATE) / total) * 100).toFixed(1) : '0.0';
+    summary.innerHTML = attKpiBlock(counts, total, pct);
+    area.innerHTML = rows.length
+      ? `<table class="tt-subs-table"><thead><tr><th>Date</th><th>Status</th><th>Remarks</th></tr></thead><tbody>${rows.map(r => `<tr><td>${escapeHtml(r.attendance_date)}</td><td>${escapeHtml(ATT_STATUS_LABELS[r.status]||r.status)}</td><td>${escapeHtml(r.remarks||'')}</td></tr>`).join('')}</tbody></table>`
+      : '<div class="empty">No attendance recorded in this range.</div>';
+  } catch(err){ area.innerHTML = '<div class="empty">Could not load: ' + escapeHtml(errMsg(err)) + '</div>'; }
+}
+
+/* ---- Month-wise Student Attendance (Online) ---- */
+function attDaysInMonth(monthStr){
+  const [y,m] = monthStr.split('-').map(Number);
+  return new Date(y, m, 0).getDate();
+}
+async function attLoadMonthwise(){
+  const classSection = document.getElementById('attMonthClass').value;
+  const month = document.getElementById('attMonthPicker').value;
+  const area = document.getElementById('attMonthArea');
+  if(!classSection || !month){ area.innerHTML = '<div class="empty">Pick a class and month.</div>'; return; }
+  area.innerHTML = '<div class="loading">Loading...</div>';
+  try{
+    const days = attDaysInMonth(month);
+    const from = `${month}-01`;
+    const to = `${month}-${String(days).padStart(2,'0')}`;
+    const { data, error } = await supabaseClient.from('att_student_attendance').select('*').eq('class_section', classSection).gte('attendance_date', from).lte('attendance_date', to);
+    if(error) throw error;
+    const byStudent = new Map();
+    (data || []).forEach(r => {
+      if(!byStudent.has(r.student_fee_id)) byStudent.set(r.student_fee_id, {});
+      byStudent.get(r.student_fee_id)[Number(r.attendance_date.slice(8,10))] = r.status;
+    });
+    const roster = attStudents.filter(s => s.class_section === classSection).sort((a,b) => (a.student_name||'').localeCompare(b.student_name||''));
+    if(!roster.length){ area.innerHTML = '<div class="empty">No students in this class.</div>'; return; }
+    const dayHeaders = Array.from({length: days}, (_,i) => `<th>${i+1}</th>`).join('');
+    const rows = roster.map(s => {
+      const marks = byStudent.get(s.id) || {};
+      const cells = Array.from({length: days}, (_,i) => {
+        const status = marks[i+1];
+        return `<td style="text-align:center;">${status ? (ATT_STATUS_SHORT[status] || '?') : '—'}</td>`;
+      }).join('');
+      return `<tr><td>${escapeHtml(s.reg_no)}</td><td>${escapeHtml(s.student_name)}</td>${cells}</tr>`;
+    }).join('');
+    area.innerHTML = `<table class="tt-subs-table"><thead><tr><th>Adm. No.</th><th>Student</th>${dayHeaders}</tr></thead><tbody>${rows}</tbody></table>
+      <p class="fs-modal-sub" style="margin-top:8px;">P=Present, A=Absent, H=Half-day, LV=Leave, LT=Late, —=Not marked</p>`;
+  } catch(err){ area.innerHTML = '<div class="empty">Could not load: ' + escapeHtml(errMsg(err)) + '</div>'; }
+}
+function attPrintMonthwise(){
+  const existing = document.getElementById('attPrintArea'); if(existing) existing.remove();
+  const wrap = document.createElement('div'); wrap.id = 'attPrintArea'; wrap.style.padding = '24px';
+  const cls = document.getElementById('attMonthClass').value;
+  const month = document.getElementById('attMonthPicker').value;
+  wrap.innerHTML = `<h2>Month-wise Attendance — ${escapeHtml(cls)} — ${escapeHtml(month)}</h2>` + document.getElementById('attMonthArea').innerHTML;
+  document.body.appendChild(wrap);
+  window.print();
+  wrap.remove();
+}
+
+/* ---- Mark Employee Attendance ---- */
+async function attLoadEmployeeRoster(){
+  const date = document.getElementById('attEmpDate').value;
+  const area = document.getElementById('attEmpArea');
+  if(!date){ area.innerHTML = '<div class="empty">Pick a date.</div>'; return; }
+  area.innerHTML = '<div class="loading">Loading...</div>';
+  try{
+    const { data, error } = await supabaseClient.from('att_employee_attendance').select('*').eq('attendance_date', date);
+    if(error) throw error;
+    const existing = new Map((data || []).map(r => [String(r.teacher_id), r]));
+    const roster = [...attStaff].sort((a,b) => (a.full_name||'').localeCompare(b.full_name||''));
+    const rows = new Map(roster.map(s => {
+      const key = String(s.id);
+      const rec = existing.get(key);
+      return [key, { status: rec?.status || 'PRESENT', remarks: rec?.remarks || '', onDutyStart: rec?.on_duty_start_time || '', onDutyEnd: rec?.on_duty_end_time || '', attendanceId: rec?.id || null, name: (s.full_name||'').trim(), designation: s.designation || '' }];
+    }));
+    attEmpRosterState = { date, rows };
+    renderAttEmployeeRosterTable();
+  } catch(err){ area.innerHTML = '<div class="empty">Could not load roster: ' + escapeHtml(errMsg(err)) + '</div>'; }
+}
+function renderAttEmployeeRosterTable(){
+  const area = document.getElementById('attEmpArea');
+  const state = attEmpRosterState;
+  if(!area || !state) return;
+  if(!state.rows.size){ area.innerHTML = '<div class="empty">No staff records found.</div>'; return; }
+  const trs = [...state.rows.entries()].map(([id, row]) => { const isOnDuty = row.status === 'ON_DUTY'; return `<tr>
+    <td>${escapeHtml(row.name)}</td>
+    <td>${escapeHtml(row.designation)}</td>
+    <td><select onchange="attSetEmployeeField('${id}','status',this.value)">${attEmpStatusOptions(row.status)}</select></td>
+    <td><input type="time" value="${escapeHtml(row.onDutyStart || '')}" style="${isOnDuty ? '' : 'display:none;'}" onchange="attSetEmployeeField('${id}','onDutyStart',this.value)"></td>
+    <td><input type="time" value="${escapeHtml(row.onDutyEnd || '')}" style="${isOnDuty ? '' : 'display:none;'}" onchange="attSetEmployeeField('${id}','onDutyEnd',this.value)"></td>
+    <td><input type="text" value="${escapeHtml(row.remarks || '')}" placeholder="Remarks" onchange="attSetEmployeeField('${id}','remarks',this.value)"></td>
+  </tr>`; }).join('');
+  area.innerHTML = `<table class="tt-subs-table"><thead><tr><th>Staff</th><th>Designation</th><th>Status</th><th>On-duty start</th><th>On-duty end</th><th>Remarks</th></tr></thead><tbody>${trs}</tbody></table>`;
+}
+function attSetEmployeeField(teacherId, field, value){
+  const row = attEmpRosterState?.rows.get(teacherId);
+  if(row){ row[field] = value; if(field === 'status') renderAttEmployeeRosterTable(); }
+}
+function attSetAllEmployeeStatus(status){
+  if(!attEmpRosterState) return;
+  attEmpRosterState.rows.forEach(row => { row.status = status; });
+  renderAttEmployeeRosterTable();
+}
+async function attSaveEmployeeAttendance(){
+  const state = attEmpRosterState;
+  if(!state || !state.rows.size){ alert('Load a date first.'); return; }
+  for(const [, row] of state.rows){
+    if(row.status === 'ON_DUTY' && (!row.onDutyStart || !row.onDutyEnd || row.onDutyStart >= row.onDutyEnd)){
+      alert('One or more "On-duty" rows are missing a valid start/end time.');
+      return;
+    }
+  }
+  const entries = [...state.rows.entries()].map(([teacherId, row]) => ({
+    teacher_id: teacherId, status: row.status, remarks: row.remarks || null,
+    on_duty_start: row.status === 'ON_DUTY' ? row.onDutyStart : null,
+    on_duty_end: row.status === 'ON_DUTY' ? row.onDutyEnd : null
+  }));
+  try{
+    const { data, error } = await supabaseClient.rpc('att_mark_employee_attendance_bulk', { p_attendance_date: state.date, p_entries: entries });
+    if(error) throw error;
+    const changed = (data || []).filter(r => r.out_changed).length;
+    const synced = (data || []).some(r => r.out_substitutes_synced);
+    alert(`Saved attendance for ${entries.length} staff member(s). ${changed} record(s) changed.${synced ? ' Timetable substitutes were updated automatically.' : ''}`);
+    await attLoadEmployeeRoster();
+  } catch(err){ alert('Could not save attendance: ' + errMsg(err)); }
+}
+
+/* ---- Employee Attendance Tracker ---- */
+async function attLoadEmployeeTracker(){
+  const teacherId = document.getElementById('attEmpTrackStaff').value;
+  const from = document.getElementById('attEmpTrackFrom').value;
+  const to = document.getElementById('attEmpTrackTo').value;
+  const area = document.getElementById('attEmpTrackArea');
+  const summary = document.getElementById('attEmpTrackSummary');
+  if(!teacherId || !from || !to){ alert('Pick a staff member and a date range.'); return; }
+  area.innerHTML = '<div class="loading">Loading...</div>';
+  try{
+    const { data, error } = await supabaseClient.from('att_employee_attendance').select('*').eq('teacher_id', teacherId).gte('attendance_date', from).lte('attendance_date', to).order('attendance_date', { ascending:false });
+    if(error) throw error;
+    const rows = data || [];
+    const counts = { PRESENT:0, ABSENT:0, HALF_DAY_FIRST:0, HALF_DAY_SECOND:0, LEAVE:0, LATE:0, ON_DUTY:0 };
+    rows.forEach(r => counts[r.status]++);
+    const total = rows.length;
+    const pct = total ? (((counts.PRESENT + counts.LATE + counts.ON_DUTY) / total) * 100).toFixed(1) : '0.0';
+    summary.innerHTML = attEmpKpiBlock(counts, total, pct);
+    area.innerHTML = rows.length
+      ? `<table class="tt-subs-table"><thead><tr><th>Date</th><th>Status</th><th>Remarks</th></tr></thead><tbody>${rows.map(r => `<tr><td>${escapeHtml(r.attendance_date)}</td><td>${escapeHtml(ATT_EMP_STATUS_LABELS[r.status]||r.status)}</td><td>${escapeHtml(r.remarks||'')}</td></tr>`).join('')}</tbody></table>`
+      : '<div class="empty">No attendance recorded in this range.</div>';
+  } catch(err){ area.innerHTML = '<div class="empty">Could not load: ' + escapeHtml(errMsg(err)) + '</div>'; }
+}
+
+/* ---- Attendance Reports ---- */
+async function attRenderReportControls(){
+  const type = document.getElementById('attReportType').value;
+  const span = document.getElementById('attReportControls');
+  const today = new Date().toISOString().slice(0,10);
+  const monthStart = today.slice(0,7) + '-01';
+  const isStudent = type.startsWith('student');
+  const prevFrom = document.getElementById('attReportFrom')?.value || monthStart;
+  const prevTo = document.getElementById('attReportTo')?.value || today;
+  const prevClass = document.getElementById('attReportClass')?.value || '';
+  span.innerHTML = `
+    <input type="date" id="attReportFrom" value="${prevFrom}" onchange="attRunReport()">
+    <input type="date" id="attReportTo" value="${prevTo}" onchange="attRunReport()">
+    ${isStudent ? `<select id="attReportClass" onchange="attRunReport()"><option value="">All Classes</option>${attClassList().map(c => `<option value="${escapeHtml(c)}" ${c===prevClass?'selected':''}>${escapeHtml(c)}</option>`).join('')}</select>` : ''}
+  `;
+  await attRunReport();
+}
+async function attRunReport(){
+  const type = document.getElementById('attReportType').value;
+  const from = document.getElementById('attReportFrom')?.value;
+  const to = document.getElementById('attReportTo')?.value;
+  const area = document.getElementById('attReportArea');
+  if(!from || !to){ area.innerHTML = '<div class="empty">Pick a date range.</div>'; return; }
+  area.innerHTML = '<div class="loading">Loading...</div>';
+  try{
+    if(type === 'student_summary'){
+      const classSection = document.getElementById('attReportClass')?.value || '';
+      let q = supabaseClient.from('att_student_attendance').select('*').gte('attendance_date', from).lte('attendance_date', to);
+      if(classSection) q = q.eq('class_section', classSection);
+      const { data, error } = await q;
+      if(error) throw error;
+      const byStudent = new Map();
+      (data || []).forEach(r => {
+        if(!byStudent.has(r.student_fee_id)) byStudent.set(r.student_fee_id, { reg_no:r.reg_no, name:r.student_name, class_section:r.class_section, counts:{PRESENT:0,ABSENT:0,HALF_DAY:0,LEAVE:0,LATE:0} });
+        byStudent.get(r.student_fee_id).counts[r.status]++;
+      });
+      const rows = [...byStudent.values()].sort((a,b) => a.class_section.localeCompare(b.class_section) || a.name.localeCompare(b.name));
+      attReportHeaders = ['Admission No','Student','Class','Present','Absent','Half-day','Leave','Late','Marked Days','% Present'];
+      attReportRows = rows.map(r => {
+        const total = Object.values(r.counts).reduce((a,b) => a+b, 0);
+        const pct = total ? (((r.counts.PRESENT + r.counts.LATE) / total) * 100).toFixed(1) : '0.0';
+        return [r.reg_no, r.name, r.class_section, r.counts.PRESENT, r.counts.ABSENT, r.counts.HALF_DAY, r.counts.LEAVE, r.counts.LATE, total, pct + '%'];
+      });
+    } else if(type === 'student_register'){
+      const classSection = document.getElementById('attReportClass')?.value || '';
+      let q = supabaseClient.from('att_student_attendance').select('*').gte('attendance_date', from).lte('attendance_date', to).order('attendance_date').order('student_name');
+      if(classSection) q = q.eq('class_section', classSection);
+      const { data, error } = await q;
+      if(error) throw error;
+      attReportHeaders = ['Date','Admission No','Student','Class','Status','Remarks'];
+      attReportRows = (data || []).map(r => [r.attendance_date, r.reg_no, r.student_name, r.class_section, ATT_STATUS_LABELS[r.status] || r.status, r.remarks || '']);
+    } else if(type === 'employee_summary'){
+      const { data, error } = await supabaseClient.from('att_employee_attendance').select('*').gte('attendance_date', from).lte('attendance_date', to);
+      if(error) throw error;
+      const byTeacher = new Map();
+      (data || []).forEach(r => {
+        if(!byTeacher.has(r.teacher_id)) byTeacher.set(r.teacher_id, { counts:{PRESENT:0,ABSENT:0,HALF_DAY_FIRST:0,HALF_DAY_SECOND:0,LEAVE:0,LATE:0,ON_DUTY:0} });
+        byTeacher.get(r.teacher_id).counts[r.status]++;
+      });
+      const rows = [...byTeacher.entries()].map(([teacherId, v]) => ({ name: attStaffName(teacherId), ...v })).sort((a,b) => a.name.localeCompare(b.name));
+      attReportHeaders = ['Staff','Present','Absent','Half-day 1st','Half-day 2nd','Leave','Late','On-duty','Marked Days','% Present'];
+      attReportRows = rows.map(r => {
+        const total = Object.values(r.counts).reduce((a,b) => a+b, 0);
+        const pct = total ? (((r.counts.PRESENT + r.counts.LATE + r.counts.ON_DUTY) / total) * 100).toFixed(1) : '0.0';
+        return [r.name, r.counts.PRESENT, r.counts.ABSENT, r.counts.HALF_DAY_FIRST, r.counts.HALF_DAY_SECOND, r.counts.LEAVE, r.counts.LATE, r.counts.ON_DUTY, total, pct + '%'];
+      });
+    } else if(type === 'employee_register'){
+      const { data, error } = await supabaseClient.from('att_employee_attendance').select('*').gte('attendance_date', from).lte('attendance_date', to).order('attendance_date');
+      if(error) throw error;
+      attReportHeaders = ['Date','Staff','Status','Remarks'];
+      attReportRows = (data || []).map(r => [r.attendance_date, attStaffName(r.teacher_id), ATT_EMP_STATUS_LABELS[r.status] || r.status, r.remarks || '']);
+    }
+    if(!attReportRows.length){ area.innerHTML = '<div class="empty">No attendance records in this range.</div>'; return; }
+    area.innerHTML = `<table class="tt-subs-table"><thead><tr>${attReportHeaders.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead><tbody>${attReportRows.map(row => `<tr>${row.map(cell => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  } catch(err){ area.innerHTML = '<div class="empty">Could not load report: ' + escapeHtml(errMsg(err)) + '</div>'; }
+}
+function attExportReport(){
+  if(!attReportRows.length){ alert('Nothing to export — load a report with data first.'); return; }
+  const csv = '\uFEFF' + [attReportHeaders, ...attReportRows].map(row => row.map(csvEscape).join(',')).join('\n');
+  const url = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'}));
+  const a = document.createElement('a'); a.href = url; a.download = `attendance_report_${new Date().toISOString().slice(0,10)}.csv`; a.click(); URL.revokeObjectURL(url);
 }
 </script>
 </body>
