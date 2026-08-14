@@ -430,6 +430,10 @@
   .ov-form-head span:first-child{font-size:13px;font-weight:700;color:var(--ink);text-transform:uppercase;letter-spacing:0.3px;}
   .ov-form-num{font-size:30px;font-weight:800;color:var(--accent);line-height:1.1;}
   .ov-form-sub{font-size:12px;color:var(--muted);margin-top:4px;}
+  .ov-link-card{display:block;text-decoration:none;color:inherit;}
+  .ov-link-card .ov-form-head span:first-child{display:flex;align-items:center;gap:6px;}
+  .ov-link-card .ov-ext-icon{font-size:12px;color:var(--accent-light);}
+  .ov-section-title{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin:0 0 10px;}
   .ov-pill{font-size:9.5px;font-weight:700;letter-spacing:0.3px;text-transform:uppercase;border-radius:20px;padding:2px 9px;white-space:nowrap;}
   .ov-pill.open{background:#dcf0e0;color:#1e6b34;}
   .ov-pill.closed{background:#f6d9d9;color:#8a2c22;}
@@ -1844,6 +1848,7 @@
     <button class="tab-btn" id="tabFees" onclick="switchTab('fees')">Fees Portal</button>
     <button class="tab-btn" id="tabTimetable" onclick="switchTab('timetable')">Timetable</button>
     <button class="tab-btn" id="tabAttendance" onclick="switchTab('attendance')">Attendance</button>
+    <button class="tab-btn" id="tabAcademic" onclick="switchTab('academic')">Academic Year</button>
   </div>
 
   <div id="overviewArea" style="display:none;"></div>
@@ -2060,7 +2065,7 @@
     <div id="attSetupView">
       <div class="fee-panel">
         <h2>Attendance Master Setup &amp; Shift Timings</h2>
-        <p class="fs-modal-sub">One shift, school-wide. Statuses are fixed: Present, Absent, Half-day, Leave, Late.</p>
+        <p class="fs-modal-sub">One shift, school-wide. Statuses are fixed: students use Present, Absent, Half-day; staff use Present, Absent, Half-day (1st/2nd), Leave, Late, On-duty.</p>
         <div class="fee-actions">
           <label style="display:flex;align-items:center;gap:6px;">Shift start <input type="time" id="attShiftStart"></label>
           <label style="display:flex;align-items:center;gap:6px;">Shift end <input type="time" id="attShiftEnd"></label>
@@ -2193,6 +2198,22 @@
         </div>
         <div class="table-container"><div id="attReportArea"></div></div>
       </div>
+    </div>
+  </div>
+
+  <div id="academicArea" style="display:none;">
+    <div class="fee-panel">
+      <h2>School Academic Year</h2>
+      <p class="fs-modal-sub">Define each academic session and mark which one is current. The current year is what future modules (Promotion, Class &amp; Section Allocation, Master Data Transfer) will act on.</p>
+      <div class="fee-actions">
+        <input type="text" id="ayLabel" placeholder="Year label, e.g. 2026-27" style="width:160px;">
+        <input type="date" id="ayStart" title="Start date">
+        <input type="date" id="ayEnd" title="End date">
+        <input type="text" id="ayNotes" placeholder="Notes (optional)" style="flex:1;min-width:160px;">
+        <button class="btn-primary" onclick="ayCreateYear()">Add Academic Year</button>
+        <button class="btn-secondary" onclick="loadAcademicYears()">Refresh</button>
+      </div>
+      <div class="table-container"><div id="ayTableArea"><div class="loading">Loading academic years...</div></div></div>
     </div>
   </div>
 
@@ -4703,17 +4724,20 @@ async function switchTab(tab){
   document.getElementById('tabFees').classList.toggle('active', tab === 'fees');
   document.getElementById('tabTimetable').classList.toggle('active', tab === 'timetable');
   document.getElementById('tabAttendance').classList.toggle('active', tab === 'attendance');
+  document.getElementById('tabAcademic').classList.toggle('active', tab === 'academic');
   document.getElementById('searchBox').value = '';
 
   const isOverview = tab === 'overview';
   const isFees = tab === 'fees';
   const isTimetable = tab === 'timetable';
   const isAttendance = tab === 'attendance';
-  const isSpecial = isOverview || isFees || isTimetable || isAttendance;
+  const isAcademic = tab === 'academic';
+  const isSpecial = isOverview || isFees || isTimetable || isAttendance || isAcademic;
   document.getElementById('overviewArea').style.display = isOverview ? 'block' : 'none';
   document.getElementById('feeArea').style.display = isFees ? 'block' : 'none';
   document.getElementById('ttArea').style.display = isTimetable ? 'block' : 'none';
   document.getElementById('attArea').style.display = isAttendance ? 'block' : 'none';
+  document.getElementById('academicArea').style.display = isAcademic ? 'block' : 'none';
   document.getElementById('statsRow').style.display = isSpecial ? 'none' : '';
   document.querySelector('#mainPanel > .table-container').style.display = isSpecial ? 'none' : '';
   document.getElementById('pageControls').style.display = isSpecial ? 'none' : 'flex';
@@ -4729,6 +4753,8 @@ async function switchTab(tab){
     await loadTimetable();
   } else if(isAttendance){
     await loadAttendance();
+  } else if(isAcademic){
+    await loadAcademicYears();
   } else {
     await loadAll();
   }
@@ -4740,6 +4766,7 @@ function refreshCurrentTab(){
   else if(currentTab === 'fees') loadFeePortal();
   else if(currentTab === 'timetable') loadTimetable();
   else if(currentTab === 'attendance') loadAttendance();
+  else if(currentTab === 'academic') loadAcademicYears();
   else loadAll();
 }
 
@@ -4924,6 +4951,25 @@ async function loadOverview(){
           <div class="ov-form-num">${stf.length}</div>
           <div class="ov-form-sub">${stfMissing} missing document${stfMissing === 1 ? '' : 's'}</div>
         </div>
+      </div>
+      <div class="ov-section-title">EP Future — Quick Links</div>
+      <div class="ov-forms-grid" style="margin-bottom:22px;">
+        <a class="ov-form-card ov-link-card" href="https://epfuture.mountlitera.com/pages/RollOverMasterData" target="_blank" rel="noopener">
+          <div class="ov-form-head"><span>Master Data Transfer <span class="ov-ext-icon">↗</span></span></div>
+          <div class="ov-form-sub">Roll over master data to the new session</div>
+        </a>
+        <a class="ov-form-card ov-link-card" href="https://epfuture.mountlitera.com/pages/PromotionStatusReport" target="_blank" rel="noopener">
+          <div class="ov-form-head"><span>Academic Promotion <span class="ov-ext-icon">↗</span></span></div>
+          <div class="ov-form-sub">Promotion status report</div>
+        </a>
+        <a class="ov-form-card ov-link-card" href="https://epfuture.mountlitera.com/pages/RolloverforExistingStudent" target="_blank" rel="noopener">
+          <div class="ov-form-head"><span>New Class &amp; Section Allocation <span class="ov-ext-icon">↗</span></span></div>
+          <div class="ov-form-sub">Rollover for existing students</div>
+        </a>
+        <a class="ov-form-card ov-link-card" href="https://epfuture.mountlitera.com/pages/SchoolAcademic" target="_blank" rel="noopener">
+          <div class="ov-form-head"><span>School Academic Year <span class="ov-ext-icon">↗</span></span></div>
+          <div class="ov-form-sub">Manage the school's academic year</div>
+        </a>
       </div>
       <div class="ov-recent">
         <h3>Recent Submissions</h3>
@@ -7618,6 +7664,70 @@ function attExportReport(){
   const csv = '\uFEFF' + [attReportHeaders, ...attReportRows].map(row => row.map(csvEscape).join(',')).join('\n');
   const url = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'}));
   const a = document.createElement('a'); a.href = url; a.download = `attendance_report_${new Date().toISOString().slice(0,10)}.csv`; a.click(); URL.revokeObjectURL(url);
+}
+
+/* ============ SCHOOL ACADEMIC YEAR ============ */
+async function loadAcademicYears(){
+  const area = document.getElementById('ayTableArea');
+  area.innerHTML = '<div class="loading">Loading academic years...</div>';
+  try{
+    const { data, error } = await supabaseClient.from('academic_years').select('*').order('start_date', { ascending: false });
+    if(error) throw error;
+    renderAcademicYears(data || []);
+  } catch(err){ area.innerHTML = '<div class="empty">Could not load academic years: ' + escapeHtml(errMsg(err)) + '</div>'; }
+}
+function renderAcademicYears(rows){
+  const area = document.getElementById('ayTableArea');
+  if(!rows.length){ area.innerHTML = '<div class="empty">No academic years yet — add one above.</div>'; return; }
+  const today = new Date().toISOString().slice(0,10);
+  const trs = rows.map(r => {
+    const state = r.is_current ? 'Current' : (r.end_date < today ? 'Closed' : (r.start_date > today ? 'Upcoming' : 'Not marked current'));
+    return `<tr>
+      <td>${escapeHtml(r.year_label)}${r.is_current ? ' <span style="color:var(--accent);font-weight:700;">★</span>' : ''}</td>
+      <td>${escapeHtml(r.start_date)}</td>
+      <td>${escapeHtml(r.end_date)}</td>
+      <td>${escapeHtml(state)}</td>
+      <td>${escapeHtml(r.notes || '')}</td>
+      <td>
+        ${r.is_current ? '' : `<button class="tab-btn" onclick="aySetCurrent(${r.id})">Set Current</button>`}
+        <button class="del-btn" onclick="ayDeleteYear(${r.id}, '${escapeHtml(r.year_label).replace(/'/g,"\\'")}')">Delete</button>
+      </td>
+    </tr>`;
+  }).join('');
+  area.innerHTML = `<table class="tt-subs-table"><thead><tr><th>Year</th><th>Start</th><th>End</th><th>Status</th><th>Notes</th><th></th></tr></thead><tbody>${trs}</tbody></table>`;
+}
+async function ayCreateYear(){
+  const year_label = document.getElementById('ayLabel').value.trim();
+  const start_date = document.getElementById('ayStart').value;
+  const end_date = document.getElementById('ayEnd').value;
+  const notes = document.getElementById('ayNotes').value.trim() || null;
+  if(!year_label || !start_date || !end_date){ alert('Fill in the year label, start date and end date.'); return; }
+  if(end_date <= start_date){ alert('End date must be after the start date.'); return; }
+  try{
+    const { error } = await supabaseClient.from('academic_years').insert({ year_label, start_date, end_date, notes });
+    if(error) throw error;
+    document.getElementById('ayLabel').value = '';
+    document.getElementById('ayStart').value = '';
+    document.getElementById('ayEnd').value = '';
+    document.getElementById('ayNotes').value = '';
+    await loadAcademicYears();
+  } catch(err){ alert('Could not add academic year: ' + errMsg(err)); }
+}
+async function aySetCurrent(id){
+  if(!confirm('Make this the current academic year? This unmarks whichever year is current now.')) return;
+  try{
+    const { error } = await supabaseClient.rpc('set_current_academic_year', { p_id: id });
+    if(error) throw error;
+    await loadAcademicYears();
+  } catch(err){ alert('Could not set current academic year: ' + errMsg(err)); }
+}
+async function ayDeleteYear(id, label){
+  if(!confirm(`Delete academic year "${label}"? This cannot be undone.`)) return;
+  try{
+    const { error } = await supabaseClient.from('academic_years').delete().eq('id', id);
+    if(error) throw error;
+    await loadAcademicYears();
+  } catch(err){ alert('Could not delete academic year: ' + errMsg(err)); }
 }
 </script>
 </body>
