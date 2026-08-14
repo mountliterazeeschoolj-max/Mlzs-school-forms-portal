@@ -1849,6 +1849,7 @@
     <button class="tab-btn" id="tabTimetable" onclick="switchTab('timetable')">Timetable</button>
     <button class="tab-btn" id="tabAttendance" onclick="switchTab('attendance')">Attendance</button>
     <button class="tab-btn" id="tabAcademic" onclick="switchTab('academic')">Academic Year</button>
+    <button class="tab-btn" id="tabAdmission" onclick="switchTab('admission')">Admission</button>
   </div>
 
   <div id="overviewArea" style="display:none;"></div>
@@ -2214,6 +2215,49 @@
         <button class="btn-secondary" onclick="loadAcademicYears()">Refresh</button>
       </div>
       <div class="table-container"><div id="ayTableArea"><div class="loading">Loading academic years...</div></div></div>
+    </div>
+  </div>
+
+  <div id="admissionArea" style="display:none;">
+    <div class="tabs fee-tabs">
+      <button class="tab-btn active" id="admViewEnquiries" onclick="switchAdmView('enquiries')">Enquiries</button>
+      <button class="tab-btn" id="admViewReports" onclick="switchAdmView('reports')">Reports</button>
+    </div>
+
+    <div id="admEnquiriesView">
+      <div class="fee-actions">
+        <input type="text" id="admSearchBox" placeholder="Search enquiry no., candidate, mobile or class" oninput="debounce('admSearch', renderEnquiriesTable, 180)">
+        <select id="admStatusFilter" onchange="renderEnquiriesTable()">
+          <option value="">All Statuses</option>
+          <option value="OPEN">Open</option>
+          <option value="FOLLOW_UP">Follow-up</option>
+          <option value="ADMITTED">Admitted</option>
+          <option value="CLOSED">Closed</option>
+        </select>
+        <button class="btn-primary" onclick="openEnquiryDialog()">New Enquiry</button>
+        <button class="btn-secondary" onclick="loadEnquiries()">Refresh</button>
+      </div>
+      <div class="table-container"><div id="admEnquiriesArea"><div class="loading">Loading enquiries...</div></div></div>
+    </div>
+
+    <div id="admReportsView" style="display:none;">
+      <div class="fee-panel">
+        <h2>Admission &amp; Enquiry Report</h2>
+        <div class="fee-actions">
+          <input type="date" id="admReportFrom" onchange="admRunReport()">
+          <input type="date" id="admReportTo" onchange="admRunReport()">
+          <select id="admReportStatus" onchange="admRunReport()">
+            <option value="">All Statuses</option>
+            <option value="OPEN">Open</option>
+            <option value="FOLLOW_UP">Follow-up</option>
+            <option value="ADMITTED">Admitted</option>
+            <option value="CLOSED">Closed</option>
+          </select>
+          <button class="btn-secondary" onclick="admExportReport()">Export CSV</button>
+        </div>
+        <div class="fee-kpis" id="admReportKpis"></div>
+        <div class="table-container"><div id="admReportArea"></div></div>
+      </div>
     </div>
   </div>
 
@@ -4725,6 +4769,7 @@ async function switchTab(tab){
   document.getElementById('tabTimetable').classList.toggle('active', tab === 'timetable');
   document.getElementById('tabAttendance').classList.toggle('active', tab === 'attendance');
   document.getElementById('tabAcademic').classList.toggle('active', tab === 'academic');
+  document.getElementById('tabAdmission').classList.toggle('active', tab === 'admission');
   document.getElementById('searchBox').value = '';
 
   const isOverview = tab === 'overview';
@@ -4732,12 +4777,14 @@ async function switchTab(tab){
   const isTimetable = tab === 'timetable';
   const isAttendance = tab === 'attendance';
   const isAcademic = tab === 'academic';
-  const isSpecial = isOverview || isFees || isTimetable || isAttendance || isAcademic;
+  const isAdmission = tab === 'admission';
+  const isSpecial = isOverview || isFees || isTimetable || isAttendance || isAcademic || isAdmission;
   document.getElementById('overviewArea').style.display = isOverview ? 'block' : 'none';
   document.getElementById('feeArea').style.display = isFees ? 'block' : 'none';
   document.getElementById('ttArea').style.display = isTimetable ? 'block' : 'none';
   document.getElementById('attArea').style.display = isAttendance ? 'block' : 'none';
   document.getElementById('academicArea').style.display = isAcademic ? 'block' : 'none';
+  document.getElementById('admissionArea').style.display = isAdmission ? 'block' : 'none';
   document.getElementById('statsRow').style.display = isSpecial ? 'none' : '';
   document.querySelector('#mainPanel > .table-container').style.display = isSpecial ? 'none' : '';
   document.getElementById('pageControls').style.display = isSpecial ? 'none' : 'flex';
@@ -4755,6 +4802,8 @@ async function switchTab(tab){
     await loadAttendance();
   } else if(isAcademic){
     await loadAcademicYears();
+  } else if(isAdmission){
+    await loadEnquiries();
   } else {
     await loadAll();
   }
@@ -4767,6 +4816,7 @@ function refreshCurrentTab(){
   else if(currentTab === 'timetable') loadTimetable();
   else if(currentTab === 'attendance') loadAttendance();
   else if(currentTab === 'academic') loadAcademicYears();
+  else if(currentTab === 'admission') loadEnquiries();
   else loadAll();
 }
 
@@ -7728,6 +7778,190 @@ async function ayDeleteYear(id, label){
     if(error) throw error;
     await loadAcademicYears();
   } catch(err){ alert('Could not delete academic year: ' + errMsg(err)); }
+}
+
+/* ============ ADMISSION: ENQUIRY → ADMISSION ============ */
+const ADM_STATUS_LABELS = { OPEN:'Open', FOLLOW_UP:'Follow-up', ADMITTED:'Admitted', CLOSED:'Closed' };
+let admEnquiries = [];
+let admReportHeaders = [], admReportRows = [];
+
+function switchAdmView(view){
+  document.getElementById('admViewEnquiries').classList.toggle('active', view === 'enquiries');
+  document.getElementById('admViewReports').classList.toggle('active', view === 'reports');
+  document.getElementById('admEnquiriesView').style.display = view === 'enquiries' ? 'block' : 'none';
+  document.getElementById('admReportsView').style.display = view === 'reports' ? 'block' : 'none';
+  if(view === 'reports'){
+    const fromEl = document.getElementById('admReportFrom'), toEl = document.getElementById('admReportTo');
+    if(!fromEl.value){ const today = new Date().toISOString().slice(0,10); fromEl.value = today.slice(0,7) + '-01'; toEl.value = today; }
+    admRunReport();
+  }
+}
+
+async function loadEnquiries(){
+  const area = document.getElementById('admEnquiriesArea');
+  area.innerHTML = '<div class="loading">Loading enquiries...</div>';
+  try{
+    const { data, error } = await supabaseClient.from('admission_enquiries').select('*').order('created_at', { ascending:false });
+    if(error) throw error;
+    admEnquiries = data || [];
+    renderEnquiriesTable();
+  } catch(err){ area.innerHTML = '<div class="empty">Could not load enquiries: ' + escapeHtml(errMsg(err)) + '</div>'; }
+}
+function renderEnquiriesTable(){
+  const area = document.getElementById('admEnquiriesArea');
+  if(!area) return;
+  const q = (document.getElementById('admSearchBox')?.value || '').toLowerCase();
+  const statusFilter = document.getElementById('admStatusFilter')?.value || '';
+  let rows = admEnquiries;
+  if(statusFilter) rows = rows.filter(r => r.status === statusFilter);
+  if(q) rows = rows.filter(r => (r.enquiry_no||'').toLowerCase().includes(q) || (r.candidate_name||'').toLowerCase().includes(q) || (r.mobile1||'').toLowerCase().includes(q) || (r.class_applying_for||'').toLowerCase().includes(q));
+  if(!rows.length){ area.innerHTML = '<div class="empty">No enquiries match.</div>'; return; }
+  const trs = rows.map(r => `<tr>
+    <td>${escapeHtml(r.enquiry_no)}</td>
+    <td>${escapeHtml(r.enquiry_date || '')}</td>
+    <td>${escapeHtml(r.candidate_name)}</td>
+    <td>${escapeHtml(r.class_applying_for || '—')}</td>
+    <td>${escapeHtml(r.mobile1 || '—')}</td>
+    <td>${escapeHtml(ADM_STATUS_LABELS[r.status] || r.status)}</td>
+    <td>
+      <button class="tab-btn" onclick="openEnquiryDialog(${r.id})">Edit</button>
+      ${r.status !== 'ADMITTED' ? `<button class="tab-btn" onclick="openConvertDialog(${r.id})">Convert to Admission</button>` : ''}
+      <button class="del-btn" onclick="deleteEnquiry(${r.id})">Delete</button>
+    </td>
+  </tr>`).join('');
+  area.innerHTML = `<table class="tt-subs-table"><thead><tr><th>Enquiry No.</th><th>Date</th><th>Candidate</th><th>Class Applying</th><th>Mobile</th><th>Status</th><th></th></tr></thead><tbody>${trs}</tbody></table>`;
+}
+function openEnquiryDialog(id){
+  const r = id ? admEnquiries.find(x => x.id === id) : null;
+  const field = (label,key,type='text') => `<div class="field"><label>${label}</label><input id="enq_${key}" type="${type}" value="${escapeHtml(r?.[key] ?? '')}"></div>`;
+  const genderOptions = ['','Male','Female','Other'].map(g => `<option value="${g}" ${(r?.gender||'')===g?'selected':''}>${g||'Select'}</option>`).join('');
+  let statusField = '';
+  if(r && r.status === 'ADMITTED'){
+    statusField = `<div class="field"><label>Status</label><input type="text" value="Admitted" disabled></div>`;
+  } else if(r){
+    const manualStatusOptions = ['OPEN','FOLLOW_UP','CLOSED'].map(v => `<option value="${v}" ${(r.status||'OPEN')===v?'selected':''}>${ADM_STATUS_LABELS[v]}</option>`).join('');
+    statusField = `<div class="field"><label>Status</label><select id="enq_status">${manualStatusOptions}</select></div>`;
+  }
+  openFeeDialog(id ? 'Edit Enquiry' : 'New Enquiry', `<div class="fee-form-grid">
+    ${field('Candidate Name','candidate_name')}
+    ${field('Date of Birth','dob','date')}
+    <div class="field"><label>Gender</label><select id="enq_gender">${genderOptions}</select></div>
+    ${field('Class Applying For','class_applying_for')}
+    ${field('Father Name','father_name')}
+    ${field('Mother Name','mother_name')}
+    ${field('Mobile 1','mobile1','tel')}
+    ${field('Mobile 2','mobile2','tel')}
+    ${field('Email','email','email')}
+    ${field('Previous School','previous_school')}
+    ${field('Source','source')}
+    ${field('Enquiry Date','enquiry_date','date')}
+    ${statusField}
+    ${field('Follow-up Date','follow_up_date','date')}
+    <div class="field full"><label>Address</label><textarea id="enq_address">${escapeHtml(r?.address ?? '')}</textarea></div>
+    <div class="field full"><label>Remarks</label><textarea id="enq_remarks">${escapeHtml(r?.remarks ?? '')}</textarea></div>
+  </div><div class="actions"><button class="btn-secondary" onclick="closeFeeDialog()">Cancel</button><button class="btn-primary" onclick="saveEnquiry(${id || 'null'})">Save Enquiry</button></div>`);
+  if(!id){ const d = document.getElementById('enq_enquiry_date'); if(d) d.value = new Date().toISOString().slice(0,10); }
+}
+async function saveEnquiry(id){
+  const keys = ['candidate_name','dob','class_applying_for','father_name','mother_name','mobile1','mobile2','email','previous_school','source','enquiry_date','follow_up_date'];
+  const record = {};
+  keys.forEach(k => { const el = document.getElementById('enq_'+k); if(el) record[k] = el.value.trim() || null; });
+  record.gender = document.getElementById('enq_gender')?.value || null;
+  record.address = document.getElementById('enq_address')?.value.trim() || null;
+  record.remarks = document.getElementById('enq_remarks')?.value.trim() || null;
+  const statusEl = document.getElementById('enq_status');
+  if(statusEl) record.status = statusEl.value;
+  if(!record.candidate_name){ alert('Candidate name is required.'); return; }
+  try{
+    const result = id
+      ? await supabaseClient.from('admission_enquiries').update(record).eq('id', id).select().single()
+      : await supabaseClient.from('admission_enquiries').insert(record).select().single();
+    if(result.error) throw result.error;
+    closeFeeDialog();
+    await loadEnquiries();
+  } catch(err){ alert('Could not save enquiry: ' + errMsg(err)); }
+}
+async function deleteEnquiry(id){
+  const r = admEnquiries.find(x => x.id === id);
+  if(r?.status === 'ADMITTED'){ alert('This enquiry has already been converted to an admission and cannot be deleted.'); return; }
+  if(!confirm('Delete this enquiry? This cannot be undone.')) return;
+  try{
+    const { error } = await supabaseClient.from('admission_enquiries').delete().eq('id', id);
+    if(error) throw error;
+    await loadEnquiries();
+  } catch(err){ alert('Could not delete enquiry: ' + errMsg(err)); }
+}
+async function openConvertDialog(id){
+  const r = admEnquiries.find(x => x.id === id); if(!r) return;
+  if(r.status === 'ADMITTED'){ alert('This enquiry has already been converted.'); return; }
+  openFeeDialog('Convert to Admission', '<div class="loading">Loading classes...</div>');
+  const dialog = document.querySelector('#feeDialog .fee-dialog-inner');
+  try{
+    const { data, error } = await supabaseClient.from('tt_classes').select('*').order('sort_order').order('class_section');
+    if(error) throw error;
+    const classOptions = (data || []).map(c => `<option value="${escapeHtml(c.class_section)}">${escapeHtml(c.class_section)}</option>`).join('');
+    dialog.innerHTML = `<h2>Convert to Admission — ${escapeHtml(r.candidate_name)}</h2>
+      <p class="fs-modal-sub">Enquiry ${escapeHtml(r.enquiry_no)}. This creates the enrolled student record and allocates their class &amp; section — they'll immediately appear in Fees and Attendance.</p>
+      <div class="fee-form-grid">
+        <div class="field"><label>Admission No.</label><input id="cv_reg_no" type="text"></div>
+        <div class="field"><label>Class &amp; Section</label><select id="cv_class_section"><option value="">Select</option>${classOptions}</select></div>
+        <div class="field"><label>Admission Date</label><input id="cv_admission_date" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
+        <div class="field"><label>Category</label><input id="cv_category" type="text"></div>
+      </div>
+      <div class="actions"><button class="btn-secondary" onclick="closeFeeDialog()">Cancel</button><button class="btn-primary" onclick="convertEnquiry(${id})">Confirm Admission</button></div>`;
+  } catch(err){ dialog.innerHTML = '<div class="empty">Could not load classes: ' + escapeHtml(errMsg(err)) + '</div>'; }
+}
+async function convertEnquiry(id){
+  const reg_no = document.getElementById('cv_reg_no').value.trim();
+  const class_section = document.getElementById('cv_class_section').value;
+  const admission_date = document.getElementById('cv_admission_date').value;
+  const category = document.getElementById('cv_category').value.trim() || null;
+  if(!reg_no || !class_section){ alert('Admission number and class & section are required.'); return; }
+  try{
+    const { error } = await supabaseClient.rpc('convert_enquiry_to_admission', { p_enquiry_id:id, p_reg_no:reg_no, p_class_section:class_section, p_admission_date:admission_date, p_category:category });
+    if(error) throw error;
+    closeFeeDialog();
+    alert(`Admitted. ${reg_no} has been enrolled in ${class_section}.`);
+    await loadEnquiries();
+  } catch(err){ alert('Could not convert to admission: ' + errMsg(err)); }
+}
+async function admRunReport(){
+  const area = document.getElementById('admReportArea');
+  const kpiArea = document.getElementById('admReportKpis');
+  const from = document.getElementById('admReportFrom').value;
+  const to = document.getElementById('admReportTo').value;
+  const status = document.getElementById('admReportStatus').value;
+  area.innerHTML = '<div class="loading">Loading...</div>';
+  try{
+    let q = supabaseClient.from('admission_enquiries').select('*, student_fees(class_section)').order('enquiry_date', { ascending:false });
+    if(from) q = q.gte('enquiry_date', from);
+    if(to) q = q.lte('enquiry_date', to);
+    if(status) q = q.eq('status', status);
+    const { data, error } = await q;
+    if(error) throw error;
+    const rows = data || [];
+    const counts = { OPEN:0, FOLLOW_UP:0, ADMITTED:0, CLOSED:0 };
+    rows.forEach(r => counts[r.status] = (counts[r.status] || 0) + 1);
+    const total = rows.length;
+    const pct = total ? ((counts.ADMITTED / total) * 100).toFixed(1) : '0.0';
+    kpiArea.innerHTML = `<div class="fee-kpi"><div class="label">Total Enquiries</div><div class="value">${total}</div></div>
+      <div class="fee-kpi"><div class="label">Open</div><div class="value">${counts.OPEN}</div></div>
+      <div class="fee-kpi"><div class="label">Follow-up</div><div class="value">${counts.FOLLOW_UP}</div></div>
+      <div class="fee-kpi"><div class="label">Admitted</div><div class="value">${counts.ADMITTED}</div></div>
+      <div class="fee-kpi"><div class="label">Closed</div><div class="value">${counts.CLOSED}</div></div>
+      <div class="fee-kpi"><div class="label">Conversion Rate</div><div class="value">${pct}%</div></div>`;
+    admReportHeaders = ['Enquiry No','Date','Candidate','Class Applying','Mobile','Status','Admitted Into','Follow-up Date','Remarks'];
+    admReportRows = rows.map(r => [r.enquiry_no, r.enquiry_date || '', r.candidate_name, r.class_applying_for || '', r.mobile1 || '', ADM_STATUS_LABELS[r.status] || r.status, r.student_fees?.class_section || '', r.follow_up_date || '', r.remarks || '']);
+    area.innerHTML = rows.length
+      ? `<table class="tt-subs-table"><thead><tr>${admReportHeaders.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead><tbody>${admReportRows.map(row => `<tr>${row.map(cell => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`).join('')}</tbody></table>`
+      : '<div class="empty">No enquiries in this range.</div>';
+  } catch(err){ area.innerHTML = '<div class="empty">Could not load report: ' + escapeHtml(errMsg(err)) + '</div>'; }
+}
+function admExportReport(){
+  if(!admReportRows.length){ alert('Nothing to export — load a report with data first.'); return; }
+  const csv = '\uFEFF' + [admReportHeaders, ...admReportRows].map(row => row.map(csvEscape).join(',')).join('\n');
+  const url = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'}));
+  const a = document.createElement('a'); a.href = url; a.download = `admission_report_${new Date().toISOString().slice(0,10)}.csv`; a.click(); URL.revokeObjectURL(url);
 }
 </script>
 </body>
