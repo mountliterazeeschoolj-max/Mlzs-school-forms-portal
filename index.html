@@ -383,6 +383,14 @@
   .tt-chip-click{cursor:pointer;}
   .tt-chip-click:hover{border-color:var(--accent-light);background:#f5fafd;}
   .tt-chip-count{font-size:10.5px;font-weight:600;color:var(--muted);background:var(--field);padding:2px 8px;border-radius:10px;}
+  .tt-chip-seats{width:56px;border:1px solid #d6e3ec;border-radius:8px;padding:3px 6px;font-size:12px;}
+  .adm-status-pill{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;letter-spacing:.3px;}
+  .adm-status-open{background:#e7f0fb;color:#2159a3;}
+  .adm-status-follow_up{background:#fdf1dc;color:#a8721c;}
+  .adm-status-admitted{background:#e4f5ea;color:#1c7a44;}
+  .adm-status-closed{background:#eee;color:#666;}
+  .adm-actions-cell{white-space:nowrap;}
+  body.rm-role .adm-admin-only{display:none !important;}
   .tt-period-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #e8eef3;font-size:12.5px;}
   .tt-period-row:last-child{border-bottom:none;}
   .tt-period-row .no{font-weight:800;color:var(--accent);min-width:26px;}
@@ -1698,7 +1706,7 @@
   <div class="gate2-brand">Mount Litera Zee School<span>Jhansi</span></div>
   <h2 class="gate2-heading">Admin <span class="accent">Login</span></h2>
   <div class="gate2-divider"></div>
-  <div class="gate2-subtitle">Log in to manage student, class XI and staff records.</div>
+  <div class="gate2-subtitle" id="adminGateSubtitle">Log in to manage student, class XI and staff records.</div>
 
   <div class="gate2-field">
     <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="m4 6 8 7 8-7"/></svg></span>
@@ -1709,13 +1717,20 @@
     <input type="password" id="adminPasswordInput" placeholder="Password" autocomplete="current-password">
     <span class="eye" onclick="togglePwVisibility('adminPasswordInput')"><svg viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></span>
   </div>
+  <div class="gate2-field" id="adminConfirmPwField" style="display:none;">
+    <span class="ic"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
+    <input type="password" id="adminConfirmPasswordInput" placeholder="Confirm password" autocomplete="new-password">
+  </div>
 
-  <button class="gate2-btn" onclick="checkPasscode()">Log In</button>
+  <button class="gate2-btn" id="adminGateBtn" onclick="submitAdminGate()">Log In</button>
 
   <div class="gate2-links">
     <a class="row" onclick="showView('adminResetRequestScreen')">
       <svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
       <span>Forgot password?</span>
+    </a>
+    <a class="row" id="adminGateModeLink" onclick="setAdminGateMode(adminGateMode === 'register' ? 'login' : 'register')">
+      <span>Relation Manager? Create your account</span>
     </a>
   </div>
 
@@ -2222,9 +2237,13 @@
     <div class="tabs fee-tabs">
       <button class="tab-btn active" id="admViewEnquiries" onclick="switchAdmView('enquiries')">Enquiries</button>
       <button class="tab-btn" id="admViewReports" onclick="switchAdmView('reports')">Reports</button>
+      <button class="tab-btn" id="admViewSeats" onclick="switchAdmView('seats')">Seats</button>
+      <button class="tab-btn adm-admin-only" id="admViewTC" onclick="switchAdmView('tc')">Transfer Certificates</button>
+      <button class="tab-btn adm-admin-only" id="admViewAccess" onclick="switchAdmView('access')">Access</button>
     </div>
 
     <div id="admEnquiriesView">
+      <div class="fee-kpis" id="admEnquiryKpis"></div>
       <div class="fee-actions">
         <input type="text" id="admSearchBox" placeholder="Search enquiry no., candidate, mobile or class" oninput="debounce('admSearch', renderEnquiriesTable, 180)">
         <select id="admStatusFilter" onchange="renderEnquiriesTable()">
@@ -2257,6 +2276,41 @@
         </div>
         <div class="fee-kpis" id="admReportKpis"></div>
         <div class="table-container"><div id="admReportArea"></div></div>
+      </div>
+    </div>
+
+    <div id="admSeatsView" style="display:none;">
+      <div class="fee-panel">
+        <h2>Seats &amp; Capacity</h2>
+        <p class="fs-modal-sub">Capacity is set per class &amp; section from Timetable → Classes. Enrolled counts come from the live student roster.</p>
+        <div class="fee-kpis" id="admSeatsKpis"></div>
+        <div class="table-container"><div id="admSeatsArea"><div class="loading">Loading seats...</div></div></div>
+      </div>
+    </div>
+
+    <div id="admTCView" class="adm-admin-only" style="display:none;">
+      <div class="fee-panel">
+        <h2>Transfer Certificates</h2>
+        <p class="fs-modal-sub">Issued certificates are numbered automatically and print bilingually — English and Hindi on the same page.</p>
+        <div class="fee-actions">
+          <input type="text" id="tcSearchBox" placeholder="Search TC no., admission no. or student" oninput="debounce('tcSearch', renderTCTable, 180)">
+          <button class="btn-primary" onclick="openIssueTCDialog()">Issue Transfer Certificate</button>
+          <button class="btn-secondary" onclick="loadTCRecords()">Refresh</button>
+        </div>
+        <div class="table-container"><div id="tcTableArea"><div class="loading">Loading transfer certificates...</div></div></div>
+      </div>
+    </div>
+
+    <div id="admAccessView" class="adm-admin-only" style="display:none;">
+      <div class="fee-panel">
+        <h2>Relation Manager Access</h2>
+        <p class="fs-modal-sub">A Relation Manager only sees the Admission portal — they can add and edit enquiries and log follow-ups, but cannot delete enquiries, convert to admission, issue transfer certificates, or manage access. They create their own password after you add their email here.</p>
+        <div class="fee-actions">
+          <input type="text" id="rmNewEmail" placeholder="Relation manager's email" style="flex:1;min-width:220px;">
+          <button class="btn-primary" onclick="rmGrantAccess()">Grant Access</button>
+          <button class="btn-secondary" onclick="loadRmAccounts()">Refresh</button>
+        </div>
+        <div class="table-container"><div id="rmAccessArea"><div class="loading">Loading...</div></div></div>
       </div>
     </div>
   </div>
@@ -3055,19 +3109,95 @@ function showAuthNote(elId, msg, type){
    server-side rate limits regardless — this just avoids hammering the API from one tab. */
 let adminLoginFailures = 0;
 let adminLoginLockedUntil = 0;
+let adminGateMode = 'login';
+let currentPortalRole = null; // 'ADMIN' | 'RM' | null
 
-/* Confirms the just-authenticated Supabase session actually belongs to an admin account
-   (checked server-side via the am_i_admin() RPC, which is backed by RLS-protected admin_emails —
-   never trust the client alone here). Signs the session out and returns false if not. Staff
-   accounts authenticate against this same Supabase project, so without this check anyone who
-   self-registered via the Staff Data Bank could otherwise reach the admin panel. */
+/* Confirms the just-authenticated Supabase session actually belongs to an admin OR
+   relation-manager account (checked server-side via get_my_portal_role(), which is backed
+   by RLS-protected admin_emails — never trust the client alone here). Signs the session out
+   and returns null if neither. Staff accounts authenticate against this same Supabase
+   project, so without this check anyone who self-registered via the Staff Data Bank could
+   otherwise reach the admin panel. */
 async function verifyAdminSessionOrRejectAccess(){
   try{
-    const { data, error } = await supabaseClient.rpc('am_i_admin');
-    if(!error && data === true) return true;
-  } catch(err){ /* treat as not-admin below */ }
+    const { data, error } = await supabaseClient.rpc('get_my_portal_role');
+    if(!error && (data === 'ADMIN' || data === 'RM')) return data;
+  } catch(err){ /* treat as not-authorized below */ }
   await supabaseClient.auth.signOut();
-  return false;
+  return null;
+}
+
+/* Shows/hides admin-only navigation and controls based on the logged-in account's role.
+   A Relation Manager only ever sees the Admission portal, and within it only Edit +
+   Follow-up Log — never Delete, Convert to Admission, Transfer Certificates, or Manage RM Access. */
+function applyPortalRoleUI(){
+  const isRm = currentPortalRole === 'RM';
+  ['tabOverview','tabStudents','tabClass11','tabStaff','tabFees','tabTimetable','tabAttendance','tabAcademic'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.style.display = isRm ? 'none' : '';
+  });
+  document.querySelectorAll('.adm-admin-only').forEach(el => { el.style.display = isRm ? 'none' : ''; });
+  document.body.classList.toggle('rm-role', isRm);
+}
+
+function setAdminGateMode(mode){
+  adminGateMode = mode;
+  const isRegister = mode === 'register';
+  document.getElementById('adminConfirmPwField').style.display = isRegister ? 'flex' : 'none';
+  document.getElementById('adminGateBtn').textContent = isRegister ? 'Create Account' : 'Log In';
+  document.getElementById('adminGateSubtitle').textContent = isRegister
+    ? 'Relation Managers: create your account using the email your admin gave you access with.'
+    : 'Log in to manage student, class XI and staff records.';
+  document.getElementById('adminGateModeLink').querySelector('span').textContent = isRegister ? 'Already have an account? Log in' : 'Relation Manager? Create your account';
+  document.getElementById('gateNote').style.display = 'none';
+}
+
+function submitAdminGate(){
+  if(adminGateMode === 'register') registerRmAccount();
+  else checkPasscode();
+}
+
+async function registerRmAccount(){
+  const email = document.getElementById('adminEmailInput').value.trim();
+  const password = document.getElementById('adminPasswordInput').value;
+  const confirm = document.getElementById('adminConfirmPasswordInput').value;
+  if(!email || !password){ showAuthNote('gateNote', 'Please enter your email and password.'); return; }
+  if(password.length < 8){ showAuthNote('gateNote', 'Password must be at least 8 characters.'); return; }
+  if(password !== confirm){ showAuthNote('gateNote', 'Passwords do not match.'); return; }
+  try{
+    const { data, error } = await supabaseClient.auth.signUp({ email, password });
+    if(error){
+      if(/already registered|already exists/i.test(errMsg(error))){
+        showAuthNote('gateNote', 'An account already exists for this email. Please log in instead.');
+        setAdminGateMode('login');
+        return;
+      }
+      showAuthNote('gateNote', 'Could not create account: ' + errMsg(error));
+      return;
+    }
+    if(data && data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0){
+      showAuthNote('gateNote', 'An account already exists for this email. Please log in instead.');
+      setAdminGateMode('login');
+      return;
+    }
+    if(data && data.session){
+      const role = await verifyAdminSessionOrRejectAccess();
+      if(!role){
+        showAuthNote('gateNote', 'This account has not been given access yet. Ask your admin to add you first.');
+        return;
+      }
+      currentPortalRole = role;
+      document.getElementById('adminPasswordInput').value = '';
+      document.getElementById('adminConfirmPasswordInput').value = '';
+      document.getElementById('gateNote').style.display = 'none';
+      showView('mainPanel');
+      applyPortalRoleUI();
+      await switchTab(role === 'RM' ? 'admission' : 'overview');
+      return;
+    }
+    showAuthNote('gateNote', 'Account created. Please check your email to verify it, then log in.', 'success');
+    setAdminGateMode('login');
+  } catch(err){ showAuthNote('gateNote', 'Could not reach the server. Check your internet connection and try again.'); }
 }
 
 async function checkPasscode(){
@@ -3092,23 +3222,26 @@ async function checkPasscode(){
       }
       return;
     }
-    if(!(await verifyAdminSessionOrRejectAccess())){
-      showAuthNote('gateNote', 'This account does not have admin access.');
+    const role = await verifyAdminSessionOrRejectAccess();
+    if(!role){
+      showAuthNote('gateNote', 'This account does not have admin or relation-manager access.');
       document.getElementById('adminPasswordInput').value = '';
       return;
     }
+    currentPortalRole = role;
     adminLoginFailures = 0;
     document.getElementById('adminPasswordInput').value = '';
     document.getElementById('gateNote').style.display = 'none';
     showView('mainPanel');
-    switchTab('overview');
+    applyPortalRoleUI();
+    switchTab(role === 'RM' ? 'admission' : 'overview');
   } catch(err){
     showAuthNote('gateNote', 'Could not reach the server. Check your internet connection and try again.');
   }
 }
 ['adminEmailInput','adminPasswordInput'].forEach(id => {
   document.getElementById(id).addEventListener('keydown', e => {
-    if(e.key === 'Enter') checkPasscode();
+    if(e.key === 'Enter') submitAdminGate();
   });
 });
 
@@ -3155,12 +3288,18 @@ async function confirmResetOtp(){
     const { error: updateError } = await supabaseClient.auth.updateUser({ password: newPassword });
     if(updateError){ showAuthNote('resetConfirmNote', 'Could not set new password: ' + errMsg(updateError)); return; }
     if(!(await verifyAdminSessionOrRejectAccess())){
-      showAuthNote('resetConfirmNote', 'This account does not have admin access.');
+      showAuthNote('resetConfirmNote', 'This account does not have admin or relation-manager access.');
       return;
     }
     resetEmailPending = '';
     showAuthNote('resetConfirmNote', 'Password reset successfully. You are now logged in.', 'success');
-    setTimeout(() => { showView('mainPanel'); switchTab('overview'); }, 900);
+    setTimeout(async () => {
+      const role = await verifyAdminSessionOrRejectAccess();
+      currentPortalRole = role;
+      showView('mainPanel');
+      applyPortalRoleUI();
+      switchTab(role === 'RM' ? 'admission' : 'overview');
+    }, 900);
   } catch(err){
     showAuthNote('resetConfirmNote', 'Could not reach the server. Check your internet connection and try again.');
   }
@@ -3177,9 +3316,12 @@ async function checkExistingSession(){
   try{
     const { data } = await supabaseClient.auth.getSession();
     if(data && data.session){
-      if(!(await verifyAdminSessionOrRejectAccess())) return;
+      const role = await verifyAdminSessionOrRejectAccess();
+      if(!role) return;
+      currentPortalRole = role;
       showView('mainPanel');
-      switchTab('overview');
+      applyPortalRoleUI();
+      switchTab(role === 'RM' ? 'admission' : 'overview');
     }
   } catch(err){ /* not logged in, stay on landing view */ }
 }
@@ -5600,7 +5742,7 @@ async function openFeePaymentHistory(id){
   const dialog = document.querySelector('#feeDialog .fee-dialog-inner');
   const { data, error } = await supabaseClient.from('fee_payments').select('*').eq('student_fee_id', id).order('payment_date', {ascending:false}).order('id', {ascending:false});
   if(error){ dialog.innerHTML += '<div class="empty">Could not load payment history: ' + escapeHtml(errMsg(error)) + '</div>'; return; }
-  const table = (data || []).length ? `<table><thead><tr><th>Date</th><th>Component</th><th>Amount</th><th>Mode</th><th>Receipt</th><th>Remarks</th></tr></thead><tbody>${data.map(p => `<tr><td>${escapeHtml(p.payment_date || '')}</td><td>${escapeHtml(p.component)}</td><td>${feeMoney(p.amount)}</td><td>${escapeHtml(p.mode || '—')}</td><td>${escapeHtml(p.receipt_no || '—')}</td><td>${escapeHtml(p.remarks || '—')}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">No payments have been recorded for this student.</div>';
+  const table = (data || []).length ? `<table><thead><tr><th>Date</th><th>Component</th><th>Amount</th><th>Mode</th><th>Receipt</th><th>Remarks</th></tr></thead><tbody>${data.map(p => `<tr><td>${escapeHtml(isoToDmy(p.payment_date) || '')}</td><td>${escapeHtml(p.component)}</td><td>${feeMoney(p.amount)}</td><td>${escapeHtml(p.mode || '—')}</td><td>${escapeHtml(p.receipt_no || '—')}</td><td>${escapeHtml(p.remarks || '—')}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">No payments have been recorded for this student.</div>';
   dialog.innerHTML = `<h2>Payment History — ${escapeHtml(record.student_name)}</h2><div class="table-container">${table}</div><div class="actions"><button class="btn-secondary" onclick="closeFeeDialog()">Close</button></div>`;
 }
 
@@ -5919,11 +6061,22 @@ function ttClassGroupModalHtml(groupId){
   const group = ttClassGroups.find(g => g.id === groupId);
   const sections = ttClasses.filter(c => c.class_group_id === groupId)
     .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0) || (a.section_name || '').localeCompare(b.section_name || ''));
-  const list = sections.length ? sections.map(c => `<div class="tt-chip">${escapeHtml(c.section_name || 'No section')}<span class="tt-chip-del" onclick="ttDeleteSection(ttDecodeValue('${ttEncodeValue(c.class_section)}'),${groupId})">&times;</span></div>`).join('')
+  const list = sections.length ? sections.map(c => `<div class="tt-chip">${escapeHtml(c.section_name || 'No section')}
+    <input type="number" min="0" class="tt-chip-seats" value="${c.capacity ?? ''}" placeholder="Seats" title="Seat capacity" onchange="ttSetCapacity(ttDecodeValue('${ttEncodeValue(c.class_section)}'), this.value, ${groupId})">
+    <span class="tt-chip-del" onclick="ttDeleteSection(ttDecodeValue('${ttEncodeValue(c.class_section)}'),${groupId})">&times;</span></div>`).join('')
     : '<div class="empty">No sections yet — add one below, or leave the name blank for a class with no sections.</div>';
-  return `<p class="fs-modal-sub">Sections belonging to <strong>${escapeHtml(group?.name || '')}</strong>. Each section gets its own timetable.</p>
+  return `<p class="fs-modal-sub">Sections belonging to <strong>${escapeHtml(group?.name || '')}</strong>. Each section gets its own timetable. Set a seat capacity so the Admission portal can show vacant seats.</p>
     <div id="ttSectionList" class="tt-chip-list">${list}</div>
     <div class="fee-actions" style="margin-top:14px;"><input type="text" id="ttNewSection" placeholder="e.g. A — leave blank for no sections"><button class="btn-primary" onclick="ttAddSection(${groupId})">Add Section</button></div>`;
+}
+async function ttSetCapacity(classSection, value, groupId){
+  const capacity = value === '' ? null : Math.max(0, parseInt(value, 10) || 0);
+  try{
+    const { error } = await supabaseClient.from('tt_classes').update({ capacity }).eq('class_section', classSection);
+    if(error) throw error;
+    const row = ttClasses.find(c => c.class_section === classSection);
+    if(row) row.capacity = capacity;
+  } catch(err){ alert('Could not save seat capacity: ' + errMsg(err)); }
 }
 function ttOpenClassGroup(groupId){
   const group = ttClassGroups.find(g => g.id === groupId);
@@ -7488,7 +7641,7 @@ async function attLoadStudentTracker(){
     const pct = total ? ((counts.PRESENT / total) * 100).toFixed(1) : '0.0';
     summary.innerHTML = attKpiBlock(counts, total, pct);
     area.innerHTML = rows.length
-      ? `<table class="tt-subs-table"><thead><tr><th>Date</th><th>Status</th><th>Remarks</th></tr></thead><tbody>${rows.map(r => `<tr><td>${escapeHtml(r.attendance_date)}</td><td>${escapeHtml(ATT_STATUS_LABELS[r.status]||r.status)}</td><td>${escapeHtml(r.remarks||'')}</td></tr>`).join('')}</tbody></table>`
+      ? `<table class="tt-subs-table"><thead><tr><th>Date</th><th>Status</th><th>Remarks</th></tr></thead><tbody>${rows.map(r => `<tr><td>${escapeHtml(isoToDmy(r.attendance_date))}</td><td>${escapeHtml(ATT_STATUS_LABELS[r.status]||r.status)}</td><td>${escapeHtml(r.remarks||'')}</td></tr>`).join('')}</tbody></table>`
       : '<div class="empty">No attendance recorded in this range.</div>';
   } catch(err){ area.innerHTML = '<div class="empty">Could not load: ' + escapeHtml(errMsg(err)) + '</div>'; }
 }
@@ -7628,7 +7781,7 @@ async function attLoadEmployeeTracker(){
     const pct = total ? (((counts.PRESENT + counts.LATE + counts.ON_DUTY) / total) * 100).toFixed(1) : '0.0';
     summary.innerHTML = attEmpKpiBlock(counts, total, pct);
     area.innerHTML = rows.length
-      ? `<table class="tt-subs-table"><thead><tr><th>Date</th><th>Status</th><th>Remarks</th></tr></thead><tbody>${rows.map(r => `<tr><td>${escapeHtml(r.attendance_date)}</td><td>${escapeHtml(ATT_EMP_STATUS_LABELS[r.status]||r.status)}</td><td>${escapeHtml(r.remarks||'')}</td></tr>`).join('')}</tbody></table>`
+      ? `<table class="tt-subs-table"><thead><tr><th>Date</th><th>Status</th><th>Remarks</th></tr></thead><tbody>${rows.map(r => `<tr><td>${escapeHtml(isoToDmy(r.attendance_date))}</td><td>${escapeHtml(ATT_EMP_STATUS_LABELS[r.status]||r.status)}</td><td>${escapeHtml(r.remarks||'')}</td></tr>`).join('')}</tbody></table>`
       : '<div class="empty">No attendance recorded in this range.</div>';
   } catch(err){ area.innerHTML = '<div class="empty">Could not load: ' + escapeHtml(errMsg(err)) + '</div>'; }
 }
@@ -7683,7 +7836,7 @@ async function attRunReport(){
       const { data, error } = await q;
       if(error) throw error;
       attReportHeaders = ['Date','Admission No','Student','Class','Status','Remarks'];
-      attReportRows = (data || []).map(r => [r.attendance_date, r.reg_no, r.student_name, r.class_section, ATT_STATUS_LABELS[r.status] || r.status, r.remarks || '']);
+      attReportRows = (data || []).map(r => [isoToDmy(r.attendance_date), r.reg_no, r.student_name, r.class_section, ATT_STATUS_LABELS[r.status] || r.status, r.remarks || '']);
     } else if(type === 'employee_summary'){
       const { data, error } = await supabaseClient.from('att_employee_attendance').select('*').gte('attendance_date', from).lte('attendance_date', to);
       if(error) throw error;
@@ -7703,7 +7856,7 @@ async function attRunReport(){
       const { data, error } = await supabaseClient.from('att_employee_attendance').select('*').gte('attendance_date', from).lte('attendance_date', to).order('attendance_date');
       if(error) throw error;
       attReportHeaders = ['Date','Staff','Status','Remarks'];
-      attReportRows = (data || []).map(r => [r.attendance_date, attStaffName(r.teacher_id), ATT_EMP_STATUS_LABELS[r.status] || r.status, r.remarks || '']);
+      attReportRows = (data || []).map(r => [isoToDmy(r.attendance_date), attStaffName(r.teacher_id), ATT_EMP_STATUS_LABELS[r.status] || r.status, r.remarks || '']);
     }
     if(!attReportRows.length){ area.innerHTML = '<div class="empty">No attendance records in this range.</div>'; return; }
     area.innerHTML = `<table class="tt-subs-table"><thead><tr>${attReportHeaders.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead><tbody>${attReportRows.map(row => `<tr>${row.map(cell => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
@@ -7734,8 +7887,8 @@ function renderAcademicYears(rows){
     const state = r.is_current ? 'Current' : (r.end_date < today ? 'Closed' : (r.start_date > today ? 'Upcoming' : 'Not marked current'));
     return `<tr>
       <td>${escapeHtml(r.year_label)}${r.is_current ? ' <span style="color:var(--accent);font-weight:700;">★</span>' : ''}</td>
-      <td>${escapeHtml(r.start_date)}</td>
-      <td>${escapeHtml(r.end_date)}</td>
+      <td>${escapeHtml(isoToDmy(r.start_date))}</td>
+      <td>${escapeHtml(isoToDmy(r.end_date))}</td>
       <td>${escapeHtml(state)}</td>
       <td>${escapeHtml(r.notes || '')}</td>
       <td>
@@ -7783,17 +7936,32 @@ async function ayDeleteYear(id, label){
 /* ============ ADMISSION: ENQUIRY → ADMISSION ============ */
 const ADM_STATUS_LABELS = { OPEN:'Open', FOLLOW_UP:'Follow-up', ADMITTED:'Admitted', CLOSED:'Closed' };
 let admEnquiries = [];
+let admClassGroups = [];
 let admReportHeaders = [], admReportRows = [];
 
+function isAdminRole(){ return currentPortalRole === 'ADMIN'; }
+
 function switchAdmView(view){
-  document.getElementById('admViewEnquiries').classList.toggle('active', view === 'enquiries');
-  document.getElementById('admViewReports').classList.toggle('active', view === 'reports');
+  if((view === 'tc' || view === 'access') && !isAdminRole()) view = 'enquiries';
+  ['Enquiries','Reports','Seats','TC','Access'].forEach(v => {
+    const btn = document.getElementById('admView' + v);
+    if(btn) btn.classList.toggle('active', v.toLowerCase() === view);
+  });
   document.getElementById('admEnquiriesView').style.display = view === 'enquiries' ? 'block' : 'none';
   document.getElementById('admReportsView').style.display = view === 'reports' ? 'block' : 'none';
+  document.getElementById('admSeatsView').style.display = view === 'seats' ? 'block' : 'none';
+  document.getElementById('admTCView').style.display = view === 'tc' ? 'block' : 'none';
+  document.getElementById('admAccessView').style.display = view === 'access' ? 'block' : 'none';
   if(view === 'reports'){
     const fromEl = document.getElementById('admReportFrom'), toEl = document.getElementById('admReportTo');
     if(!fromEl.value){ const today = new Date().toISOString().slice(0,10); fromEl.value = today.slice(0,7) + '-01'; toEl.value = today; }
     admRunReport();
+  } else if(view === 'seats'){
+    loadSeats();
+  } else if(view === 'tc' && isAdminRole()){
+    loadTCRecords();
+  } else if(view === 'access' && isAdminRole()){
+    loadRmAccounts();
   }
 }
 
@@ -7801,11 +7969,29 @@ async function loadEnquiries(){
   const area = document.getElementById('admEnquiriesArea');
   area.innerHTML = '<div class="loading">Loading enquiries...</div>';
   try{
-    const { data, error } = await supabaseClient.from('admission_enquiries').select('*').order('created_at', { ascending:false });
-    if(error) throw error;
-    admEnquiries = data || [];
+    const [enqRes, groupsRes] = await Promise.all([
+      supabaseClient.from('admission_enquiries').select('*').order('created_at', { ascending:false }),
+      supabaseClient.from('tt_class_groups').select('*').order('sort_order').order('name')
+    ]);
+    if(enqRes.error) throw enqRes.error;
+    admEnquiries = enqRes.data || [];
+    admClassGroups = groupsRes.data || [];
+    renderEnquiryKpis();
     renderEnquiriesTable();
   } catch(err){ area.innerHTML = '<div class="empty">Could not load enquiries: ' + escapeHtml(errMsg(err)) + '</div>'; }
+}
+function renderEnquiryKpis(){
+  const kpiArea = document.getElementById('admEnquiryKpis');
+  if(!kpiArea) return;
+  const counts = { OPEN:0, FOLLOW_UP:0, ADMITTED:0, CLOSED:0 };
+  admEnquiries.forEach(r => counts[r.status] = (counts[r.status] || 0) + 1);
+  const total = admEnquiries.length;
+  const pct = total ? ((counts.ADMITTED / total) * 100).toFixed(1) : '0.0';
+  kpiArea.innerHTML = `<div class="fee-kpi"><div class="label">Total Enquiries</div><div class="value">${total}</div></div>
+    <div class="fee-kpi"><div class="label">Open</div><div class="value">${counts.OPEN}</div></div>
+    <div class="fee-kpi"><div class="label">Follow-up</div><div class="value">${counts.FOLLOW_UP}</div></div>
+    <div class="fee-kpi"><div class="label">Admitted</div><div class="value">${counts.ADMITTED}</div></div>
+    <div class="fee-kpi"><div class="label">Conversion Rate</div><div class="value">${pct}%</div></div>`;
 }
 function renderEnquiriesTable(){
   const area = document.getElementById('admEnquiriesArea');
@@ -7816,20 +8002,26 @@ function renderEnquiriesTable(){
   if(statusFilter) rows = rows.filter(r => r.status === statusFilter);
   if(q) rows = rows.filter(r => (r.enquiry_no||'').toLowerCase().includes(q) || (r.candidate_name||'').toLowerCase().includes(q) || (r.mobile1||'').toLowerCase().includes(q) || (r.class_applying_for||'').toLowerCase().includes(q));
   if(!rows.length){ area.innerHTML = '<div class="empty">No enquiries match.</div>'; return; }
+  const admin = isAdminRole();
   const trs = rows.map(r => `<tr>
     <td>${escapeHtml(r.enquiry_no)}</td>
-    <td>${escapeHtml(r.enquiry_date || '')}</td>
+    <td>${escapeHtml(isoToDmy(r.enquiry_date) || '')}</td>
     <td>${escapeHtml(r.candidate_name)}</td>
     <td>${escapeHtml(r.class_applying_for || '—')}</td>
     <td>${escapeHtml(r.mobile1 || '—')}</td>
-    <td>${escapeHtml(ADM_STATUS_LABELS[r.status] || r.status)}</td>
-    <td>
+    <td><span class="adm-status-pill adm-status-${r.status.toLowerCase()}">${escapeHtml(ADM_STATUS_LABELS[r.status] || r.status)}</span></td>
+    <td class="adm-actions-cell">
       <button class="tab-btn" onclick="openEnquiryDialog(${r.id})">Edit</button>
-      ${r.status !== 'ADMITTED' ? `<button class="tab-btn" onclick="openConvertDialog(${r.id})">Convert to Admission</button>` : ''}
-      <button class="del-btn" onclick="deleteEnquiry(${r.id})">Delete</button>
+      <button class="tab-btn" onclick="openFollowupDialog(${r.id})">Follow-up Log</button>
+      ${admin && r.status !== 'ADMITTED' ? `<button class="tab-btn" onclick="openConvertDialog(${r.id})">Convert to Admission</button>` : ''}
+      ${admin ? `<button class="del-btn" onclick="deleteEnquiry(${r.id})">Delete</button>` : ''}
     </td>
   </tr>`).join('');
   area.innerHTML = `<table class="tt-subs-table"><thead><tr><th>Enquiry No.</th><th>Date</th><th>Candidate</th><th>Class Applying</th><th>Mobile</th><th>Status</th><th></th></tr></thead><tbody>${trs}</tbody></table>`;
+}
+function admClassOptions(selected){
+  const opts = admClassGroups.map(g => `<option value="${escapeHtml(g.name)}" ${g.name === selected ? 'selected' : ''}>${escapeHtml(g.name)}</option>`).join('');
+  return `<option value="">Select class</option>${opts}`;
 }
 function openEnquiryDialog(id){
   const r = id ? admEnquiries.find(x => x.id === id) : null;
@@ -7846,7 +8038,7 @@ function openEnquiryDialog(id){
     ${field('Candidate Name','candidate_name')}
     ${field('Date of Birth','dob','date')}
     <div class="field"><label>Gender</label><select id="enq_gender">${genderOptions}</select></div>
-    ${field('Class Applying For','class_applying_for')}
+    <div class="field"><label>Class Applying For</label><select id="enq_class_applying_for">${admClassOptions(r?.class_applying_for)}</select></div>
     ${field('Father Name','father_name')}
     ${field('Mother Name','mother_name')}
     ${field('Mobile 1','mobile1','tel')}
@@ -7863,9 +8055,10 @@ function openEnquiryDialog(id){
   if(!id){ const d = document.getElementById('enq_enquiry_date'); if(d) d.value = new Date().toISOString().slice(0,10); }
 }
 async function saveEnquiry(id){
-  const keys = ['candidate_name','dob','class_applying_for','father_name','mother_name','mobile1','mobile2','email','previous_school','source','enquiry_date','follow_up_date'];
+  const keys = ['candidate_name','dob','father_name','mother_name','mobile1','mobile2','email','previous_school','source','enquiry_date','follow_up_date'];
   const record = {};
   keys.forEach(k => { const el = document.getElementById('enq_'+k); if(el) record[k] = el.value.trim() || null; });
+  record.class_applying_for = document.getElementById('enq_class_applying_for')?.value || null;
   record.gender = document.getElementById('enq_gender')?.value || null;
   record.address = document.getElementById('enq_address')?.value.trim() || null;
   record.remarks = document.getElementById('enq_remarks')?.value.trim() || null;
@@ -7925,6 +8118,55 @@ async function convertEnquiry(id){
     await loadEnquiries();
   } catch(err){ alert('Could not convert to admission: ' + errMsg(err)); }
 }
+
+/* ---- Follow-up log (append-only; both Admin and RM can add, only Admin can delete) ---- */
+async function openFollowupDialog(id){
+  const r = admEnquiries.find(x => x.id === id); if(!r) return;
+  openFeeDialog('Follow-up Log — ' + escapeHtml(r.candidate_name), '<div class="loading">Loading follow-ups...</div>');
+  await renderFollowupDialog(id);
+}
+async function renderFollowupDialog(id){
+  const r = admEnquiries.find(x => x.id === id); if(!r) return;
+  const dialog = document.querySelector('#feeDialog .fee-dialog-inner');
+  if(!dialog) return;
+  try{
+    const { data, error } = await supabaseClient.from('admission_enquiry_followups').select('*').eq('enquiry_id', id).order('followup_date', { ascending:false }).order('id', { ascending:false });
+    if(error) throw error;
+    const admin = isAdminRole();
+    const rows = data || [];
+    const list = rows.length ? `<table class="tt-subs-table"><thead><tr><th>Date</th><th>Remark</th>${admin ? '<th></th>' : ''}</tr></thead><tbody>${rows.map(f => `<tr><td>${escapeHtml(isoToDmy(f.followup_date))}</td><td>${escapeHtml(f.remarks)}</td>${admin ? `<td><button class="del-btn" onclick="deleteFollowup(${f.id},${id})">Delete</button></td>` : ''}</tr>`).join('')}</tbody></table>` : '<div class="empty">No follow-ups logged yet.</div>';
+    dialog.innerHTML = `<h2>Follow-up Log — ${escapeHtml(r.candidate_name)}</h2>
+      <p class="fs-modal-sub">Enquiry ${escapeHtml(r.enquiry_no)} &middot; ${escapeHtml(ADM_STATUS_LABELS[r.status] || r.status)}</p>
+      <div class="fee-form-grid">
+        <div class="field"><label>Follow-up Date</label><input id="fu_date" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
+        <div class="field full"><label>Remark</label><textarea id="fu_remarks" placeholder="What was discussed / next step"></textarea></div>
+      </div>
+      <div class="actions" style="margin-bottom:16px;"><button class="btn-primary" onclick="addFollowup(${id})">Add Follow-up</button></div>
+      <div class="table-container">${list}</div>
+      <div class="actions"><button class="btn-secondary" onclick="closeFeeDialog()">Close</button></div>`;
+  } catch(err){ dialog.innerHTML = '<div class="empty">Could not load follow-ups: ' + escapeHtml(errMsg(err)) + '</div>'; }
+}
+async function addFollowup(id){
+  const followup_date = document.getElementById('fu_date').value;
+  const remarks = document.getElementById('fu_remarks').value.trim();
+  if(!remarks){ alert('Enter a remark for this follow-up.'); return; }
+  try{
+    const { data: user } = await supabaseClient.auth.getUser();
+    const { error } = await supabaseClient.from('admission_enquiry_followups').insert({ enquiry_id: id, followup_date: followup_date || null, remarks, created_by: user?.user?.email || null });
+    if(error) throw error;
+    await renderFollowupDialog(id);
+  } catch(err){ alert('Could not save follow-up: ' + errMsg(err)); }
+}
+async function deleteFollowup(followupId, enquiryId){
+  if(!confirm('Delete this follow-up entry?')) return;
+  try{
+    const { error } = await supabaseClient.from('admission_enquiry_followups').delete().eq('id', followupId);
+    if(error) throw error;
+    await renderFollowupDialog(enquiryId);
+  } catch(err){ alert('Could not delete follow-up: ' + errMsg(err)); }
+}
+
+/* ---- Reports ---- */
 async function admRunReport(){
   const area = document.getElementById('admReportArea');
   const kpiArea = document.getElementById('admReportKpis');
@@ -7951,7 +8193,7 @@ async function admRunReport(){
       <div class="fee-kpi"><div class="label">Closed</div><div class="value">${counts.CLOSED}</div></div>
       <div class="fee-kpi"><div class="label">Conversion Rate</div><div class="value">${pct}%</div></div>`;
     admReportHeaders = ['Enquiry No','Date','Candidate','Class Applying','Mobile','Status','Admitted Into','Follow-up Date','Remarks'];
-    admReportRows = rows.map(r => [r.enquiry_no, r.enquiry_date || '', r.candidate_name, r.class_applying_for || '', r.mobile1 || '', ADM_STATUS_LABELS[r.status] || r.status, r.student_fees?.class_section || '', r.follow_up_date || '', r.remarks || '']);
+    admReportRows = rows.map(r => [r.enquiry_no, isoToDmy(r.enquiry_date) || '', r.candidate_name, r.class_applying_for || '', r.mobile1 || '', ADM_STATUS_LABELS[r.status] || r.status, r.student_fees?.class_section || '', isoToDmy(r.follow_up_date) || '', r.remarks || '']);
     area.innerHTML = rows.length
       ? `<table class="tt-subs-table"><thead><tr>${admReportHeaders.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead><tbody>${admReportRows.map(row => `<tr>${row.map(cell => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`).join('')}</tbody></table>`
       : '<div class="empty">No enquiries in this range.</div>';
@@ -7962,6 +8204,168 @@ function admExportReport(){
   const csv = '\uFEFF' + [admReportHeaders, ...admReportRows].map(row => row.map(csvEscape).join(',')).join('\n');
   const url = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'}));
   const a = document.createElement('a'); a.href = url; a.download = `admission_report_${new Date().toISOString().slice(0,10)}.csv`; a.click(); URL.revokeObjectURL(url);
+}
+
+/* ---- Seats & Capacity ---- */
+async function loadSeats(){
+  const area = document.getElementById('admSeatsArea');
+  const kpiArea = document.getElementById('admSeatsKpis');
+  area.innerHTML = '<div class="loading">Loading seats...</div>';
+  try{
+    const { data, error } = await supabaseClient.rpc('get_class_seat_summary');
+    if(error) throw error;
+    const rows = data || [];
+    const totalCapacity = rows.reduce((sum, r) => sum + (r.capacity ?? 0), 0);
+    const totalEnrolled = rows.reduce((sum, r) => sum + Number(r.enrolled || 0), 0);
+    const totalVacant = rows.reduce((sum, r) => sum + (r.capacity != null ? Math.max(0, r.vacant) : 0), 0);
+    kpiArea.innerHTML = `<div class="fee-kpi"><div class="label">Total Capacity</div><div class="value">${totalCapacity || '—'}</div></div>
+      <div class="fee-kpi"><div class="label">Total Enrolled</div><div class="value">${totalEnrolled}</div></div>
+      <div class="fee-kpi"><div class="label">Total Vacant</div><div class="value">${totalCapacity ? totalVacant : '—'}</div></div>`;
+    area.innerHTML = rows.length ? `<table class="tt-subs-table"><thead><tr><th>Class &amp; Section</th><th>Capacity</th><th>Enrolled</th><th>Vacant</th></tr></thead><tbody>${rows.map(r => {
+      const vacant = r.capacity == null ? '—' : r.vacant;
+      const full = r.capacity != null && r.vacant <= 0;
+      return `<tr><td>${escapeHtml(r.class_section)}</td><td>${r.capacity ?? '—'}</td><td>${r.enrolled}</td><td>${full ? `<span style="color:#b1392d;font-weight:700;">${escapeHtml(String(vacant))}</span>` : escapeHtml(String(vacant))}</td></tr>`;
+    }).join('')}</tbody></table>` : '<div class="empty">No classes set up yet.</div>';
+  } catch(err){ area.innerHTML = '<div class="empty">Could not load seats: ' + escapeHtml(errMsg(err)) + '</div>'; }
+}
+
+/* ============ TRANSFER CERTIFICATES (admin only) ============ */
+let tcRecords = [];
+async function loadTCRecords(){
+  const area = document.getElementById('tcTableArea');
+  area.innerHTML = '<div class="loading">Loading transfer certificates...</div>';
+  try{
+    const { data, error } = await supabaseClient.from('tc_records').select('*').order('created_at', { ascending:false });
+    if(error) throw error;
+    tcRecords = data || [];
+    renderTCTable();
+  } catch(err){ area.innerHTML = '<div class="empty">Could not load transfer certificates: ' + escapeHtml(errMsg(err)) + '</div>'; }
+}
+function renderTCTable(){
+  const area = document.getElementById('tcTableArea');
+  if(!area) return;
+  const q = (document.getElementById('tcSearchBox')?.value || '').toLowerCase();
+  let rows = tcRecords;
+  if(q) rows = rows.filter(r => (r.tc_no||'').toLowerCase().includes(q) || (r.reg_no||'').toLowerCase().includes(q) || (r.student_name||'').toLowerCase().includes(q));
+  if(!rows.length){ area.innerHTML = '<div class="empty">No transfer certificates issued yet.</div>'; return; }
+  area.innerHTML = `<table class="tt-subs-table"><thead><tr><th>TC No.</th><th>Admission No.</th><th>Student</th><th>Class</th><th>Date of Leaving</th><th>Issued</th><th></th></tr></thead><tbody>${rows.map(r => `<tr>
+    <td>${escapeHtml(r.tc_no)}</td><td>${escapeHtml(r.reg_no)}</td><td>${escapeHtml(r.student_name)}</td><td>${escapeHtml(r.class_section)}</td>
+    <td>${escapeHtml(isoToDmy(r.date_of_leaving))}</td><td>${escapeHtml(isoToDmy(r.issue_date))}</td>
+    <td><button class="tab-btn" onclick="printTC(${r.id})">Print</button></td>
+  </tr>`).join('')}</tbody></table>`;
+}
+async function openIssueTCDialog(){
+  openFeeDialog('Issue Transfer Certificate', '<div class="loading">Loading students...</div>');
+  const dialog = document.querySelector('#feeDialog .fee-dialog-inner');
+  try{
+    const { data, error } = await supabaseClient.from('student_fees').select('id, reg_no, student_name, class_section').order('student_name');
+    if(error) throw error;
+    const studentOptions = (data || []).map(s => `<option value="${s.id}">${escapeHtml(s.reg_no)} — ${escapeHtml(s.student_name)} (${escapeHtml(s.class_section)})</option>`).join('');
+    dialog.innerHTML = `<h2>Issue Transfer Certificate</h2>
+      <div class="fee-form-grid">
+        <div class="field full"><label>Student</label><select id="tc_student_fee_id"><option value="">Select student</option>${studentOptions}</select></div>
+        <div class="field"><label>Date of Leaving</label><input id="tc_date_of_leaving" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
+        <div class="field"><label>Conduct</label><input id="tc_conduct" type="text" value="Good"></div>
+        <div class="field full"><label>Reason for Leaving</label><input id="tc_reason" type="text" placeholder="e.g. Parent transferred / relocation"></div>
+        <div class="field full"><label>Remarks</label><textarea id="tc_remarks"></textarea></div>
+      </div>
+      <div class="actions"><button class="btn-secondary" onclick="closeFeeDialog()">Cancel</button><button class="btn-primary" onclick="issueTC()">Issue Certificate</button></div>`;
+  } catch(err){ dialog.innerHTML = '<div class="empty">Could not load students: ' + escapeHtml(errMsg(err)) + '</div>'; }
+}
+async function issueTC(){
+  const student_fee_id = document.getElementById('tc_student_fee_id').value;
+  const date_of_leaving = document.getElementById('tc_date_of_leaving').value;
+  const conduct = document.getElementById('tc_conduct').value.trim() || 'Good';
+  const reason = document.getElementById('tc_reason').value.trim() || null;
+  const remarks = document.getElementById('tc_remarks').value.trim() || null;
+  if(!student_fee_id || !date_of_leaving){ alert('Select a student and a date of leaving.'); return; }
+  try{
+    const { data, error } = await supabaseClient.rpc('issue_transfer_certificate', { p_student_fee_id: Number(student_fee_id), p_date_of_leaving: date_of_leaving, p_reason_for_leaving: reason, p_conduct: conduct, p_remarks: remarks });
+    if(error) throw error;
+    closeFeeDialog();
+    await loadTCRecords();
+    if(data?.id) printTC(data.id);
+  } catch(err){ alert('Could not issue transfer certificate: ' + errMsg(err)); }
+}
+function tcField(en, hi, val){
+  return `<tr><th>${escapeHtml(en)}<br><span class="tc-hi">${hi}</span></th><td>${escapeHtml(val || '—')}</td></tr>`;
+}
+function printTC(id){
+  const r = tcRecords.find(x => x.id === id); if(!r) return;
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head><title>Transfer Certificate ${escapeHtml(r.tc_no)}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;600;700&family=Noto+Serif:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+      body{font-family:'Noto Serif',Georgia,serif;padding:36px;color:#111;}
+      .tc-hi{font-family:'Noto Sans Devanagari',sans-serif;color:#444;font-weight:400;}
+      h1{font-size:20px;text-align:center;margin:0 0 2px;}
+      .tc-hi-h1{font-family:'Noto Sans Devanagari',sans-serif;font-size:17px;text-align:center;margin:0 0 4px;color:#333;}
+      .tc-sub{text-align:center;font-size:12px;color:#555;margin-bottom:4px;}
+      .tc-no{text-align:right;font-weight:700;margin-bottom:10px;}
+      hr{border:none;border-top:2px solid #333;margin:14px 0 20px;}
+      table{width:100%;border-collapse:collapse;}
+      th,td{text-align:left;padding:9px 10px;border-bottom:1px solid #ddd;font-size:13px;vertical-align:top;}
+      th{width:40%;font-weight:600;color:#222;}
+      .tc-sign{display:flex;justify-content:space-between;margin-top:60px;font-size:13px;}
+      .tc-sign div{text-align:center;width:200px;border-top:1px solid #333;padding-top:6px;}
+    </style></head><body>
+    <h1>Mount Litera Zee School, Jhansi</h1>
+    <div class="tc-sub">School Transfer Certificate</div>
+    <div class="tc-hi-h1">स्थानांतरण प्रमाण पत्र</div>
+    <div class="tc-no">TC No: ${escapeHtml(r.tc_no)}</div>
+    <hr>
+    <table>
+      ${tcField('Admission No.', 'प्रवेश संख्या', r.reg_no)}
+      ${tcField("Student's Name", 'छात्र का नाम', r.student_name)}
+      ${tcField("Father's Name", 'पिता का नाम', r.father_name)}
+      ${tcField("Mother's Name", 'माता का नाम', r.mother_name)}
+      ${tcField('Date of Birth', 'जन्म तिथि', isoToDmy(r.dob))}
+      ${tcField('Class', 'कक्षा', r.class_section)}
+      ${tcField('Date of Admission', 'प्रवेश तिथि', isoToDmy(r.admission_date))}
+      ${tcField('Date of Leaving', 'छोड़ने की तिथि', isoToDmy(r.date_of_leaving))}
+      ${tcField('Reason for Leaving', 'छोड़ने का कारण', r.reason_for_leaving)}
+      ${tcField('Conduct', 'आचरण', r.conduct)}
+      ${tcField('Remarks', 'टिप्पणी', r.remarks)}
+      ${tcField('Date of Issue', 'जारी करने की तिथि', isoToDmy(r.issue_date))}
+    </table>
+    <div class="tc-sign">
+      <div>Class Teacher<br><span class="tc-hi">कक्षा शिक्षक</span></div>
+      <div>Principal<br><span class="tc-hi">प्राचार्य</span></div>
+    </div>
+    <script>window.onload = () => setTimeout(() => window.print(), 300);<\/script>
+    </body></html>`);
+  win.document.close();
+}
+
+/* ============ ACCESS: RELATION MANAGER MANAGEMENT (admin only) ============ */
+async function loadRmAccounts(){
+  const area = document.getElementById('rmAccessArea');
+  area.innerHTML = '<div class="loading">Loading...</div>';
+  try{
+    const { data, error } = await supabaseClient.rpc('list_rm_accounts');
+    if(error) throw error;
+    const rows = data || [];
+    area.innerHTML = rows.length ? `<table class="tt-subs-table"><thead><tr><th>Email</th><th></th></tr></thead><tbody>${rows.map(r => `<tr><td>${escapeHtml(r.email)}</td><td><button class="del-btn" onclick="rmRevokeAccess('${escapeHtml(r.email).replace(/'/g,"\\'")}')">Revoke</button></td></tr>`).join('')}</tbody></table>` : '<div class="empty">No relation managers added yet.</div>';
+  } catch(err){ area.innerHTML = '<div class="empty">Could not load access list: ' + escapeHtml(errMsg(err)) + '</div>'; }
+}
+async function rmGrantAccess(){
+  const email = document.getElementById('rmNewEmail').value.trim();
+  if(!email){ alert('Enter the relation manager\'s email.'); return; }
+  try{
+    const { error } = await supabaseClient.rpc('grant_rm_access', { p_email: email });
+    if(error) throw error;
+    document.getElementById('rmNewEmail').value = '';
+    await loadRmAccounts();
+  } catch(err){ alert('Could not grant access: ' + errMsg(err)); }
+}
+async function rmRevokeAccess(email){
+  if(!confirm(`Revoke Admission portal access for ${email}?`)) return;
+  try{
+    const { error } = await supabaseClient.rpc('revoke_rm_access', { p_email: email });
+    if(error) throw error;
+    await loadRmAccounts();
+  } catch(err){ alert('Could not revoke access: ' + errMsg(err)); }
 }
 </script>
 </body>
