@@ -4825,6 +4825,68 @@ async function resendStaffMail(record){
   }
 }
 
+/* Lets the admin set/update a staff member's Training Hours in the Staff Data Bank.
+   On save: writes training_hours to Supabase, then automatically emails the staff
+   member their updated details via the send-oasis-email edge function. */
+async function editTrainingHours(record){
+  const current = record.trainingHours || '';
+  const input = prompt('Training hours for ' + (record.fullName || 'this staff member') + ':', current);
+  if(input === null) return; // cancelled
+  const trainingHours = input.trim();
+  if(trainingHours === current.trim()){ return; }
+
+  try{
+    const { error } = await supabaseClient.from('staff_records')
+      .update({ training_hours: trainingHours })
+      .eq('id', record._key);
+    if(error) throw error;
+
+    // Reflect the change locally without a full reload.
+    const idx = allRecords.findIndex(r => r._key === record._key);
+    if(idx !== -1) allRecords[idx].trainingHours = trainingHours;
+    renderTable();
+
+    if(!record.emailId){
+      alert('Training hours saved. Note: this record has no email address on file, so no email was sent.');
+      return;
+    }
+
+    // Automatically email the staff member their updated record.
+    const formData = {};
+    Object.keys(record).forEach(k => {
+      if(['_key','fullName','emailId','oasisId'].includes(k)) return;
+      formData[k] = record[k];
+    });
+    formData.trainingHours = trainingHours;
+
+    const res = await fetch(SUPABASE_URL + '/functions/v1/send-oasis-email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+        'apikey': SUPABASE_ANON_KEY
+      },
+      body: JSON.stringify({
+        fullName: record.fullName || '',
+        emailId: record.emailId,
+        oasisId: record.oasisId || '',
+        trainingHoursUpdate: true,
+        formData: formData
+      })
+    });
+    if(!res.ok){
+      const t = await res.text();
+      console.error('Training hours email failed:', t);
+      alert('Training hours saved, but the notification email could not be sent: ' + t);
+      return;
+    }
+    alert('Training hours saved and emailed to ' + record.emailId + '.');
+  } catch(err){
+    console.error(err);
+    alert('Could not save training hours: ' + errMsg(err));
+  }
+}
+
 function downloadStaffCSV(){
   const obj = collectStaffData();
   const headers = [
@@ -4999,7 +5061,7 @@ function mapRow(row, tab){
       qualification: row.qualification, bed: row.bed, dateOfJoining: row.date_of_joining,
       totalExperience: row.total_experience, subjectsTaught: row.subjects_taught, classTaught: row.class_taught,
       oasisId: row.oasis_id, accountNumber: row.account_number, ifscCode: row.ifsc_code,
-      aadharNumber: row.aadhar_number, panNumber: row.pan_number,
+      aadharNumber: row.aadhar_number, panNumber: row.pan_number, trainingHours: row.training_hours,
       photoFile: row.photo_path, aadharCardFrontFile: row.aadhar_card_front_path, aadharCardBackFile: row.aadhar_card_back_path,
       panCardFile: row.pan_card_path,
       passbookFile: row.passbook_path, submittedAt: row.submitted_at
@@ -5235,7 +5297,7 @@ function renderTable(){
     ['fullName','Full Name'], ['designation','Designation'], ['gender','Gender'], ['dob','DOB'],
     ['contactNumber','Contact'], ['qualification','Qualification'], ['bed','B.Ed'],
     ['dateOfJoining','Joined'], ['subjectsTaught','Subjects'], ['classTaught','Class'],
-    ['totalExperience','Experience'], ['aadharCardFrontFile','Aadhar (F)'], ['aadharCardBackFile','Aadhar (B)'], ['panCardFile','PAN'],
+    ['totalExperience','Experience'], ['trainingHours','Training Hours'], ['aadharCardFrontFile','Aadhar (F)'], ['aadharCardBackFile','Aadhar (B)'], ['panCardFile','PAN'],
     ['submittedAt','Submitted At']
   ];
 
@@ -5252,6 +5314,7 @@ function renderTable(){
     cols.forEach(([key]) => {
       let val = r[key] || '';
       if(key === 'submittedAt' && val){ val = new Date(val).toLocaleString(); }
+      if(key === 'trainingHours'){ val = val ? escapeHtml(val) : '<span class="badge">not set</span>'; }
       if(fileKeys.includes(key)){
         val = val ? `<span class="badge" style="cursor:pointer;text-decoration:underline;" onclick='viewDoc(${JSON.stringify(val)})'>view</span>` : '<span class="badge">missing</span>';
       }
@@ -5259,6 +5322,7 @@ function renderTable(){
     });
     let actionBtns = `<button class="tab-btn" onclick='printRecord(${JSON.stringify(r)})'>Print</button>`;
     if(currentTab === 'staff'){
+      actionBtns += ` <button class="tab-btn" onclick='editTrainingHours(${JSON.stringify(r)})'>${r.trainingHours ? 'Edit' : 'Add'} Training Hours</button>`;
       actionBtns += ` <button class="tab-btn" onclick='resendStaffMail(${JSON.stringify(r)})'>Resend Mail</button>`;
     }
     actionBtns += ` <button class="del-btn" onclick="deleteRecord('${r._key}')">Delete</button>`;
@@ -5382,12 +5446,12 @@ function getExportSpec(){
         'Full Name','Designation','Gender',"Father's/Husband's Name",'Relation','Date of Birth','Contact Number',
         "Father's/Husband's Number",'Email ID','Current Address','Full Address','Highest Qualification',
         'B.Ed','Date of Joining','Total Experience','Subjects Taught','Class Taught','CBSE Oasis ID',
-        'Account Number','IFSC Code','Aadhar Number','PAN Number','Photo File','Aadhar Card Front File','Aadhar Card Back File','PAN Card File','Passbook File','Submitted At'
+        'Account Number','IFSC Code','Aadhar Number','PAN Number','Training Hours','Photo File','Aadhar Card Front File','Aadhar Card Back File','PAN Card File','Passbook File','Submitted At'
       ],
       keys: [
         'fullName','designation','gender','parentName','parentRelation','dob','contactNumber','parentContactNumber','emailId',
         'currentAddress','fullAddress','qualification','bed','dateOfJoining','totalExperience',
-        'subjectsTaught','classTaught','oasisId','accountNumber','ifscCode','aadharNumber','panNumber',
+        'subjectsTaught','classTaught','oasisId','accountNumber','ifscCode','aadharNumber','panNumber','trainingHours',
         'photoFile','aadharCardFrontFile','aadharCardBackFile','panCardFile','passbookFile','submittedAt'
       ],
       baseName: 'staff_databank'
