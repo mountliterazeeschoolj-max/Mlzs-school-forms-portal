@@ -2295,6 +2295,7 @@
         <div class="fee-actions">
           <input type="text" id="tcSearchBox" placeholder="Search TC no., admission no. or student" oninput="debounce('tcSearch', renderTCTable, 180)">
           <button class="btn-primary" onclick="openIssueTCDialog()">Issue Transfer Certificate</button>
+          <button class="btn-secondary" onclick="openTCSettingsDialog()">Book/Serial No.</button>
           <button class="btn-secondary" onclick="loadTCRecords()">Refresh</button>
         </div>
         <div class="table-container"><div id="tcTableArea"><div class="loading">Loading transfer certificates...</div></div></div>
@@ -8322,80 +8323,199 @@ async function openIssueTCDialog(){
   openFeeDialog('Issue Transfer Certificate', '<div class="loading">Loading students...</div>');
   const dialog = document.querySelector('#feeDialog .fee-dialog-inner');
   try{
-    const { data, error } = await supabaseClient.from('student_fees').select('id, reg_no, student_name, class_section').order('student_name');
+    const [{ data, error }, { data: settings, error: sErr }] = await Promise.all([
+      supabaseClient.from('student_fees').select('id, reg_no, student_name, class_section, category').order('student_name'),
+      supabaseClient.rpc('get_tc_settings')
+    ]);
     if(error) throw error;
-    const studentOptions = (data || []).map(s => `<option value="${s.id}">${escapeHtml(s.reg_no)} — ${escapeHtml(s.student_name)} (${escapeHtml(s.class_section)})</option>`).join('');
+    if(sErr) throw sErr;
+    const studentOptions = (data || []).map(s => `<option value="${s.id}" data-category="${escapeHtml(s.category||'')}">${escapeHtml(s.reg_no)} — ${escapeHtml(s.student_name)} (${escapeHtml(s.class_section)})</option>`).join('');
+    const bookNo = settings?.book_no || '1';
+    const serialNo = settings?.next_serial_no || 1;
     dialog.innerHTML = `<h2>Issue Transfer Certificate</h2>
+      <div class="note" style="margin:0 0 14px;">Book No. <b>${escapeHtml(bookNo)}</b> &nbsp;•&nbsp; This will be S. No. <b>${escapeHtml(String(serialNo))}</b> (assigned automatically on issue)</div>
       <div class="fee-form-grid">
         <div class="field full"><label>Student</label><select id="tc_student_fee_id"><option value="">Select student</option>${studentOptions}</select></div>
         <div class="field"><label>Date of Leaving</label><input id="tc_date_of_leaving" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
-        <div class="field"><label>Conduct</label><input id="tc_conduct" type="text" value="Good"></div>
+        <div class="field"><label>Date of Admission (1st) with Class</label><input id="tc_first_admission_class" type="text" placeholder="e.g. Class I"></div>
+        <div class="field"><label>Nationality</label><input id="tc_nationality" type="text" value="Indian"></div>
+        <div class="field"><label>Category (SC/ST/OBC/General)</label><input id="tc_category" type="text"></div>
+        <div class="field"><label>DOB in words</label><input id="tc_dob_words" type="text" placeholder="e.g. Tenth April Two Thousand Ten"></div>
+        <div class="field"><label>DOB proof submitted at admission</label><input id="tc_dob_proof" type="text" placeholder="e.g. Birth Certificate"></div>
+        <div class="field"><label>Class last studied (in words)</label><input id="tc_last_class_words" type="text"></div>
+        <div class="field full"><label>School/Board exam last taken with result</label><input id="tc_last_exam_result" type="text"></div>
+        <div class="field"><label>Whether failed</label><input id="tc_whether_failed" type="text" value="No"></div>
+        <div class="field full"><label>Subjects offered</label><input id="tc_subjects_offered" type="text"></div>
+        <div class="field"><label>Qualified for promotion</label><input id="tc_qualified_for_promotion" type="text" value="Yes"></div>
+        <div class="field"><label>Total working days in session</label><input id="tc_total_working_days" type="number"></div>
+        <div class="field"><label>Total present days</label><input id="tc_total_present_days" type="number"></div>
+        <div class="field"><label>Attendance %</label><input id="tc_attendance_percentage" type="number" step="0.01"></div>
+        <div class="field"><label>Dues paid</label><input id="tc_dues_paid" type="text" value="Yes"></div>
+        <div class="field"><label>Fee concession availed</label><input id="tc_fee_concession" type="text" value="No"></div>
+        <div class="field"><label>NCC Cadet / Scout details</label><input id="tc_ncc_scout" type="text"></div>
+        <div class="field"><label>School category</label><input id="tc_school_category" type="text" value="Independent"></div>
+        <div class="field full"><label>Games / extra-curricular activities</label><input id="tc_games_played" type="text"></div>
+        <div class="field"><label>Date of application for certificate</label><input id="tc_application_date" type="date"></div>
+        <div class="field"><label>Date struck off rolls</label><input id="tc_struck_off_date" type="date"></div>
+        <div class="field"><label>Registration No. (Class IX-XII)</label><input id="tc_registration_no" type="text"></div>
+        <div class="field"><label>General conduct</label><input id="tc_conduct" type="text" value="Good"></div>
         <div class="field full"><label>Reason for Leaving</label><input id="tc_reason" type="text" placeholder="e.g. Parent transferred / relocation"></div>
-        <div class="field full"><label>Remarks</label><textarea id="tc_remarks"></textarea></div>
+        <div class="field full"><label>Any other remark</label><textarea id="tc_remarks"></textarea></div>
       </div>
       <div class="actions"><button class="btn-secondary" onclick="closeFeeDialog()">Cancel</button><button class="btn-primary" onclick="issueTC()">Issue Certificate</button></div>`;
+    document.getElementById('tc_student_fee_id').addEventListener('change', (e) => {
+      const cat = e.target.selectedOptions[0]?.dataset.category || '';
+      if(cat) document.getElementById('tc_category').value = cat;
+    });
   } catch(err){ dialog.innerHTML = '<div class="empty">Could not load students: ' + escapeHtml(errMsg(err)) + '</div>'; }
 }
 async function issueTC(){
+  const val = (id) => document.getElementById(id).value.trim();
   const student_fee_id = document.getElementById('tc_student_fee_id').value;
-  const date_of_leaving = document.getElementById('tc_date_of_leaving').value;
-  const conduct = document.getElementById('tc_conduct').value.trim() || 'Good';
-  const reason = document.getElementById('tc_reason').value.trim() || null;
-  const remarks = document.getElementById('tc_remarks').value.trim() || null;
+  const date_of_leaving = val('tc_date_of_leaving');
   if(!student_fee_id || !date_of_leaving){ alert('Select a student and a date of leaving.'); return; }
+  const params = {
+    p_student_fee_id: Number(student_fee_id),
+    p_date_of_leaving: date_of_leaving,
+    p_reason_for_leaving: val('tc_reason') || null,
+    p_conduct: val('tc_conduct') || 'Good',
+    p_remarks: val('tc_remarks') || null,
+    p_nationality: val('tc_nationality') || 'Indian',
+    p_category: val('tc_category') || null,
+    p_dob_words: val('tc_dob_words') || null,
+    p_dob_proof: val('tc_dob_proof') || null,
+    p_first_admission_class: val('tc_first_admission_class') || null,
+    p_last_class_words: val('tc_last_class_words') || null,
+    p_last_exam_result: val('tc_last_exam_result') || null,
+    p_whether_failed: val('tc_whether_failed') || 'No',
+    p_subjects_offered: val('tc_subjects_offered') || null,
+    p_qualified_for_promotion: val('tc_qualified_for_promotion') || 'Yes',
+    p_total_working_days: val('tc_total_working_days') ? Number(val('tc_total_working_days')) : null,
+    p_total_present_days: val('tc_total_present_days') ? Number(val('tc_total_present_days')) : null,
+    p_attendance_percentage: val('tc_attendance_percentage') ? Number(val('tc_attendance_percentage')) : null,
+    p_dues_paid: val('tc_dues_paid') || 'Yes',
+    p_fee_concession: val('tc_fee_concession') || 'No',
+    p_ncc_scout: val('tc_ncc_scout') || null,
+    p_school_category: val('tc_school_category') || 'Independent',
+    p_games_played: val('tc_games_played') || null,
+    p_application_date: val('tc_application_date') || null,
+    p_struck_off_date: val('tc_struck_off_date') || null,
+    p_registration_no: val('tc_registration_no') || null
+  };
   try{
-    const { data, error } = await supabaseClient.rpc('issue_transfer_certificate', { p_student_fee_id: Number(student_fee_id), p_date_of_leaving: date_of_leaving, p_reason_for_leaving: reason, p_conduct: conduct, p_remarks: remarks });
+    const { data, error } = await supabaseClient.rpc('issue_transfer_certificate', params);
     if(error) throw error;
     closeFeeDialog();
     await loadTCRecords();
     if(data?.id) printTC(data.id);
   } catch(err){ alert('Could not issue transfer certificate: ' + errMsg(err)); }
 }
-function tcField(en, hi, val){
-  return `<tr><th>${escapeHtml(en)}<br><span class="tc-hi">${hi}</span></th><td>${escapeHtml(val || '—')}</td></tr>`;
+async function openTCSettingsDialog(){
+  openFeeDialog('TC Book / Serial No.', '<div class="loading">Loading...</div>');
+  const dialog = document.querySelector('#feeDialog .fee-dialog-inner');
+  try{
+    const { data, error } = await supabaseClient.rpc('get_tc_settings');
+    if(error) throw error;
+    dialog.innerHTML = `<h2>TC Book / Serial No.</h2>
+      <p class="fs-modal-sub">Book No. is set manually here. S. No. auto-increments by 1 every time a certificate is issued.</p>
+      <div class="fee-form-grid">
+        <div class="field"><label>Book No.</label><input id="tcs_book_no" type="text" value="${escapeHtml(data?.book_no||'1')}"></div>
+        <div class="field"><label>Next S. No.</label><input id="tcs_next_serial_no" type="number" value="${data?.next_serial_no||1}"></div>
+      </div>
+      <div class="actions"><button class="btn-secondary" onclick="closeFeeDialog()">Cancel</button><button class="btn-primary" onclick="saveTCSettings()">Save</button></div>`;
+  } catch(err){ dialog.innerHTML = '<div class="empty">Could not load settings: ' + escapeHtml(errMsg(err)) + '</div>'; }
+}
+async function saveTCSettings(){
+  const book_no = document.getElementById('tcs_book_no').value.trim();
+  const next_serial_no = Number(document.getElementById('tcs_next_serial_no').value);
+  if(!book_no || !next_serial_no || next_serial_no < 1){ alert('Enter a Book No. and a valid next S. No.'); return; }
+  try{
+    const { error } = await supabaseClient.rpc('update_tc_settings', { p_book_no: book_no, p_next_serial_no: next_serial_no });
+    if(error) throw error;
+    closeFeeDialog();
+  } catch(err){ alert('Could not save: ' + errMsg(err)); }
+}
+function tcRow(no, enLabel, hiLabel, val){
+  return `<tr><td class="tc-no-col">${no}.</td><td class="tc-label">${escapeHtml(enLabel)}<br><span class="tc-hi">${hiLabel}</span></td><td class="tc-dots">${escapeHtml(val || '')}</td></tr>`;
 }
 function printTC(id){
   const r = tcRecords.find(x => x.id === id); if(!r) return;
+  const attendanceLine = (r.total_present_days != null || r.attendance_percentage != null)
+    ? `${r.total_present_days ?? ''}${r.attendance_percentage != null ? ' (' + r.attendance_percentage + '%)' : ''}` : '';
   const win = window.open('', '_blank');
-  win.document.write(`<!DOCTYPE html><html><head><title>Transfer Certificate ${escapeHtml(r.tc_no)}</title>
+  win.document.write(`<!DOCTYPE html><html><head><title>Transfer Certificate - ${escapeHtml(r.student_name||'')}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;600;700&family=Noto+Serif:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-      body{font-family:'Noto Serif',Georgia,serif;padding:36px;color:#111;}
-      .tc-hi{font-family:'Noto Sans Devanagari',sans-serif;color:#444;font-weight:400;}
-      h1{font-size:20px;text-align:center;margin:0 0 2px;}
-      .tc-hi-h1{font-family:'Noto Sans Devanagari',sans-serif;font-size:17px;text-align:center;margin:0 0 4px;color:#333;}
-      .tc-sub{text-align:center;font-size:12px;color:#555;margin-bottom:4px;}
-      .tc-no{text-align:right;font-weight:700;margin-bottom:10px;}
-      hr{border:none;border-top:2px solid #333;margin:14px 0 20px;}
-      table{width:100%;border-collapse:collapse;}
-      th,td{text-align:left;padding:9px 10px;border-bottom:1px solid #ddd;font-size:13px;vertical-align:top;}
-      th{width:40%;font-weight:600;color:#222;}
-      .tc-sign{display:flex;justify-content:space-between;margin-top:60px;font-size:13px;}
-      .tc-sign div{text-align:center;width:200px;border-top:1px solid #333;padding-top:6px;}
+      *{box-sizing:border-box;}
+      body{font-family:'Noto Serif',Georgia,serif;padding:26px 34px;color:#111;font-size:13px;}
+      .tc-hi{font-family:'Noto Sans Devanagari',sans-serif;color:#333;font-weight:400;font-size:12px;}
+      .tc-header{text-align:center;border-bottom:3px double #163a68;padding-bottom:10px;margin-bottom:16px;}
+      .tc-school-name{font-size:26px;font-weight:700;color:#1a3a6b;letter-spacing:0.5px;font-family:Georgia,'Times New Roman',serif;}
+      .tc-addr{font-size:11.5px;color:#333;margin-top:4px;}
+      .tc-addr b{color:#1a3a6b;}
+      .tc-affil{font-size:11.5px;font-weight:700;color:#1a3a6b;margin-top:2px;}
+      .tc-pill{margin:16px auto 14px;max-width:520px;background:#5b2a6e;color:#fff;text-align:center;border-radius:20px;padding:8px 20px;font-size:16px;font-weight:700;font-family:'Noto Sans Devanagari',Georgia,serif;}
+      .tc-meta{font-size:12.5px;margin-bottom:4px;}
+      .tc-meta b{border-bottom:1px solid #333;padding:0 2px;}
+      table.tc-fields{width:100%;border-collapse:collapse;margin-top:14px;}
+      table.tc-fields td{vertical-align:top;padding:5px 4px;border-bottom:1px dotted #bbb;font-size:12.5px;}
+      .tc-no-col{width:22px;font-weight:700;}
+      .tc-label{width:40%;font-weight:600;}
+      .tc-dots{border-bottom:1px solid #333;}
+      .tc-declaration{margin-top:20px;font-size:12px;line-height:1.5;}
+      .tc-sign{display:flex;justify-content:space-between;margin-top:64px;font-size:12px;}
+      .tc-sign div{text-align:center;width:220px;border-top:1px solid #333;padding-top:6px;}
+      .tc-sign .principal{text-align:right;width:260px;border-top:none;}
+      .tc-sign .principal span{display:block;border-top:1px solid #333;padding-top:6px;}
     </style></head><body>
-    <h1>Mount Litera Zee School, Jhansi</h1>
-    <div class="tc-sub">School Transfer Certificate</div>
-    <div class="tc-hi-h1">स्थानांतरण प्रमाण पत्र</div>
-    <div class="tc-no">TC No: ${escapeHtml(r.tc_no)}</div>
-    <hr>
-    <table>
-      ${tcField('Admission No.', 'प्रवेश संख्या', r.reg_no)}
-      ${tcField("Student's Name", 'छात्र का नाम', r.student_name)}
-      ${tcField("Father's Name", 'पिता का नाम', r.father_name)}
-      ${tcField("Mother's Name", 'माता का नाम', r.mother_name)}
-      ${tcField('Date of Birth', 'जन्म तिथि', isoToDmy(r.dob))}
-      ${tcField('Class', 'कक्षा', r.class_section)}
-      ${tcField('Date of Admission', 'प्रवेश तिथि', isoToDmy(r.admission_date))}
-      ${tcField('Date of Leaving', 'छोड़ने की तिथि', isoToDmy(r.date_of_leaving))}
-      ${tcField('Reason for Leaving', 'छोड़ने का कारण', r.reason_for_leaving)}
-      ${tcField('Conduct', 'आचरण', r.conduct)}
-      ${tcField('Remarks', 'टिप्पणी', r.remarks)}
-      ${tcField('Date of Issue', 'जारी करने की तिथि', isoToDmy(r.issue_date))}
+    <div class="tc-header">
+      <div class="tc-school-name">Mount Litera Zee School</div>
+      <div class="tc-addr"><b>Address:</b> Isai Tola, Tube Well Road, Khati Baba, Jhansi (U.P.) - 284003</div>
+      <div class="tc-addr">Ph: 0510-2483553, Mob: 9793344335, E-mail: zeeschooljhansi@gmail.com, Website: www.mlzsjhansi.com</div>
+      <div class="tc-affil">Affiliated to Central Board of Secondary Education, New Delhi</div>
+    </div>
+    <div class="tc-pill">स्थानान्तरण प्रमाण-पत्र / TRANSFER CERTIFICATE</div>
+    <div class="tc-meta">विद्यालय सं0/School code. <b>${escapeHtml(r.school_code||'70693')}</b>
+      &nbsp; पुस्तक नं0/Book No. <b>${escapeHtml(r.book_no||'')}</b>
+      &nbsp; क्रम सं0/S. No. <b>${escapeHtml(String(r.serial_no||''))}</b>
+      &nbsp; प्रवेश सं0/Admission No. <b>${escapeHtml(r.admission_no||r.reg_no||'')}</b></div>
+    <div class="tc-meta">Affiliation No. <b>${escapeHtml(r.affiliation_no||'2131446')}</b>
+      &nbsp; status of the school: Secondary / Sr. Secondary <b>${escapeHtml(r.school_status||'Senior Secondary')}</b>
+      &nbsp; Registration Number of the candidate (in case of Class IX to XII) <b>${escapeHtml(r.registration_no||'')}</b></div>
+    <table class="tc-fields">
+      ${tcRow(1, 'Name of the Student', 'विद्यार्थी का नाम', r.student_name)}
+      ${tcRow(2, "Mother's Name", 'माता का नाम', r.mother_name)}
+      ${tcRow(3, "Father's Name", 'पिता का नाम', r.father_name)}
+      ${tcRow(4, 'Date of birth according to the Admission Register (in figures / in words)', 'प्रवेश पुस्तिका के अनुसार जन्म तिथि (अंकों में / शब्दों में)', `${isoToDmy(r.dob)}${r.dob_words ? ' / ' + r.dob_words : ''}`)}
+      ${tcRow(5, 'Proof for Date of Birth submitted at the time of admission', 'प्रवेश के समय जमा किया गया जन्म तिथि का प्रमाण पत्र', r.dob_proof)}
+      ${tcRow(6, 'Nationality', 'राष्ट्रीयता', r.nationality)}
+      ${tcRow(7, 'Whether the student belongs to SC/ST/OBC Category', 'क्या अनु0जाति/जनजाति/पिछड़ा वर्ग से सम्बन्धित', r.category)}
+      ${tcRow(8, 'Date of first admission in the School with Class', 'विद्यालय में प्रथम प्रवेश की तिथि तथा कक्षा', `${isoToDmy(r.admission_date)}${r.first_admission_class ? ' - ' + r.first_admission_class : ''}`)}
+      ${tcRow(9, 'Class in which the student last studied (in figure / in words)', 'पिछली कक्षा जिसमें विद्यार्थी अध्ययनरत था', `${r.class_section||''}${r.last_class_words ? ' / ' + r.last_class_words : ''}`)}
+      ${tcRow(10, 'School/Board Annual Examination last taken with result', 'पिछले विद्यालय/बोर्ड परीक्षा एवं परिणाम', r.last_exam_result)}
+      ${tcRow(11, 'Whether the student has failed', 'क्या विद्यार्थी का परीक्षा परिणाम अनुत्तीर्ण है', r.whether_failed)}
+      ${tcRow(12, 'Subjects offered', 'प्रस्तावित विषय', r.subjects_offered)}
+      ${tcRow(13, 'Whether qualified for promotion to the next higher Class', 'क्या उच्च कक्षा में पदोन्नत का अधिकारी है', r.qualified_for_promotion)}
+      ${tcRow(14, 'Total No. of working days in the academic session', 'अन्तिम तिथि तक उपस्थितियों की कुल संख्या', r.total_working_days)}
+      ${tcRow(15, "Total number & percentage of student's presence in the academic session", 'शैक्षणिक सत्र में विद्यार्थी की उपस्थिति की कुल संख्या और प्रतिशत', attendanceLine)}
+      ${tcRow(16, 'Whether the student has paid all the dues to the school', 'क्या विद्यार्थी ने विद्यालय की सभी देय राशि का भुगतान कर दिया है', r.dues_paid)}
+      ${tcRow(17, 'Whether the student availed any fee concession, if so the nature of such concession', 'क्या विद्यार्थी को कोई शुल्क रियायत प्रदान की गई थी', r.fee_concession)}
+      ${tcRow(18, 'Whether the student is NCC Cadet / Scout (give details)', 'क्या विद्यार्थी एन0सी0सी0 कैडेट/स्काउट है', r.ncc_scout)}
+      ${tcRow(19, 'Whether school is under Govt./Minority/Independent Category', 'क्या विद्यालय सरकारी/अल्पसंख्यक/स्वतंत्र श्रेणी में आता है', r.school_category)}
+      ${tcRow(20, 'Games played on extra curricular activities in which the student usually took part (mention achievement level)', 'अतिरिक्त पाठ्यक्रम गतिविधियों पर खेले जाने वाले खेल', r.games_played)}
+      ${tcRow(21, 'Date of application for certificate', 'प्रमाण-पत्र के लिए आवेदन की तिथि', isoToDmy(r.application_date))}
+      ${tcRow(22, "Date on which student's name was struck off the rolls of the school", 'विद्यालय से विद्यार्थी का नाम काटे जाने की तिथि', isoToDmy(r.struck_off_date))}
+      ${tcRow(23, 'Reason for leaving the school', 'विद्यालय छोड़ने का कारण', r.reason_for_leaving)}
+      ${tcRow(24, 'Any other remark', 'कोई अन्य टिप्पणी', r.remarks)}
+      ${tcRow(25, 'Date of issue of certificate', 'प्रमाण-पत्र जारी करने की तिथि', isoToDmy(r.issue_date))}
+      ${tcRow(26, 'General conduct', 'सामान्य आचरण', r.conduct)}
     </table>
+    <div class="tc-declaration">I hereby declare that the information furnished above including the Name of the Candidate, Father's Name, Mother's Name and Date of birth is correct as per the school records.</div>
     <div class="tc-sign">
-      <div>Class Teacher<br><span class="tc-hi">कक्षा शिक्षक</span></div>
-      <div>Principal<br><span class="tc-hi">प्राचार्य</span></div>
+      <div>तैयारकर्ता / Prepared by</div>
+      <div>जांचकर्ता / Checked by</div>
+      <div class="principal"><span>ह0 प्रधानाचार्य / कार्यालय मोहर<br>(Sign of Principal with official seal)</span></div>
     </div>
     <script>window.onload = () => setTimeout(() => window.print(), 300);<\/script>
     </body></html>`);
