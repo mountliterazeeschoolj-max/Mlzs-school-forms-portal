@@ -1890,6 +1890,7 @@
       <div class="fee-actions">
         <input type="text" id="feeSearchBox" placeholder="Search admission no., student, class, parent or mobile" oninput="debounce('feeSearch', renderFeeTable, 180)">
         <button class="btn-primary" onclick="openFeeStudentDialog()">Add Student</button>
+        <button class="btn-primary" onclick="openFeeBulkStudentDialog()">Bulk Upload Students</button>
         <button class="btn-secondary" onclick="exportFeeCsv('due')">Export Due Data</button>
         <button class="btn-secondary" onclick="exportFeeCsv('paid')">Export Paid Data</button>
       </div>
@@ -5755,10 +5756,29 @@ document.addEventListener('DOMContentLoaded', installModalCloseControls);
 function openFeeStudentDialog(id){
   const r = id ? feeRecords.find(x => x.id === id) : {};
   const field = (label,key,type='text') => `<div class="field"><label>${label}</label><input id="fs_${key}" type="${type}" value="${escapeHtml(r?.[key] ?? '')}"></div>`;
+  const classDatalist = `<datalist id="fs_class_datalist">${[...feeStructure.keys()].map(c => `<option value="${escapeHtml(c)}">`).join('')}</datalist>`;
   openFeeDialog(id ? 'Edit Fee Student' : 'Add Fee Student', `<div class="fee-form-grid">
-    ${field('Admission No.','reg_no')}${field('Student Name','student_name')}${field('Class / Section','class_section')}${field('Mobile','mobile_number','tel')}${field('Father Name','father_name')}${field('Mother Name','mother_name')}${field('Date of Birth','dob','date')}${field('Admission Date','admission_date','date')}${field('Category','category')}<div class="field full"><label>Address</label><textarea id="fs_address">${escapeHtml(r?.address ?? '')}</textarea></div>
+    ${field('Admission No.','reg_no')}${field('Student Name','student_name')}
+    <div class="field"><label>Class / Section</label><input id="fs_class_section" list="fs_class_datalist" value="${escapeHtml(r?.class_section ?? '')}" onchange="feeAutoFillFromStructure()">${classDatalist}</div>
+    ${field('Mobile','mobile_number','tel')}${field('Father Name','father_name')}${field('Mother Name','mother_name')}${field('Date of Birth','dob','date')}${field('Admission Date','admission_date','date')}${field('Category','category')}<div class="field full"><label>Address</label><textarea id="fs_address">${escapeHtml(r?.address ?? '')}</textarea></div>
     ${field('Last Year Due','prev_session_fee','number')}${field('Q1 Fee','q1_fee','number')}${field('Q2 Fee','q2_fee','number')}${field('Q3 Fee','q3_fee','number')}${field('Q4 Fee','q4_fee','number')}${field('Bus Fee','bus_fee','number')}
+    <div class="field full" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <button type="button" class="btn-secondary" onclick="feeAutoFillFromStructure(true)">Fetch Fees from Class Structure</button>
+      <span class="fs-modal-sub" style="margin:0;">Q1–Q4 (and Bus Fee) auto-fill from the master Fee Structure when you pick/type a matching class above.</span>
+    </div>
   </div><div class="actions"><button class="btn-secondary" onclick="closeFeeDialog()">Cancel</button><button class="btn-primary" onclick="saveFeeStudent(${id || 'null'})">Save Student</button></div>`);
+}
+/* Pulls Q1-Q4 (and Bus Fee) for the class typed/selected in the Add/Edit Student dialog from the master Fee Structure.
+   Fires automatically when the class field changes; `force=true` (the button) also warns if that class has no saved structure yet. */
+function feeAutoFillFromStructure(force){
+  const classVal = (document.getElementById('fs_class_section')?.value || '').trim();
+  const schedule = feeStructure.get(classVal);
+  if(!schedule){ if(force) alert(classVal ? `No saved Fee Structure for "${classVal}" yet. Add it via Fees → Import & Setup → Edit Fee Structure, or enter fees manually.` : 'Enter a class first.'); return; }
+  document.getElementById('fs_q1_fee').value = Number(schedule.q1_fee || 0);
+  document.getElementById('fs_q2_fee').value = Number(schedule.q2_fee || 0);
+  document.getElementById('fs_q3_fee').value = Number(schedule.q3_fee || 0);
+  document.getElementById('fs_q4_fee').value = Number(schedule.q4_fee || 0);
+  document.getElementById('fs_bus_fee').value = Number(schedule.bus_fee || 0);
 }
 
 async function saveFeeStudent(id){
@@ -5854,7 +5874,7 @@ function normaliseFeeDate(value){
 }
 
 function openFeeBulkStudentDialog(){
-  openFeeDialog('Bulk Add Students', `<p class="fs-modal-sub">Upload or paste CSV. Required columns: <strong>Admission No, Student Name, Class</strong>. Optional: Father Name, Mother Name, DOB, Admission Date, Category, Mobile, Address, Last Year Due. Q1–Q4 and Bus Fee are automatically read from the current Fee Structure.</p>
+  openFeeDialog('Bulk Add Students', `<p class="fs-modal-sub">Upload or paste CSV to add students from <strong>any/all classes in one go</strong> — just include a Class value per row, mixing as many different classes as you like in the same file. Required columns: <strong>Admission No, Student Name, Class</strong>. Optional: Father Name, Mother Name, DOB, Admission Date, Category, Mobile, Address, Last Year Due. Q1–Q4 and Bus Fee are automatically read from the current Fee Structure for each row's class; classes with no saved Fee Structure yet are imported with ₹0 fees (fix later via Edit Fee Structure).</p>
     <div class="field">${csvFileInput('bulkStudentsFile')}<textarea id="bulkStudentsFile_text" placeholder="Admission No,Student Name,Class,Father Name,Mother Name,DOB,Admission Date,Category,Mobile,Address,Last Year Due"></textarea></div>
     <div class="actions"><button class="btn-secondary" onclick="closeFeeDialog()">Cancel</button><button class="btn-primary" onclick="saveBulkFeeStudents()">Import Students</button></div>`);
 }
@@ -5864,7 +5884,7 @@ async function saveBulkFeeStudents(){
   const require = ['admission no','student name','class'];
   if(require.some(h => !headers.includes(h))){ alert('CSV must include: Admission No, Student Name, Class.'); return; }
   const existing = new Set(feeRecords.map(r => String(r.reg_no).trim()));
-  const records = [], skipped = [];
+  const records = [], skipped = [], notes = [];
   rows.forEach((row, index) => {
     const reg_no = valueAt(headers,row,['admission no','admission no.','reg no','reg. no']);
     const student_name = valueAt(headers,row,['student name','name']);
@@ -5872,12 +5892,13 @@ async function saveBulkFeeStudents(){
     const schedule = feeStructure.get(class_section);
     if(!reg_no || !student_name || !class_section){ skipped.push(`Row ${index + 2}: missing required value`); return; }
     if(existing.has(reg_no)){ skipped.push(`Row ${index + 2}: admission no. ${reg_no} already exists`); return; }
-    if(!schedule){ skipped.push(`Row ${index + 2}: no fee structure for ${class_section}`); return; }
-    records.push({ reg_no, student_name, class_section, father_name:valueAt(headers,row,['father name','father']), mother_name:valueAt(headers,row,['mother name','mother']), dob:normaliseFeeDate(valueAt(headers,row,['dob','date of birth'])), admission_date:normaliseFeeDate(valueAt(headers,row,['admission date','admission'])), category:valueAt(headers,row,['category']) || null, mobile_number:valueAt(headers,row,['mobile','mobile number','mobile no']) || null, address:valueAt(headers,row,['address']) || null, prev_session_fee:Number(valueAt(headers,row,['last year due','previous session fee','prev session fee']) || 0), q1_fee:Number(schedule.q1_fee || 0), q2_fee:Number(schedule.q2_fee || 0), q3_fee:Number(schedule.q3_fee || 0), q4_fee:Number(schedule.q4_fee || 0), bus_fee:Number(schedule.bus_fee || 0), fee_status:'DUE' });
+    if(!schedule) notes.push(`Row ${index + 2}: no fee structure saved yet for "${class_section}" — imported with ₹0 fees`);
+    records.push({ reg_no, student_name, class_section, father_name:valueAt(headers,row,['father name','father']), mother_name:valueAt(headers,row,['mother name','mother']), dob:normaliseFeeDate(valueAt(headers,row,['dob','date of birth'])), admission_date:normaliseFeeDate(valueAt(headers,row,['admission date','admission'])), category:valueAt(headers,row,['category']) || null, mobile_number:valueAt(headers,row,['mobile','mobile number','mobile no']) || null, address:valueAt(headers,row,['address']) || null, prev_session_fee:Number(valueAt(headers,row,['last year due','previous session fee','prev session fee']) || 0), q1_fee:Number(schedule?.q1_fee || 0), q2_fee:Number(schedule?.q2_fee || 0), q3_fee:Number(schedule?.q3_fee || 0), q4_fee:Number(schedule?.q4_fee || 0), bus_fee:Number(schedule?.bus_fee || 0), fee_status:'DUE' });
   });
   if(!records.length){ alert('No rows can be imported.\n' + skipped.join('\n')); return; }
   for(let i=0;i<records.length;i+=100){ const { error } = await supabaseClient.from('student_fees').insert(records.slice(i,i+100)); if(error){ alert('Import stopped: ' + errMsg(error)); return; } }
-  closeFeeDialog(); await loadFeePortal(); alert(`Imported ${records.length} student(s).${skipped.length ? '\nSkipped:\n' + skipped.join('\n') : ''}`);
+  closeFeeDialog(); await loadFeePortal();
+  alert(`Imported ${records.length} student(s) across all classes in the file.${notes.length ? '\n\n' + notes.join('\n') : ''}${skipped.length ? '\n\nSkipped:\n' + skipped.join('\n') : ''}`);
 }
 
 function openBulkPaymentDialog(){
@@ -8295,6 +8316,34 @@ async function loadSeats(){
 }
 
 /* ============ TRANSFER CERTIFICATES (admin only) ============ */
+const DOB_WORDS_ORDINALS = ['','First','Second','Third','Fourth','Fifth','Sixth','Seventh','Eighth','Ninth','Tenth','Eleventh','Twelfth','Thirteenth','Fourteenth','Fifteenth','Sixteenth','Seventeenth','Eighteenth','Nineteenth','Twentieth','Twenty-First','Twenty-Second','Twenty-Third','Twenty-Fourth','Twenty-Fifth','Twenty-Sixth','Twenty-Seventh','Twenty-Eighth','Twenty-Ninth','Thirtieth','Thirty-First'];
+const DOB_WORDS_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DOB_WORDS_ONES = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
+const DOB_WORDS_TENS = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+/* Converts a whole number (used here for a 4-digit year) into English words, e.g. 2010 -> "Two Thousand Ten". */
+function numberToWords(num){
+  num = Math.floor(Math.abs(Number(num) || 0));
+  if(num === 0) return 'Zero';
+  const twoDigits = (n) => n < 20 ? DOB_WORDS_ONES[n] : DOB_WORDS_TENS[Math.floor(n/10)] + (n % 10 ? '-' + DOB_WORDS_ONES[n % 10] : '');
+  const threeDigits = (n) => {
+    let str = '';
+    if(n >= 100){ str += DOB_WORDS_ONES[Math.floor(n/100)] + ' Hundred'; n %= 100; if(n) str += ' '; }
+    if(n) str += twoDigits(n);
+    return str;
+  };
+  if(num < 1000) return threeDigits(num);
+  const thousands = Math.floor(num/1000), rest = num % 1000;
+  return threeDigits(thousands) + ' Thousand' + (rest ? ' ' + threeDigits(rest) : '');
+}
+/* Converts an ISO (YYYY-MM-DD) date of birth into the words format used on the printed TC, e.g. "Tenth April Two Thousand Ten". */
+function dobToWords(isoDate){
+  if(!isoDate) return '';
+  const m = String(isoDate).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(!m) return '';
+  const year = Number(m[1]), month = Number(m[2]), day = Number(m[3]);
+  if(!day || !month || day > 31 || month > 12) return '';
+  return `${DOB_WORDS_ORDINALS[day]} ${DOB_WORDS_MONTHS[month-1]} ${numberToWords(year)}`;
+}
 let tcRecords = [];
 async function loadTCRecords(){
   const area = document.getElementById('tcTableArea');
@@ -8324,12 +8373,12 @@ async function openIssueTCDialog(){
   const dialog = document.querySelector('#feeDialog .fee-dialog-inner');
   try{
     const [{ data, error }, { data: settings, error: sErr }] = await Promise.all([
-      supabaseClient.from('student_fees').select('id, reg_no, student_name, class_section, category').order('student_name'),
+      supabaseClient.from('student_fees').select('id, reg_no, student_name, class_section, category, dob').order('student_name'),
       supabaseClient.rpc('get_tc_settings')
     ]);
     if(error) throw error;
     if(sErr) throw sErr;
-    const studentOptions = (data || []).map(s => `<option value="${s.id}" data-category="${escapeHtml(s.category||'')}">${escapeHtml(s.reg_no)} — ${escapeHtml(s.student_name)} (${escapeHtml(s.class_section)})</option>`).join('');
+    const studentOptions = (data || []).map(s => `<option value="${s.id}" data-category="${escapeHtml(s.category||'')}" data-dob="${escapeHtml(s.dob||'')}">${escapeHtml(s.reg_no)} — ${escapeHtml(s.student_name)} (${escapeHtml(s.class_section)})</option>`).join('');
     const bookNo = settings?.book_no || '1';
     const serialNo = settings?.next_serial_no || 1;
     dialog.innerHTML = `<h2>Issue Transfer Certificate</h2>
@@ -8340,7 +8389,7 @@ async function openIssueTCDialog(){
         <div class="field"><label>Date of Admission (1st) with Class</label><input id="tc_first_admission_class" type="text" placeholder="e.g. Class I"></div>
         <div class="field"><label>Nationality</label><input id="tc_nationality" type="text" value="Indian"></div>
         <div class="field"><label>Category (SC/ST/OBC/General)</label><input id="tc_category" type="text"></div>
-        <div class="field"><label>DOB in words</label><input id="tc_dob_words" type="text" placeholder="e.g. Tenth April Two Thousand Ten"></div>
+        <div class="field"><label>DOB in words</label><input id="tc_dob_words" type="text" placeholder="Auto-filled when a student is selected — edit if needed"></div>
         <div class="field"><label>DOB proof submitted at admission</label><input id="tc_dob_proof" type="text" placeholder="e.g. Birth Certificate"></div>
         <div class="field"><label>Class last studied (in words)</label><input id="tc_last_class_words" type="text"></div>
         <div class="field full"><label>School/Board exam last taken with result</label><input id="tc_last_exam_result" type="text"></div>
@@ -8367,6 +8416,8 @@ async function openIssueTCDialog(){
     document.getElementById('tc_student_fee_id').addEventListener('change', (e) => {
       const cat = e.target.selectedOptions[0]?.dataset.category || '';
       if(cat) document.getElementById('tc_category').value = cat;
+      const dob = e.target.selectedOptions[0]?.dataset.dob || '';
+      document.getElementById('tc_dob_words').value = dobToWords(dob);
     });
   } catch(err){ dialog.innerHTML = '<div class="empty">Could not load students: ' + escapeHtml(errMsg(err)) + '</div>'; }
 }
