@@ -8855,18 +8855,29 @@ function patchLkRecord(updated){
 
 function openLkAddDialog(){
   const studentOptions = `<datalist id="lk_student_datalist">${lkStudents.map(s => `<option value="${escapeHtml(s.reg_no)}">${escapeHtml(s.student_name)} — ${escapeHtml(s.class_section)}</option>`).join('')}</datalist>`;
+  const classOptions = `<datalist id="lk_class_datalist">${[...lkStructure.keys()].map(c => `<option value="${escapeHtml(c)}">`).join('')}</datalist>`;
   openFeeDialog('Issue / Record Litera Kit', `<div class="fee-form-grid">
-    <div class="field"><label>Admission No.</label><input id="lk_reg_no" list="lk_student_datalist" onchange="lkAutoFillFromRoster()">${studentOptions}</div>
+    <div class="field"><label>Admission No.</label><input id="lk_reg_no" list="lk_student_datalist" oninput="lkAutoFillFromRoster()" onchange="lkAutoFillFromRoster()">${studentOptions}</div>
     <div class="field"><label>Student Name</label><input id="lk_student_name"></div>
-    <div class="field"><label>Class / Section</label><input id="lk_class_section" onchange="lkAutoFillFromStructure()"></div>
+    <div class="field"><label>Class / Section</label><input id="lk_class_section" list="lk_class_datalist" oninput="lkAutoFillFromStructure()" onchange="lkAutoFillFromStructure()">${classOptions}</div>
     <div class="field"><label>Session</label><input id="lk_session" value="${escapeHtml(lkDefaultSession())}"></div>
     <div class="field"><label>Kit Name</label><input id="lk_kit_name" value="Litera Gear Kit"></div>
-    <div class="field"><label>Kit Cost</label><input id="lk_kit_cost" type="number" min="0" step="0.01" value="0"></div>
+    <div class="field"><label>Kit Cost</label><input id="lk_kit_cost" type="number" min="0" step="0.01" value="0"><span class="field-hint" id="lk_kit_hint"></span></div>
     <div class="field"><label>Amount Paid Now (optional)</label><input id="lk_amount_paid" type="number" min="0" step="0.01" value="0"></div>
     <div class="field"><label>Payment Date</label><input id="lk_payment_date" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
     <div class="field"><label>Mode</label><input id="lk_mode" placeholder="Cash / UPI / Bank"></div>
     <div class="field"><label>Receipt No.</label><input id="lk_receipt"></div>
   </div><div class="actions"><button class="btn-secondary" onclick="closeFeeDialog()">Cancel</button><button class="btn-primary" onclick="saveLkAddRecord()">Save Kit Record</button></div>`);
+}
+/* Case/whitespace-tolerant lookup into the Master Fee Setup so "IX-A", " ix-a ", "IX -A" etc. all match. */
+function lkFindStructure(cls){
+  const norm = String(cls || '').trim().toLowerCase().replace(/\s+/g,' ');
+  if(!norm) return null;
+  if(lkStructure.has(cls)) return lkStructure.get(cls);
+  for(const [key, value] of lkStructure.entries()){
+    if(String(key || '').trim().toLowerCase().replace(/\s+/g,' ') === norm) return value;
+  }
+  return null;
 }
 function lkAutoFillFromRoster(){
   const reg = (document.getElementById('lk_reg_no').value || '').trim();
@@ -8878,10 +8889,15 @@ function lkAutoFillFromRoster(){
 }
 function lkAutoFillFromStructure(){
   const cls = (document.getElementById('lk_class_section').value || '').trim();
-  const schedule = lkStructure.get(cls);
-  if(!schedule) return;
+  const hint = document.getElementById('lk_kit_hint');
+  const schedule = lkFindStructure(cls);
+  if(!schedule){
+    if(hint) hint.textContent = cls ? `No Master Fee Setup saved yet for "${cls}" — set it in Litera Kit → Setup, or enter the cost manually.` : '';
+    return;
+  }
   document.getElementById('lk_kit_name').value = schedule.kit_name || 'Litera Gear Kit';
   document.getElementById('lk_kit_cost').value = Number(schedule.kit_cost || 0);
+  if(hint) hint.textContent = `Auto-filled from Master Fee Setup for ${schedule.class_section}.`;
 }
 async function saveLkAddRecord(){
   const reg_no = document.getElementById('lk_reg_no').value.trim();
