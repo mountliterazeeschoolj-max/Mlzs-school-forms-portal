@@ -1887,6 +1887,7 @@
     <button class="tab-btn" id="tabClass11" onclick="switchTab('class11')">Class XI</button>
     <button class="tab-btn" id="tabStaff" onclick="switchTab('staff')">Staff</button>
     <button class="tab-btn" id="tabFees" onclick="switchTab('fees')">Fees Portal</button>
+    <button class="tab-btn" id="tabLiteraKit" onclick="switchTab('literakit')">Litera Kit</button>
     <button class="tab-btn" id="tabTimetable" onclick="switchTab('timetable')">Timetable</button>
     <button class="tab-btn" id="tabAttendance" onclick="switchTab('attendance')">Attendance</button>
     <button class="tab-btn" id="tabAcademic" onclick="switchTab('academic')">Academic Year</button>
@@ -1946,6 +1947,58 @@
 
     <div id="feeManageView" style="display:none;">
       <div class="fee-panel"><h2>Bulk Operations</h2><p class="fs-modal-sub">Import new students, update paid fees from a CSV, or maintain the fee schedule used for new students.</p><div class="fee-actions"><button class="btn-primary" onclick="openFeeBulkStudentDialog()">Bulk Add Students</button><button class="btn-primary" onclick="openBulkPaymentDialog()">Bulk Update Paid Fees</button><button class="btn-secondary" onclick="openFeeStructureDialog()">Edit Fee Structure</button></div></div>
+    </div>
+  </div>
+
+  <div id="lkArea" style="display:none;">
+    <div class="tabs fee-tabs">
+      <button class="tab-btn active" id="lkViewOverview" onclick="switchLkView('overview')">Overview</button>
+      <button class="tab-btn" id="lkViewPurchase" onclick="switchLkView('purchase')">Purchase &amp; Handover</button>
+      <button class="tab-btn" id="lkViewReports" onclick="switchLkView('reports')">Reports</button>
+      <button class="tab-btn" id="lkViewSetup" onclick="switchLkView('setup')">Setup</button>
+    </div>
+
+    <div id="lkOverviewView">
+      <div class="fee-actions">
+        <button class="btn-secondary" onclick="loadLiteraKitPortal()">Refresh Kit Data</button>
+        <button class="btn-primary" onclick="openLkAddDialog()">Issue / Record Kit for a Student</button>
+      </div>
+      <div class="fee-kpis" id="lkKpis"></div>
+      <div class="fee-panel" style="margin-top:18px;">
+        <h2>Class-wise Kit Cost</h2>
+        <div class="table-container"><div id="lkStructurePreview"><div class="loading">Loading...</div></div></div>
+      </div>
+    </div>
+
+    <div id="lkPurchaseView" style="display:none;">
+      <div class="fee-actions">
+        <input type="text" id="lkSearchBox" placeholder="Search admission no., student, class or session" oninput="debounce('lkSearch', renderLkTable, 180)">
+        <select id="lkStatusFilter" onchange="renderLkTable()"><option value="ALL">All Payment Status</option><option value="PAID">Paid</option><option value="PARTIAL">Partially Paid</option><option value="UNPAID">Unpaid</option></select>
+        <select id="lkHandoverFilter" onchange="renderLkTable()"><option value="ALL">All Handover Status</option><option value="YES">Handed Over</option><option value="NO">Pending Handover</option></select>
+        <button class="btn-primary" onclick="openLkAddDialog()">Issue / Record Kit for a Student</button>
+      </div>
+      <div class="table-container"><div id="lkTableArea"><div class="loading">Loading litera kit records...</div></div></div>
+    </div>
+
+    <div id="lkReportsView" style="display:none;">
+      <div class="fee-panel">
+        <h2>Litera Kit Reports</h2>
+        <p class="fs-modal-sub">Download the full kit register, or narrow it to students with a payment due or a pending handover.</p>
+        <div class="fee-actions">
+          <button class="btn-secondary" onclick="exportLkCsv('all')">Download Full Report</button>
+          <button class="btn-secondary" onclick="exportLkCsv('due')">Download Payment Due</button>
+          <button class="btn-secondary" onclick="exportLkCsv('pending_handover')">Download Pending Handover</button>
+        </div>
+      </div>
+      <div class="fee-panel" id="lkReportSummary"></div>
+    </div>
+
+    <div id="lkSetupView" style="display:none;">
+      <div class="fee-panel">
+        <h2>Litera Gear Kit — Master Fee Setup</h2>
+        <p class="fs-modal-sub">Set the Litera Gear kit cost for each class here — kit contents (and cost) differ by class, so this is maintained per class, separately from the tuition Fee Structure. New kit records for a class auto-fill from whatever is saved here.</p>
+        <div class="fee-actions"><button class="btn-primary" onclick="openLkStructureDialog()">Edit Kit Fee Structure</button></div>
+      </div>
     </div>
   </div>
 
@@ -5069,6 +5122,7 @@ async function switchTab(tab){
   document.getElementById('tabClass11').classList.toggle('active', tab === 'class11');
   document.getElementById('tabStaff').classList.toggle('active', tab === 'staff');
   document.getElementById('tabFees').classList.toggle('active', tab === 'fees');
+  document.getElementById('tabLiteraKit').classList.toggle('active', tab === 'literakit');
   document.getElementById('tabTimetable').classList.toggle('active', tab === 'timetable');
   document.getElementById('tabAttendance').classList.toggle('active', tab === 'attendance');
   document.getElementById('tabAcademic').classList.toggle('active', tab === 'academic');
@@ -5077,13 +5131,15 @@ async function switchTab(tab){
 
   const isOverview = tab === 'overview';
   const isFees = tab === 'fees';
+  const isLiteraKit = tab === 'literakit';
   const isTimetable = tab === 'timetable';
   const isAttendance = tab === 'attendance';
   const isAcademic = tab === 'academic';
   const isAdmission = tab === 'admission';
-  const isSpecial = isOverview || isFees || isTimetable || isAttendance || isAcademic || isAdmission;
+  const isSpecial = isOverview || isFees || isLiteraKit || isTimetable || isAttendance || isAcademic || isAdmission;
   document.getElementById('overviewArea').style.display = isOverview ? 'block' : 'none';
   document.getElementById('feeArea').style.display = isFees ? 'block' : 'none';
+  document.getElementById('lkArea').style.display = isLiteraKit ? 'block' : 'none';
   document.getElementById('ttArea').style.display = isTimetable ? 'block' : 'none';
   document.getElementById('attArea').style.display = isAttendance ? 'block' : 'none';
   document.getElementById('academicArea').style.display = isAcademic ? 'block' : 'none';
@@ -5099,6 +5155,8 @@ async function switchTab(tab){
     await loadOverview();
   } else if(isFees){
     await loadFeePortal();
+  } else if(isLiteraKit){
+    await loadLiteraKitPortal();
   } else if(isTimetable){
     await loadTimetable();
   } else if(isAttendance){
@@ -5116,6 +5174,7 @@ async function switchTab(tab){
 function refreshCurrentTab(){
   if(currentTab === 'overview') loadOverview();
   else if(currentTab === 'fees') loadFeePortal();
+  else if(currentTab === 'literakit') loadLiteraKitPortal();
   else if(currentTab === 'timetable') loadTimetable();
   else if(currentTab === 'attendance') loadAttendance();
   else if(currentTab === 'academic') loadAcademicYears();
@@ -8684,6 +8743,283 @@ function printTC(id){
     <script>window.onload = () => setTimeout(() => window.print(), 300);<\/script>
     </body></html>`);
   win.document.close();
+}
+
+/* ============ LITERA KIT PURCHASE PORTAL ============ */
+let lkRecords = [];       // rows from litera_kit_purchases
+let lkStructure = new Map(); // class_section -> {class_section, kit_name, kit_cost}
+let lkStudents = [];       // roster pulled from student_fees, for the "add record" picker
+let currentLkView = 'overview';
+const lkMoney = value => '₹' + Number(value || 0).toLocaleString('en-IN', {maximumFractionDigits: 2});
+const lkPaid = r => Number(r.amount_paid || 0);
+const lkDue = r => Math.max(0, Number(r.kit_cost || 0) - lkPaid(r));
+const lkStatus = r => lkDue(r) <= 0 && Number(r.kit_cost || 0) > 0 ? 'PAID' : (lkPaid(r) > 0 ? 'PARTIAL' : 'UNPAID');
+const lkStatusLabel = s => s === 'PAID' ? 'Paid' : s === 'PARTIAL' ? 'Partially Paid' : 'Unpaid';
+function lkDefaultSession(){
+  const now = new Date(); const y = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+  return `${y}-${String((y + 1) % 100).padStart(2,'0')}`;
+}
+
+function switchLkView(view){
+  currentLkView = view;
+  const views = ['overview','purchase','reports','setup'];
+  views.forEach(name => {
+    document.getElementById('lkView' + name[0].toUpperCase() + name.slice(1)).classList.toggle('active', name === view);
+    document.getElementById('lk' + name[0].toUpperCase() + name.slice(1) + 'View').style.display = name === view ? 'block' : 'none';
+  });
+  if(view === 'purchase') renderLkTable();
+  if(view === 'reports') renderLkReportSummary();
+}
+
+async function loadLiteraKitPortal(){
+  const area = document.getElementById('lkTableArea');
+  if(area) area.innerHTML = '<div class="loading">Loading litera kit records...</div>';
+  try{
+    const [purchaseRes, structureRes, studentRes] = await Promise.all([
+      supabaseClient.from('litera_kit_purchases').select('*').order('student_name'),
+      supabaseClient.from('litera_kit_structure').select('*').order('class_section'),
+      supabaseClient.from('student_fees').select('reg_no,student_name,class_section').order('student_name')
+    ]);
+    if(purchaseRes.error) throw purchaseRes.error;
+    if(structureRes.error) throw structureRes.error;
+    if(studentRes.error) throw studentRes.error;
+    lkRecords = purchaseRes.data || [];
+    lkStructure = new Map((structureRes.data || []).map(row => [row.class_section, row]));
+    lkStudents = studentRes.data || [];
+    renderLkKpis();
+    renderLkStructurePreview();
+    renderLkTable();
+    renderLkReportSummary();
+  } catch(err){
+    const msg = 'Could not load Litera Kit records: ' + escapeHtml(errMsg(err)) + '. If this is the first time, make sure the litera_kit_structure and litera_kit_purchases tables have been created in Supabase.';
+    if(area) area.innerHTML = '<div class="empty">' + msg + '</div>';
+    const kpis = document.getElementById('lkKpis'); if(kpis) kpis.innerHTML = '<div class="empty">' + msg + '</div>';
+  }
+}
+
+function renderLkKpis(){
+  const collected = lkRecords.reduce((sum, r) => sum + lkPaid(r), 0);
+  const due = lkRecords.reduce((sum, r) => sum + lkDue(r), 0);
+  const handedOver = lkRecords.filter(r => r.handed_over).length;
+  document.getElementById('lkKpis').innerHTML = `
+    <div class="fee-kpi"><div class="label">Kit Records</div><div class="value">${lkRecords.length}</div></div>
+    <div class="fee-kpi"><div class="label">Collected</div><div class="value">${lkMoney(collected)}</div></div>
+    <div class="fee-kpi due"><div class="label">Due</div><div class="value">${lkMoney(due)}</div></div>
+    <div class="fee-kpi"><div class="label">Handed Over</div><div class="value">${handedOver} / ${lkRecords.length}</div></div>`;
+}
+
+function renderLkStructurePreview(){
+  const el = document.getElementById('lkStructurePreview'); if(!el) return;
+  const rows = [...lkStructure.values()].sort((a,b) => a.class_section.localeCompare(b.class_section));
+  el.innerHTML = rows.length ? `<table><thead><tr><th>Class</th><th>Kit Name</th><th>Kit Cost</th></tr></thead><tbody>${rows.map(r => `<tr><td>${escapeHtml(r.class_section)}</td><td>${escapeHtml(r.kit_name || 'Litera Gear Kit')}</td><td>${lkMoney(r.kit_cost)}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">No kit costs saved yet — use Setup → Edit Kit Fee Structure.</div>';
+}
+
+function renderLkTable(){
+  const area = document.getElementById('lkTableArea'); if(!area) return;
+  const q = (document.getElementById('lkSearchBox')?.value || '').trim().toLowerCase();
+  const statusFilter = document.getElementById('lkStatusFilter')?.value || 'ALL';
+  const handoverFilter = document.getElementById('lkHandoverFilter')?.value || 'ALL';
+  const rows = lkRecords.filter(r => {
+    if(q && !`${r.reg_no} ${r.student_name} ${r.class_section} ${r.session || ''}`.toLowerCase().includes(q)) return false;
+    if(statusFilter !== 'ALL' && lkStatus(r) !== statusFilter) return false;
+    if(handoverFilter === 'YES' && !r.handed_over) return false;
+    if(handoverFilter === 'NO' && r.handed_over) return false;
+    return true;
+  });
+  if(!rows.length){ area.innerHTML = '<div class="empty">No litera kit records match.</div>'; return; }
+  area.innerHTML = `<table><thead><tr><th>Admission No</th><th>Student</th><th>Class</th><th>Session</th><th>Kit Cost</th><th>Paid</th><th>Due</th><th>Payment</th><th>Handover</th><th>Actions</th></tr></thead><tbody>
+    ${rows.map(r => {
+      const status = lkStatus(r);
+      return `<tr>
+        <td>${escapeHtml(r.reg_no)}</td><td>${escapeHtml(r.student_name)}</td><td>${escapeHtml(r.class_section)}</td><td>${escapeHtml(r.session || '—')}</td>
+        <td>${lkMoney(r.kit_cost)}</td><td>${lkMoney(lkPaid(r))}</td><td>${lkMoney(lkDue(r))}</td>
+        <td><span class="badge">${lkStatusLabel(status)}</span></td>
+        <td><span class="badge">${r.handed_over ? 'Handed Over' : 'Pending'}</span>${r.handed_over && r.handover_date ? `<div class="fs-modal-sub" style="margin:2px 0 0;">${escapeHtml(isoToDmy(r.handover_date) || '')}</div>` : ''}</td>
+        <td>
+          ${status !== 'PAID' ? `<button class="tab-btn" onclick="openLkPaymentDialog(${r.id})">Pay</button>` : ''}
+          ${!r.handed_over ? `<button class="tab-btn" onclick="openLkHandoverDialog(${r.id})">Handover</button>` : `<button class="tab-btn" onclick="undoLkHandover(${r.id})">Undo Handover</button>`}
+          <button class="tab-btn" onclick="openLkPaymentHistory(${r.id})">History</button>
+          <button class="tab-btn" onclick="deleteLkRecord(${r.id})">Remove</button>
+        </td>
+      </tr>`;
+    }).join('')}
+  </tbody></table>`;
+}
+
+function patchLkRecord(updated){
+  if(!updated) return;
+  const idx = lkRecords.findIndex(r => r.id === updated.id);
+  if(idx === -1) lkRecords.push(updated); else lkRecords[idx] = updated;
+  renderLkKpis(); renderLkTable(); renderLkReportSummary();
+}
+
+function openLkAddDialog(){
+  const studentOptions = `<datalist id="lk_student_datalist">${lkStudents.map(s => `<option value="${escapeHtml(s.reg_no)}">${escapeHtml(s.student_name)} — ${escapeHtml(s.class_section)}</option>`).join('')}</datalist>`;
+  openFeeDialog('Issue / Record Litera Kit', `<div class="fee-form-grid">
+    <div class="field"><label>Admission No.</label><input id="lk_reg_no" list="lk_student_datalist" onchange="lkAutoFillFromRoster()">${studentOptions}</div>
+    <div class="field"><label>Student Name</label><input id="lk_student_name"></div>
+    <div class="field"><label>Class / Section</label><input id="lk_class_section" onchange="lkAutoFillFromStructure()"></div>
+    <div class="field"><label>Session</label><input id="lk_session" value="${escapeHtml(lkDefaultSession())}"></div>
+    <div class="field"><label>Kit Name</label><input id="lk_kit_name" value="Litera Gear Kit"></div>
+    <div class="field"><label>Kit Cost</label><input id="lk_kit_cost" type="number" min="0" step="0.01" value="0"></div>
+    <div class="field"><label>Amount Paid Now (optional)</label><input id="lk_amount_paid" type="number" min="0" step="0.01" value="0"></div>
+    <div class="field"><label>Payment Date</label><input id="lk_payment_date" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
+    <div class="field"><label>Mode</label><input id="lk_mode" placeholder="Cash / UPI / Bank"></div>
+    <div class="field"><label>Receipt No.</label><input id="lk_receipt"></div>
+  </div><div class="actions"><button class="btn-secondary" onclick="closeFeeDialog()">Cancel</button><button class="btn-primary" onclick="saveLkAddRecord()">Save Kit Record</button></div>`);
+}
+function lkAutoFillFromRoster(){
+  const reg = (document.getElementById('lk_reg_no').value || '').trim();
+  const student = lkStudents.find(s => s.reg_no === reg);
+  if(!student) return;
+  document.getElementById('lk_student_name').value = student.student_name || '';
+  document.getElementById('lk_class_section').value = student.class_section || '';
+  lkAutoFillFromStructure();
+}
+function lkAutoFillFromStructure(){
+  const cls = (document.getElementById('lk_class_section').value || '').trim();
+  const schedule = lkStructure.get(cls);
+  if(!schedule) return;
+  document.getElementById('lk_kit_name').value = schedule.kit_name || 'Litera Gear Kit';
+  document.getElementById('lk_kit_cost').value = Number(schedule.kit_cost || 0);
+}
+async function saveLkAddRecord(){
+  const reg_no = document.getElementById('lk_reg_no').value.trim();
+  const student_name = document.getElementById('lk_student_name').value.trim();
+  const class_section = document.getElementById('lk_class_section').value.trim();
+  const session = document.getElementById('lk_session').value.trim();
+  const kit_name = document.getElementById('lk_kit_name').value.trim() || 'Litera Gear Kit';
+  const kit_cost = Number(document.getElementById('lk_kit_cost').value || 0);
+  const initialPaid = Number(document.getElementById('lk_amount_paid').value || 0);
+  if(!reg_no || !student_name || !class_section){ alert('Admission number, student name and class are required.'); return; }
+  if(initialPaid > kit_cost){ alert('Amount paid cannot exceed the kit cost.'); return; }
+  try{
+    const insertRes = await supabaseClient.from('litera_kit_purchases').insert({ reg_no, student_name, class_section, session: session || null, kit_name, kit_cost, amount_paid: 0, handed_over: false }).select().single();
+    if(insertRes.error) throw insertRes.error;
+    let saved = insertRes.data;
+    if(initialPaid > 0){
+      const { data: user } = await supabaseClient.auth.getUser();
+      const { data, error } = await supabaseClient.rpc('record_litera_kit_payment', { p_purchase_id: saved.id, p_amount: initialPaid, p_payment_date: document.getElementById('lk_payment_date').value, p_mode: document.getElementById('lk_mode').value || null, p_receipt_no: document.getElementById('lk_receipt').value || null, p_remarks: null, p_recorded_by: user?.user?.email || null });
+      if(error) throw error;
+      saved = data;
+    }
+    closeFeeDialog();
+    patchLkRecord(saved);
+  } catch(err){ alert('Could not save kit record: ' + errMsg(err)); }
+}
+
+function openLkPaymentDialog(id){
+  const r = lkRecords.find(x => x.id === id); if(!r) return;
+  openFeeDialog('Record Kit Payment — ' + escapeHtml(r.student_name), `<div class="fee-form-grid">
+    <div class="field"><label>Due Amount</label><input value="${lkMoney(lkDue(r))}" disabled></div>
+    <div class="field"><label>Amount</label><input id="lkp_amount" type="number" min="0.01" step="0.01"></div>
+    <div class="field"><label>Payment Date</label><input id="lkp_date" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
+    <div class="field"><label>Mode</label><input id="lkp_mode" placeholder="Cash / UPI / Bank"></div>
+    <div class="field"><label>Receipt No.</label><input id="lkp_receipt"></div><div class="field"><label>Remarks</label><input id="lkp_remarks"></div>
+  </div><div class="actions"><button class="btn-secondary" onclick="closeFeeDialog()">Cancel</button><button class="btn-primary" onclick="saveLkPayment(${id})">Save Payment</button></div>`);
+}
+async function saveLkPayment(id){
+  const record = lkRecords.find(x => x.id === id); if(!record) return;
+  const amount = Number(document.getElementById('lkp_amount').value);
+  const due = lkDue(record);
+  if(!(amount > 0)){ alert('Enter a payment amount greater than zero.'); return; }
+  if(amount > due){ alert(`Amount exceeds the remaining kit due of ${lkMoney(due)}.`); return; }
+  const { data: user } = await supabaseClient.auth.getUser();
+  const { data, error } = await supabaseClient.rpc('record_litera_kit_payment', { p_purchase_id: id, p_amount: amount, p_payment_date: document.getElementById('lkp_date').value, p_mode: document.getElementById('lkp_mode').value || null, p_receipt_no: document.getElementById('lkp_receipt').value || null, p_remarks: document.getElementById('lkp_remarks').value || null, p_recorded_by: user?.user?.email || null });
+  if(error){ alert('Could not record payment: ' + errMsg(error)); return; }
+  closeFeeDialog();
+  patchLkRecord(data);
+}
+
+function openLkHandoverDialog(id){
+  const r = lkRecords.find(x => x.id === id); if(!r) return;
+  if(lkDue(r) > 0 && !confirm(`${lkMoney(lkDue(r))} is still due for ${r.student_name}. Hand over the kit anyway?`)) return;
+  openFeeDialog('Hand Over Litera Kit — ' + escapeHtml(r.student_name), `<div class="fee-form-grid">
+    <div class="field"><label>Handover Date</label><input id="lkh_date" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
+    <div class="field"><label>Handed Over By</label><input id="lkh_by" placeholder="Staff name"></div>
+  </div><div class="actions"><button class="btn-secondary" onclick="closeFeeDialog()">Cancel</button><button class="btn-primary" onclick="saveLkHandover(${id})">Confirm Handover</button></div>`);
+}
+async function saveLkHandover(id){
+  const { data: user } = await supabaseClient.auth.getUser();
+  const by = document.getElementById('lkh_by').value.trim() || user?.user?.email || null;
+  const { data, error } = await supabaseClient.rpc('record_litera_kit_handover', { p_purchase_id: id, p_handover_date: document.getElementById('lkh_date').value, p_handover_by: by });
+  if(error){ alert('Could not record handover: ' + errMsg(error)); return; }
+  closeFeeDialog();
+  patchLkRecord(data);
+}
+async function undoLkHandover(id){
+  if(!confirm('Mark this kit as not yet handed over?')) return;
+  const { data, error } = await supabaseClient.from('litera_kit_purchases').update({ handed_over: false, handover_date: null, handover_by: null }).eq('id', id).select().single();
+  if(error){ alert('Could not undo handover: ' + errMsg(error)); return; }
+  patchLkRecord(data);
+}
+
+async function openLkPaymentHistory(id){
+  const record = lkRecords.find(x => x.id === id); if(!record) return;
+  openFeeDialog('Kit Payment History — ' + escapeHtml(record.student_name), '<div class="loading">Loading payments...</div>');
+  const dialog = document.querySelector('#feeDialog .fee-dialog-inner');
+  const { data, error } = await supabaseClient.from('litera_kit_payments').select('*').eq('purchase_id', id).order('payment_date', {ascending:false}).order('id', {ascending:false});
+  if(error){ dialog.innerHTML += '<div class="empty">Could not load payment history: ' + escapeHtml(errMsg(error)) + '</div>'; return; }
+  const table = (data || []).length ? `<table><thead><tr><th>Date</th><th>Amount</th><th>Mode</th><th>Receipt</th><th>Remarks</th></tr></thead><tbody>${data.map(p => `<tr><td>${escapeHtml(isoToDmy(p.payment_date) || '')}</td><td>${lkMoney(p.amount)}</td><td>${escapeHtml(p.mode || '—')}</td><td>${escapeHtml(p.receipt_no || '—')}</td><td>${escapeHtml(p.remarks || '—')}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">No payments recorded yet.</div>';
+  dialog.innerHTML = `<h2>Kit Payment History — ${escapeHtml(record.student_name)}</h2><div class="table-container">${table}</div><div class="actions"><button class="btn-secondary" onclick="closeFeeDialog()">Close</button></div>`;
+}
+
+async function deleteLkRecord(id){
+  if(!confirm('Remove this litera kit record and its payment history? This cannot be undone.')) return;
+  try{
+    const { error: payErr } = await supabaseClient.from('litera_kit_payments').delete().eq('purchase_id', id); if(payErr) throw payErr;
+    const { error } = await supabaseClient.from('litera_kit_purchases').delete().eq('id', id); if(error) throw error;
+    lkRecords = lkRecords.filter(r => r.id !== id);
+    renderLkKpis(); renderLkTable(); renderLkReportSummary();
+  } catch(err){ alert('Could not remove kit record: ' + errMsg(err)); }
+}
+
+function openLkStructureDialog(){
+  const classes = new Set([...lkStructure.keys(), ...lkStudents.map(s => s.class_section).filter(Boolean)]);
+  const rows = [...classes].sort().map(cls => {
+    const existing = lkStructure.get(cls) || {};
+    return `<tr><td>${escapeHtml(cls)}</td>
+      <td><input id="lkStruct_${cls}_name" value="${escapeHtml(existing.kit_name || 'Litera Gear Kit')}"></td>
+      <td><input id="lkStruct_${cls}_cost" type="number" min="0" step="0.01" value="${Number(existing.kit_cost || 0)}"></td></tr>`;
+  }).join('');
+  window.__lkStructureClasses = [...classes];
+  openFeeDialog('Edit Litera Kit Fee Structure', `<div class="table-container"><table><thead><tr><th>Class</th><th>Kit Name</th><th>Kit Cost</th></tr></thead><tbody>${rows || '<tr><td colspan="3">No classes found yet — add a student in the Fees Portal first.</td></tr>'}</tbody></table></div>
+    <div class="actions"><button class="btn-secondary" onclick="closeFeeDialog()">Cancel</button><button class="btn-primary" onclick="saveLkStructure()">Save Kit Structure</button></div>`);
+}
+async function saveLkStructure(){
+  const classes = window.__lkStructureClasses || [];
+  const updates = classes.map(cls => ({
+    class_section: cls,
+    kit_name: document.getElementById(`lkStruct_${cls}_name`).value.trim() || 'Litera Gear Kit',
+    kit_cost: Number(document.getElementById(`lkStruct_${cls}_cost`).value || 0)
+  }));
+  if(!updates.length){ closeFeeDialog(); return; }
+  const { error } = await supabaseClient.from('litera_kit_structure').upsert(updates, { onConflict: 'class_section' });
+  if(error){ alert('Could not save kit structure: ' + errMsg(error)); return; }
+  closeFeeDialog();
+  await loadLiteraKitPortal();
+}
+
+function renderLkReportSummary(){
+  const el = document.getElementById('lkReportSummary'); if(!el) return;
+  const total = lkRecords.length;
+  const paid = lkRecords.filter(r => lkStatus(r) === 'PAID').length;
+  const partial = lkRecords.filter(r => lkStatus(r) === 'PARTIAL').length;
+  const unpaid = lkRecords.filter(r => lkStatus(r) === 'UNPAID').length;
+  const handedOver = lkRecords.filter(r => r.handed_over).length;
+  el.innerHTML = `<div class="fee-summary"><div>Total Records<strong>${total}</strong></div><div>Fully Paid<strong>${paid}</strong></div><div>Partially Paid<strong>${partial}</strong></div><div>Unpaid<strong>${unpaid}</strong></div><div>Handed Over<strong>${handedOver}</strong></div></div>`;
+}
+
+function exportLkCsv(kind){
+  const rows = lkRecords.filter(r => {
+    if(kind === 'due') return lkDue(r) > 0;
+    if(kind === 'pending_handover') return !r.handed_over;
+    return true;
+  });
+  const headers = ['Admission No','Student Name','Class','Session','Kit Name','Kit Cost','Amount Paid','Due','Payment Status','Handed Over','Handover Date','Handed Over By'];
+  const csv = '\uFEFF' + [headers, ...rows.map(r => [r.reg_no, r.student_name, r.class_section, r.session || '', r.kit_name, r.kit_cost, lkPaid(r), lkDue(r), lkStatusLabel(lkStatus(r)), r.handed_over ? 'Yes' : 'No', r.handover_date || '', r.handover_by || ''])].map(row => row.map(csvEscape).join(',')).join('\n');
+  const url = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'})); const a = document.createElement('a');
+  a.href = url; a.download = `litera_kit_${kind}_${new Date().toISOString().slice(0,10)}.csv`; a.click(); URL.revokeObjectURL(url);
 }
 
 /* ============ ACCESS: RELATION MANAGER MANAGEMENT (admin only) ============ */
