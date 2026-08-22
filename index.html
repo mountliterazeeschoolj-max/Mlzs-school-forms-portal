@@ -1742,6 +1742,32 @@
   </div>
 </div>
 
+<!-- ================= RELATION MANAGER EMAIL VERIFICATION — ENTER CODE (AFTER REGISTER) ================= -->
+<div id="adminVerifyEmailScreen" class="gate2" style="display:none;">
+  <img class="gate2-logo gate-logo" alt="Mount Litera Zee School Jhansi Logo">
+  <div class="gate2-brand">Mount Litera Zee School<span>Jhansi</span></div>
+  <h2 class="gate2-heading">Verify Your <span class="accent">Email</span></h2>
+  <div class="gate2-divider"></div>
+  <div class="gate2-subtitle">We emailed a 6-digit code to <b id="adminVerifyEmailDisplay"></b> to confirm it's really you.</div>
+
+  <div class="gate2-field">
+    <span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9h4M7 13h7"/></svg></span>
+    <input type="text" id="adminVerifyOtpInput" placeholder="Code from email" inputmode="numeric" maxlength="12">
+  </div>
+
+  <button class="gate2-btn" id="adminVerifyOtpBtn" onclick="confirmAdminSignupOtp()">Verify &amp; Continue</button>
+
+  <div class="gate2-links">
+    <a onclick="resendAdminSignupOtp()">Resend code</a>
+  </div>
+  <div class="note" id="adminVerifyOtpNote" style="display:none;"></div>
+  <div class="gate2-subtitle" style="margin:10px 0 0;font-size:11.5px;">Not seeing it? Check your spam/junk folder — it can take a minute or two, and codes expire after a while, so use "Resend code" if it's been a bit.</div>
+  <div class="gate2-back" onclick="showView('gateScreen')">
+    <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    Back to Log In
+  </div>
+</div>
+
 <!-- ================= ADMIN PASSWORD RESET — REQUEST CODE ================= -->
 <div id="adminResetRequestScreen" class="gate2" style="display:none;">
   <img class="gate2-logo gate-logo" alt="Mount Litera Zee School Jhansi Logo">
@@ -3074,7 +3100,7 @@ async function performFeeSelfLookup(){
 
 /* ============ VIEW SWITCHING ============ */
 function showView(id){
-  ['landingView','studentFormView','class11FormView','staffFormView','staffThankYouView','staffLoginScreen','staffResetConfirmScreen','staffVerifyEmailScreen','staffEditView','gateScreen','mainPanel','adminResetRequestScreen','adminResetConfirmScreen','adminChangePasswordScreen'].forEach(v => {
+  ['landingView','studentFormView','class11FormView','staffFormView','staffThankYouView','staffLoginScreen','staffResetConfirmScreen','staffVerifyEmailScreen','staffEditView','gateScreen','adminVerifyEmailScreen','mainPanel','adminResetRequestScreen','adminResetConfirmScreen','adminChangePasswordScreen'].forEach(v => {
     const el = document.getElementById(v);
     if(v === id){
       el.style.display = 'block';
@@ -3197,10 +3223,81 @@ async function registerRmAccount(){
       await switchTab(role === 'RM' ? 'admission' : 'overview');
       return;
     }
-    showAuthNote('gateNote', 'Account created. Please check your email to verify it, then log in.', 'success');
-    setAdminGateMode('login');
+    /* "Confirm email" is ON, so there's no session yet — take the RM to the in-app
+       code-entry screen instead of just telling them to check their inbox, since
+       this project's "Confirm signup" email template sends a 6-digit token (not a
+       clickable link). See the Staff signup flow above for the same pattern. */
+    openAdminVerifyEmail(email);
+    /* signUp() silently skips sending a fresh email if this address already has an
+       unconfirmed account sitting in Supabase (an anti-enumeration behaviour), so
+       also explicitly call resend() — that's the call Supabase documents as
+       reliably (re-)firing the signup OTP email. */
+    await resendAdminSignupOtp();
   } catch(err){ showAuthNote('gateNote', 'Could not reach the server. Check your internet connection and try again.'); }
 }
+
+/* ---- Email verification (OTP) after registering a new Relation Manager account ----
+   Mirrors confirmStaffSignupOtp()/resendStaffSignupOtp() below — verifyOtp(type:'signup')
+   checks the 6-digit code and, on success, both confirms the address and logs the user in. */
+let adminSignupEmailPending = '';
+
+function openAdminVerifyEmail(email){
+  adminSignupEmailPending = email;
+  document.getElementById('adminVerifyEmailDisplay').textContent = email;
+  document.getElementById('adminVerifyOtpInput').value = '';
+  document.getElementById('adminVerifyOtpNote').style.display = 'none';
+  showView('adminVerifyEmailScreen');
+}
+
+async function confirmAdminSignupOtp(){
+  const code = document.getElementById('adminVerifyOtpInput').value.trim();
+  const showNote = msg => {
+    const note = document.getElementById('adminVerifyOtpNote');
+    note.textContent = msg;
+    note.style.display = 'block';
+  };
+  if(!adminSignupEmailPending){ showView('gateScreen'); return; }
+  if(!code){ showNote('Please enter the code from your email.'); return; }
+  const btn = document.getElementById('adminVerifyOtpBtn');
+  btn.disabled = true;
+  try{
+    const { error } = await supabaseClient.auth.verifyOtp({ email: adminSignupEmailPending, token: code, type: 'signup' });
+    if(error){ showNote('Incorrect or expired code: ' + errMsg(error)); return; }
+    const role = await verifyAdminSessionOrRejectAccess();
+    if(!role){
+      adminSignupEmailPending = '';
+      showView('gateScreen');
+      setAdminGateMode('login');
+      showAuthNote('gateNote', 'Email verified, but this account has not been given access yet. Ask your admin to add you first.');
+      return;
+    }
+    currentPortalRole = role;
+    adminSignupEmailPending = '';
+    showView('mainPanel');
+    applyPortalRoleUI();
+    await switchTab(role === 'RM' ? 'admission' : 'overview');
+  } catch(err){
+    showNote('Could not reach the server: ' + errMsg(err));
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function resendAdminSignupOtp(){
+  const note = document.getElementById('adminVerifyOtpNote');
+  if(!adminSignupEmailPending){ showView('gateScreen'); return; }
+  try{
+    const { error } = await supabaseClient.auth.resend({ type: 'signup', email: adminSignupEmailPending });
+    note.textContent = error ? ('Could not resend the code: ' + errMsg(error)) : 'A new code has been sent.';
+    note.style.display = 'block';
+  } catch(err){
+    note.textContent = 'Could not reach the server: ' + errMsg(err);
+    note.style.display = 'block';
+  }
+}
+document.getElementById('adminVerifyOtpInput').addEventListener('keydown', e => {
+  if(e.key === 'Enter') confirmAdminSignupOtp();
+});
 
 async function checkPasscode(){
   if(Date.now() < adminLoginLockedUntil){
