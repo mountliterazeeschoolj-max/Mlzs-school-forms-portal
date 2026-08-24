@@ -8838,6 +8838,7 @@ function renderLkTable(){
         <td>
           ${status !== 'PAID' ? `<button class="tab-btn" onclick="openLkPaymentDialog(${r.id})">Pay</button>` : ''}
           ${!r.handed_over ? `<button class="tab-btn" onclick="openLkHandoverDialog(${r.id})">Handover</button>` : `<button class="tab-btn" onclick="undoLkHandover(${r.id})">Undo Handover</button>`}
+          <button class="tab-btn" onclick="openLkEditDialog(${r.id})">Edit</button>
           <button class="tab-btn" onclick="openLkPaymentHistory(${r.id})">History</button>
           <button class="tab-btn" onclick="deleteLkRecord(${r.id})">Remove</button>
         </td>
@@ -8922,6 +8923,59 @@ async function saveLkAddRecord(){
     closeFeeDialog();
     patchLkRecord(saved);
   } catch(err){ alert('Could not save kit record: ' + errMsg(err)); }
+}
+
+function openLkEditDialog(id){
+  const r = lkRecords.find(x => x.id === id); if(!r) return;
+  const studentOptions = `<datalist id="lk_edit_student_datalist">${lkStudents.map(s => `<option value="${escapeHtml(s.reg_no)}">${escapeHtml(s.student_name)} — ${escapeHtml(s.class_section)}</option>`).join('')}</datalist>`;
+  const classOptions = `<datalist id="lk_edit_class_datalist">${[...lkStructure.keys()].map(c => `<option value="${escapeHtml(c)}">`).join('')}</datalist>`;
+  openFeeDialog('Edit Litera Kit Record — ' + escapeHtml(r.student_name), `<div class="fee-form-grid">
+    <div class="field"><label>Admission No.</label><input id="lk_edit_reg_no" list="lk_edit_student_datalist" value="${escapeHtml(r.reg_no)}" oninput="lkAutoFillEditFromRoster()" onchange="lkAutoFillEditFromRoster()">${studentOptions}</div>
+    <div class="field"><label>Student Name</label><input id="lk_edit_student_name" value="${escapeHtml(r.student_name)}"></div>
+    <div class="field"><label>Class / Section</label><input id="lk_edit_class_section" list="lk_edit_class_datalist" value="${escapeHtml(r.class_section)}" oninput="lkAutoFillEditFromStructure()" onchange="lkAutoFillEditFromStructure()">${classOptions}</div>
+    <div class="field"><label>Session</label><input id="lk_edit_session" value="${escapeHtml(r.session || '')}"></div>
+    <div class="field"><label>Kit Name</label><input id="lk_edit_kit_name" value="${escapeHtml(r.kit_name || 'Litera Gear Kit')}"></div>
+    <div class="field"><label>Kit Cost</label><input id="lk_edit_kit_cost" type="number" min="0" step="0.01" value="${Number(r.kit_cost || 0)}"><span class="field-hint" id="lk_edit_kit_hint"></span></div>
+  </div>
+  <p class="fs-modal-sub">Amount already paid (${lkMoney(lkPaid(r))}) and handover status are unaffected by this edit — use Pay / Handover for those.</p>
+  <div class="actions"><button class="btn-secondary" onclick="closeFeeDialog()">Cancel</button><button class="btn-primary" onclick="saveLkEditRecord(${id})">Save Changes</button></div>`);
+}
+function lkAutoFillEditFromRoster(){
+  const reg = (document.getElementById('lk_edit_reg_no').value || '').trim();
+  const student = lkStudents.find(s => s.reg_no === reg);
+  if(!student) return;
+  document.getElementById('lk_edit_student_name').value = student.student_name || '';
+  document.getElementById('lk_edit_class_section').value = student.class_section || '';
+  lkAutoFillEditFromStructure();
+}
+function lkAutoFillEditFromStructure(){
+  const cls = (document.getElementById('lk_edit_class_section').value || '').trim();
+  const hint = document.getElementById('lk_edit_kit_hint');
+  const schedule = lkFindStructure(cls);
+  if(!schedule){
+    if(hint) hint.textContent = cls ? `No Master Fee Setup saved yet for "${cls}" — set it in Litera Kit → Setup, or enter the cost manually.` : '';
+    return;
+  }
+  document.getElementById('lk_edit_kit_name').value = schedule.kit_name || 'Litera Gear Kit';
+  document.getElementById('lk_edit_kit_cost').value = Number(schedule.kit_cost || 0);
+  if(hint) hint.textContent = `Auto-filled from Master Fee Setup for ${schedule.class_section}.`;
+}
+async function saveLkEditRecord(id){
+  const record = lkRecords.find(x => x.id === id); if(!record) return;
+  const reg_no = document.getElementById('lk_edit_reg_no').value.trim();
+  const student_name = document.getElementById('lk_edit_student_name').value.trim();
+  const class_section = document.getElementById('lk_edit_class_section').value.trim();
+  const session = document.getElementById('lk_edit_session').value.trim();
+  const kit_name = document.getElementById('lk_edit_kit_name').value.trim() || 'Litera Gear Kit';
+  const kit_cost = Number(document.getElementById('lk_edit_kit_cost').value || 0);
+  if(!reg_no || !student_name || !class_section){ alert('Admission number, student name and class are required.'); return; }
+  if(kit_cost < lkPaid(record)){ alert(`Kit cost cannot be lower than the amount already paid (${lkMoney(lkPaid(record))}).`); return; }
+  try{
+    const { data, error } = await supabaseClient.from('litera_kit_purchases').update({ reg_no, student_name, class_section, session: session || null, kit_name, kit_cost }).eq('id', id).select().single();
+    if(error) throw error;
+    closeFeeDialog();
+    patchLkRecord(data);
+  } catch(err){ alert('Could not save changes: ' + errMsg(err)); }
 }
 
 function openLkPaymentDialog(id){
