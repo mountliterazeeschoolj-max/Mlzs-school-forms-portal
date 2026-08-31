@@ -2401,6 +2401,8 @@
     <div class="tabs fee-tabs">
       <button class="tab-btn active" id="duViewAssign" onclick="switchDuView('assign')">Assign Staff</button>
       <button class="tab-btn" id="duViewLocations" onclick="switchDuView('locations')">Locations</button>
+      <button class="tab-btn" id="duViewSupport" onclick="switchDuView('support')">Support Staff</button>
+      <button class="tab-btn" id="duViewRooms" onclick="switchDuView('rooms')">Room Allocation</button>
       <button class="tab-btn" id="duViewReports" onclick="switchDuView('reports')">Reports</button>
     </div>
 
@@ -2423,6 +2425,43 @@
           <button class="btn-primary" onclick="addDuLocation()">Add Location</button>
         </div>
         <div class="table-container"><div id="duLocationsTableArea"><div class="loading">Loading locations...</div></div></div>
+      </div>
+    </div>
+
+    <div id="duSupportView" style="display:none;">
+      <div class="fee-panel">
+        <h2>Support Staff Duty</h2>
+        <p class="fs-modal-sub">For drivers, maids, gardeners and other support staff who aren't in the Staff Data Bank. Add each person once below, then set their default duty point or a date-specific one, same as teaching staff.</p>
+        <div class="fee-actions">
+          <input type="text" id="duNewSupportName" placeholder="Name" style="flex:1;min-width:160px;">
+          <input type="text" id="duNewSupportRole" placeholder="Role (Driver, Maid, Gardener...)" style="flex:1;min-width:160px;">
+          <button class="btn-primary" onclick="addDuSupportStaff()">Add Person</button>
+        </div>
+        <div class="fee-actions">
+          <input type="text" id="duSupportSearchBox" placeholder="Search name or role" oninput="debounce('duSupportSearch', renderDuSupportTable, 180)">
+        </div>
+        <div class="table-container"><div id="duSupportTableArea"><div class="loading">Loading support staff...</div></div></div>
+      </div>
+    </div>
+
+    <div id="duRoomsView" style="display:none;">
+      <div class="fee-panel">
+        <h2>Room Allocation</h2>
+        <p class="fs-modal-sub">Which wing/room each act or class is using on a given event date.</p>
+        <div class="fee-actions">
+          <input type="date" id="duNewRoomDate">
+          <input type="text" id="duNewRoomWing" placeholder="Wing (e.g. WING-1 Ground Floor)" style="flex:1;min-width:160px;">
+          <input type="text" id="duNewRoomNo" placeholder="Room No." style="width:100px;">
+          <input type="text" id="duNewRoomAct" placeholder="Act / Event name" style="flex:1;min-width:160px;">
+          <input type="text" id="duNewRoomAllotted" placeholder="Allotted to (class/section)" style="flex:1;min-width:160px;">
+          <button class="btn-primary" onclick="addDuRoomAllocation()">Add Row</button>
+        </div>
+        <div class="fee-actions">
+          <select id="duRoomDateFilter" onchange="renderDuRoomsTable()">
+            <option value="">All Dates</option>
+          </select>
+        </div>
+        <div class="table-container"><div id="duRoomsTableArea"><div class="loading">Loading room allocations...</div></div></div>
       </div>
     </div>
 
@@ -9251,18 +9290,23 @@ function exportLkCsv(kind){
    default location; a row with a duty_date is a one-off override for that date,
    which the report and CSV export prefer over the default when present. */
 let duStaff = [];       // rows from staff_records {id, full_name, designation}
-let duLocations = [];   // rows from duty_locations {id, name, notes}
+let duLocations = [];   // rows from duty_locations {id, name, notes, category}
 let duAssignments = []; // rows from duty_assignments {id, staff_id, location_id, duty_date}
+let duSupportStaff = [];       // rows from duty_support_staff {id, name, role}
+let duSupportAssignments = []; // rows from duty_support_assignments {id, support_staff_id, location_id, duty_date}
+let duRooms = [];              // rows from duty_room_allocations {id, event_date, wing, room_no, act_name, allotted_to}
 let currentDuView = 'assign';
 
 function switchDuView(view){
   currentDuView = view;
-  const views = ['assign','locations','reports'];
+  const views = ['assign','locations','support','rooms','reports'];
   views.forEach(name => {
     document.getElementById('duView' + name[0].toUpperCase() + name.slice(1)).classList.toggle('active', name === view);
     document.getElementById('du' + name[0].toUpperCase() + name.slice(1) + 'View').style.display = name === view ? 'block' : 'none';
   });
   if(view === 'locations') renderDuLocationsTable();
+  if(view === 'support') renderDuSupportTable();
+  if(view === 'rooms') renderDuRoomsTable();
   if(view === 'reports') renderDuReport();
 }
 
@@ -9270,22 +9314,33 @@ async function loadDutyChartPortal(){
   const area = document.getElementById('duAssignTableArea');
   if(area) area.innerHTML = '<div class="loading">Loading staff...</div>';
   try{
-    const [staffRes, locRes, assignRes] = await Promise.all([
+    const [staffRes, locRes, assignRes, supportStaffRes, supportAssignRes, roomsRes] = await Promise.all([
       supabaseClient.from('staff_records').select('id,full_name,designation').order('full_name'),
       supabaseClient.from('duty_locations').select('*').order('name'),
-      supabaseClient.from('duty_assignments').select('*')
+      supabaseClient.from('duty_assignments').select('*'),
+      supabaseClient.from('duty_support_staff').select('*').order('name'),
+      supabaseClient.from('duty_support_assignments').select('*'),
+      supabaseClient.from('duty_room_allocations').select('*').order('event_date').order('wing').order('room_no')
     ]);
     if(staffRes.error) throw staffRes.error;
     if(locRes.error) throw locRes.error;
     if(assignRes.error) throw assignRes.error;
+    if(supportStaffRes.error) throw supportStaffRes.error;
+    if(supportAssignRes.error) throw supportAssignRes.error;
+    if(roomsRes.error) throw roomsRes.error;
     duStaff = staffRes.data || [];
     duLocations = locRes.data || [];
     duAssignments = assignRes.data || [];
+    duSupportStaff = supportStaffRes.data || [];
+    duSupportAssignments = supportAssignRes.data || [];
+    duRooms = roomsRes.data || [];
     renderDuAssignTable();
     renderDuLocationsTable();
+    if(currentDuView === 'support') renderDuSupportTable();
+    if(currentDuView === 'rooms') renderDuRoomsTable();
     if(currentDuView === 'reports') renderDuReport();
   } catch(err){
-    const msg = 'Could not load Duty Chart data: ' + escapeHtml(errMsg(err)) + '. If this is the first time, make sure the duty_locations and duty_assignments tables have been created in Supabase (see setup SQL).';
+    const msg = 'Could not load Duty Chart data: ' + escapeHtml(errMsg(err)) + '. If this is the first time, make sure the duty chart tables have been created in Supabase (see setup SQL).';
     if(area) area.innerHTML = '<div class="empty">' + msg + '</div>';
   }
 }
@@ -9496,6 +9551,187 @@ function exportDuReportCsv(){
   const url = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'}));
   const a = document.createElement('a');
   a.href = url; a.download = `duty_chart_${mode === 'date' ? date : 'default'}.csv`; a.click(); URL.revokeObjectURL(url);
+}
+
+/* ---- Support Staff (drivers, maids, gardeners...) — same location list as teaching staff,
+   own roster since these people aren't in staff_records. Same default/override model. ---- */
+function duSupportDefaultFor(id){ return duSupportAssignments.find(a => a.support_staff_id === id && !a.duty_date) || null; }
+function duSupportOverridesFor(id){ return duSupportAssignments.filter(a => a.support_staff_id === id && a.duty_date).sort((a,b) => a.duty_date < b.duty_date ? -1 : 1); }
+
+function renderDuSupportTable(){
+  const area = document.getElementById('duSupportTableArea'); if(!area) return;
+  const q = (document.getElementById('duSupportSearchBox')?.value || '').toLowerCase().trim();
+  const rows = duSupportStaff.filter(s => !q || (s.name||'').toLowerCase().includes(q) || (s.role||'').toLowerCase().includes(q));
+  if(!rows.length){ area.innerHTML = '<div class="empty">No support staff added yet.</div>'; return; }
+  area.innerHTML = `<table><thead><tr><th>Name</th><th>Role</th><th>Default Location</th><th>Date Overrides</th><th></th></tr></thead><tbody>
+    ${rows.map(s => {
+      const def = duSupportDefaultFor(s.id);
+      const overrides = duSupportOverridesFor(s.id);
+      const overrideText = overrides.length
+        ? overrides.map(o => `${escapeHtml(isoToDmy(o.duty_date) || o.duty_date)}: ${escapeHtml(duLocationName(o.location_id))} <a href="javascript:void(0)" onclick="deleteDuSupportAssignment(${o.id})" style="color:#b3261e;text-decoration:none;">✕</a>`).join('<br>')
+        : '<span style="color:var(--muted);">None</span>';
+      return `<tr>
+        <td>${escapeHtml(s.name || '')}</td>
+        <td>${escapeHtml(s.role || '—')}</td>
+        <td><select onchange="saveDuSupportDefault(${s.id}, this.value)">${duLocationOptions(def ? def.location_id : null)}</select></td>
+        <td style="font-size:12.5px;">${overrideText}</td>
+        <td>
+          <button class="btn-secondary" style="padding:6px 10px;font-size:12px;" onclick="openDuSupportOverrideDialog(${s.id}, '${escapeHtml(s.name||'').replace(/'/g,"\\'")}')">+ Date Override</button>
+          <button class="btn-secondary" style="padding:6px 10px;font-size:12px;color:#b3261e;border-color:#b3261e;" onclick="deleteDuSupportStaff(${s.id})">Remove</button>
+        </td>
+      </tr>`;
+    }).join('')}
+  </tbody></table>`;
+}
+
+async function addDuSupportStaff(){
+  const name = document.getElementById('duNewSupportName').value.trim();
+  const role = document.getElementById('duNewSupportRole').value.trim();
+  if(!name){ alert('Enter a name.'); return; }
+  try{
+    const { data, error } = await supabaseClient.from('duty_support_staff').insert([{ name, role: role || null }]).select().single();
+    if(error) throw error;
+    duSupportStaff.push(data);
+    duSupportStaff.sort((a,b) => a.name.localeCompare(b.name));
+    document.getElementById('duNewSupportName').value = '';
+    document.getElementById('duNewSupportRole').value = '';
+    renderDuSupportTable();
+  } catch(err){ alert('Could not add support staff: ' + errMsg(err)); }
+}
+
+async function deleteDuSupportStaff(id){
+  if(!confirm('Remove this person and all their duty assignments?')) return;
+  try{
+    const { error } = await supabaseClient.from('duty_support_staff').delete().eq('id', id);
+    if(error) throw error;
+    duSupportStaff = duSupportStaff.filter(s => s.id !== id);
+    duSupportAssignments = duSupportAssignments.filter(a => a.support_staff_id !== id);
+    renderDuSupportTable();
+  } catch(err){ alert('Could not remove: ' + errMsg(err)); }
+}
+
+async function saveDuSupportDefault(supportId, locationValue){
+  const locationId = locationValue ? Number(locationValue) : null;
+  try{
+    const existing = duSupportDefaultFor(supportId);
+    if(existing){
+      if(!locationId){
+        const { error } = await supabaseClient.from('duty_support_assignments').delete().eq('id', existing.id);
+        if(error) throw error;
+        duSupportAssignments = duSupportAssignments.filter(a => a.id !== existing.id);
+      } else {
+        const { data, error } = await supabaseClient.from('duty_support_assignments').update({ location_id: locationId, updated_at: new Date().toISOString() }).eq('id', existing.id).select().single();
+        if(error) throw error;
+        const idx = duSupportAssignments.findIndex(a => a.id === existing.id);
+        duSupportAssignments[idx] = data;
+      }
+    } else if(locationId){
+      const { data, error } = await supabaseClient.from('duty_support_assignments').insert([{ support_staff_id: supportId, location_id: locationId, duty_date: null }]).select().single();
+      if(error) throw error;
+      duSupportAssignments.push(data);
+    }
+  } catch(err){ alert('Could not save default location: ' + errMsg(err)); }
+  renderDuSupportTable();
+}
+
+function openDuSupportOverrideDialog(supportId, name){
+  openFeeDialog('Date Override — ' + name, `
+    <div class="field" style="margin-bottom:12px;">
+      <label>Date</label>
+      <input type="date" id="duSupOvDate">
+    </div>
+    <div class="field" style="margin-bottom:12px;">
+      <label>Location</label>
+      <select id="duSupOvLocation">${duLocationOptions(null)}</select>
+    </div>
+    <div class="fs-modal-actions">
+      <button class="btn-secondary" onclick="closeFeeDialog()">Cancel</button>
+      <button class="btn-primary" onclick="saveDuSupportOverride(${supportId})">Save Override</button>
+    </div>
+  `);
+}
+
+async function saveDuSupportOverride(supportId){
+  const date = document.getElementById('duSupOvDate').value;
+  const locationId = document.getElementById('duSupOvLocation').value;
+  if(!date){ alert('Pick a date.'); return; }
+  if(!locationId){ alert('Pick a location.'); return; }
+  try{
+    const { data, error } = await supabaseClient.from('duty_support_assignments')
+      .upsert([{ support_staff_id: supportId, location_id: Number(locationId), duty_date: date }], { onConflict: 'support_staff_id,duty_date' })
+      .select().single();
+    if(error) throw error;
+    const idx = duSupportAssignments.findIndex(a => a.support_staff_id === supportId && a.duty_date === date);
+    if(idx >= 0) duSupportAssignments[idx] = data; else duSupportAssignments.push(data);
+    closeFeeDialog();
+    renderDuSupportTable();
+  } catch(err){ alert('Could not save override: ' + errMsg(err)); }
+}
+
+async function deleteDuSupportAssignment(id){
+  if(!confirm('Remove this date override?')) return;
+  try{
+    const { error } = await supabaseClient.from('duty_support_assignments').delete().eq('id', id);
+    if(error) throw error;
+    duSupportAssignments = duSupportAssignments.filter(a => a.id !== id);
+    renderDuSupportTable();
+  } catch(err){ alert('Could not remove override: ' + errMsg(err)); }
+}
+
+/* ---- Room Allocation — independent of staff duty: which act/class is using which room on a given date ---- */
+function renderDuRoomsTable(){
+  const area = document.getElementById('duRoomsTableArea'); if(!area) return;
+  const filterSel = document.getElementById('duRoomDateFilter');
+  if(filterSel){
+    const dates = [...new Set(duRooms.map(r => r.event_date))].sort();
+    const current = filterSel.value;
+    filterSel.innerHTML = '<option value="">All Dates</option>' + dates.map(d => `<option value="${d}"${d === current ? ' selected' : ''}>${escapeHtml(isoToDmy(d) || d)}</option>`).join('');
+  }
+  const filterDate = filterSel ? filterSel.value : '';
+  const rows = duRooms.filter(r => !filterDate || r.event_date === filterDate);
+  if(!rows.length){ area.innerHTML = '<div class="empty">No room allocations added yet.</div>'; return; }
+  area.innerHTML = `<table><thead><tr><th>Date</th><th>Wing</th><th>Room No.</th><th>Act / Event</th><th>Allotted To</th><th></th></tr></thead><tbody>
+    ${rows.map(r => `<tr>
+      <td>${escapeHtml(isoToDmy(r.event_date) || r.event_date)}</td>
+      <td>${escapeHtml(r.wing || '')}</td>
+      <td>${escapeHtml(r.room_no || '—')}</td>
+      <td>${escapeHtml(r.act_name || '—')}</td>
+      <td>${escapeHtml(r.allotted_to || '—')}</td>
+      <td><button class="btn-secondary" style="padding:6px 10px;font-size:12px;color:#b3261e;border-color:#b3261e;" onclick="deleteDuRoomAllocation(${r.id})">Delete</button></td>
+    </tr>`).join('')}
+  </tbody></table>`;
+}
+
+async function addDuRoomAllocation(){
+  const event_date = document.getElementById('duNewRoomDate').value;
+  const wing = document.getElementById('duNewRoomWing').value.trim();
+  const room_no = document.getElementById('duNewRoomNo').value.trim();
+  const act_name = document.getElementById('duNewRoomAct').value.trim();
+  const allotted_to = document.getElementById('duNewRoomAllotted').value.trim();
+  if(!event_date){ alert('Pick a date.'); return; }
+  if(!wing){ alert('Enter a wing.'); return; }
+  try{
+    const { data, error } = await supabaseClient.from('duty_room_allocations').insert([{
+      event_date, wing, room_no: room_no || null, act_name: act_name || null, allotted_to: allotted_to || null
+    }]).select().single();
+    if(error) throw error;
+    duRooms.push(data);
+    document.getElementById('duNewRoomWing').value = '';
+    document.getElementById('duNewRoomNo').value = '';
+    document.getElementById('duNewRoomAct').value = '';
+    document.getElementById('duNewRoomAllotted').value = '';
+    renderDuRoomsTable();
+  } catch(err){ alert('Could not add room allocation: ' + errMsg(err)); }
+}
+
+async function deleteDuRoomAllocation(id){
+  if(!confirm('Delete this room allocation row?')) return;
+  try{
+    const { error } = await supabaseClient.from('duty_room_allocations').delete().eq('id', id);
+    if(error) throw error;
+    duRooms = duRooms.filter(r => r.id !== id);
+    renderDuRoomsTable();
+  } catch(err){ alert('Could not delete: ' + errMsg(err)); }
 }
 
 /* ============ ACCESS: RELATION MANAGER MANAGEMENT (admin only) ============ */
