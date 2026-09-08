@@ -2537,7 +2537,14 @@
       </div>
 
       <div class="cnp-panel">
-        <h2>2. Card Size (inches)</h2>
+        <h2>2. Card Size <span id="cnpSizeUnitLabel">(inches)</span></h2>
+        <div class="field" style="margin-bottom:10px;">
+          <label>Units</label>
+          <select id="cnpUnitSelect">
+            <option value="in" selected>Inches (in)</option>
+            <option value="cm">Centimeters (cm)</option>
+          </select>
+        </div>
         <div class="cnp-row2">
           <div class="field">
             <label>Width</label>
@@ -2548,11 +2555,11 @@
             <input type="number" id="cnpCardHeight" step="0.01" min="0.5" value="8.4">
           </div>
         </div>
-        <div class="cnp-hint">This is the physical size of the finished card, e.g. 5.13" &times; 8.4".</div>
+        <div class="cnp-hint" id="cnpSizeHint">This is the physical size of the finished card, e.g. 5.13" &times; 8.4".</div>
       </div>
 
       <div class="cnp-panel">
-        <h2>3. Name Position (inches)</h2>
+        <h2>3. Name Position <span id="cnpPosUnitLabel">(inches)</span></h2>
         <div class="cnp-row2">
           <div class="field">
             <label>From Left</label>
@@ -2563,7 +2570,7 @@
             <input type="number" id="cnpMarginTop" step="0.01" min="0" value="2.10">
           </div>
         </div>
-        <div class="cnp-hint">Distance from the card's top-left corner to where the name starts.</div>
+        <div class="cnp-hint" id="cnpPosHint">Distance from the card's top-left corner to where the name starts, in the units selected above.</div>
         <div class="field" style="margin-top:12px;">
           <label style="text-transform:none;font-weight:600;color:var(--ink);font-size:13px;"><input type="checkbox" id="cnpShowGuides" checked style="width:auto;margin-right:6px;"> Show margin guide lines in preview</label>
         </div>
@@ -10090,12 +10097,39 @@ function cnpPopulateFonts(){
 
 const $cnp = id => document.getElementById(id);
 
+const CNP_CM_PER_IN = 2.54;
+let cnpUnit = 'in';
+function cnpToInches(v){ return cnpUnit === 'cm' ? v / CNP_CM_PER_IN : v; }
+function cnpFromInches(v){ return cnpUnit === 'cm' ? v * CNP_CM_PER_IN : v; }
+function cnpConvertValue(v, fromUnit, toUnit){
+  if(fromUnit === toUnit) return v;
+  const inches = fromUnit === 'cm' ? v / CNP_CM_PER_IN : v;
+  return toUnit === 'cm' ? inches * CNP_CM_PER_IN : inches;
+}
+
+/* Switches the Card Size / Name Position inputs between inches and centimeters,
+   converting whatever values are already typed in so nothing is lost. */
+function cnpSetUnit(newUnit){
+  if(newUnit === cnpUnit) return;
+  const oldUnit = cnpUnit;
+  ['cnpCardWidth','cnpCardHeight','cnpMarginLeft','cnpMarginTop'].forEach(id => {
+    const el = $cnp(id);
+    const raw = parseFloat(el.value);
+    if(!isNaN(raw)) el.value = cnpConvertValue(raw, oldUnit, newUnit).toFixed(2);
+  });
+  cnpUnit = newUnit;
+  const label = newUnit === 'cm' ? '(centimeters)' : '(inches)';
+  $cnp('cnpSizeUnitLabel').textContent = label;
+  $cnp('cnpPosUnitLabel').textContent = label;
+  cnpRefreshAll();
+}
+
 function cnpGetConfig(){
   return {
-    width: parseFloat($cnp('cnpCardWidth').value) || 5,
-    height: parseFloat($cnp('cnpCardHeight').value) || 7,
-    marginLeft: parseFloat($cnp('cnpMarginLeft').value) || 0,
-    marginTop: parseFloat($cnp('cnpMarginTop').value) || 0,
+    width: cnpToInches(parseFloat($cnp('cnpCardWidth').value) || (cnpUnit === 'cm' ? 13.03 : 5.13)),
+    height: cnpToInches(parseFloat($cnp('cnpCardHeight').value) || (cnpUnit === 'cm' ? 21.34 : 8.4)),
+    marginLeft: cnpToInches(parseFloat($cnp('cnpMarginLeft').value) || 0),
+    marginTop: cnpToInches(parseFloat($cnp('cnpMarginTop').value) || 0),
     fontFamily: $cnp('cnpFontFamily').value,
     fontSize: parseFloat($cnp('cnpFontSize').value) || 18,
     fontColor: $cnp('cnpFontColor').value,
@@ -10181,10 +10215,13 @@ function cnpRefreshAll(){
   txt.style.color = cfg.fontColor;
   txt.style.fontWeight = cfg.fontWeight;
 
-  $cnp('cnpMetaSize').textContent = cfg.width + '" x ' + cfg.height + '"';
-  $cnp('cnpMetaMargin').textContent = cfg.marginLeft + '" left / ' + cfg.marginTop + '" top';
+  const dispW = cnpFromInches(cfg.width), dispH = cnpFromInches(cfg.height);
+  const dispML = cnpFromInches(cfg.marginLeft), dispMT = cnpFromInches(cfg.marginTop);
+  const u = cnpUnit === 'cm' ? 'cm' : '"';
+  $cnp('cnpMetaSize').textContent = dispW.toFixed(2) + u + ' x ' + dispH.toFixed(2) + u;
+  $cnp('cnpMetaMargin').textContent = dispML.toFixed(2) + u + ' left / ' + dispMT.toFixed(2) + u + ' top';
   const paperHint = $cnp('cnpPaperSizeHint');
-  if(paperHint) paperHint.textContent = cfg.width + 'in × ' + cfg.height + 'in';
+  if(paperHint) paperHint.textContent = dispW.toFixed(2) + (cnpUnit === 'cm' ? 'cm' : 'in') + ' × ' + dispH.toFixed(2) + (cnpUnit === 'cm' ? 'cm' : 'in');
 
   cnpBuildPrintRoot(cfg, names);
 }
@@ -10251,6 +10288,9 @@ document.addEventListener('change', function(e){
       cnpRefreshAll();
     };
     reader.readAsDataURL(file);
+  }
+  if(e.target && e.target.id === 'cnpUnitSelect'){
+    cnpSetUnit(e.target.value);
   }
 });
 
