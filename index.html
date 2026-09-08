@@ -2567,6 +2567,19 @@
         <div class="field" style="margin-top:12px;">
           <label style="text-transform:none;font-weight:600;color:var(--ink);font-size:13px;"><input type="checkbox" id="cnpShowGuides" checked style="width:auto;margin-right:6px;"> Show margin guide lines in preview</label>
         </div>
+        <div class="field" style="margin-top:10px;">
+          <label style="text-transform:none;font-weight:600;color:var(--ink);font-size:13px;"><input type="checkbox" id="cnpNamesOnly" style="width:auto;margin-right:6px;"> Print names only (no card image) — for pre-printed card stock</label>
+        </div>
+      </div>
+
+      <div class="cnp-panel" id="cnpPaperSizePanel">
+        <h2>Paper Size — Read Before Printing</h2>
+        <div class="cnp-hint" style="margin-top:0;">
+          Your card size is set to <b id="cnpPaperSizeHint">–</b>. Most printers don't have that as a preset, so Chrome's <b>Paper size</b> box may show <b>blank</b> — that's the "mismatch" you're seeing, not a broken print.
+        </div>
+        <div class="cnp-hint">
+          To fix it: click <b>More settings</b> in the print dialog → set <b>Paper size</b> to <b>Custom</b> (or <i>Manage custom sizes…</i>) and enter the exact width/height shown above → set <b>Margins</b> to <b>None</b> → <b>Scale</b> to <b>100 / Default</b> (not "Fit to page"). If your printer has no Custom option in Chrome, use <b>Print using system dialog</b> (bottom-left of the print panel) — Windows lets you add a custom paper size there.
+        </div>
       </div>
 
       <div class="cnp-panel">
@@ -10087,7 +10100,8 @@ function cnpGetConfig(){
     fontSize: parseFloat($cnp('cnpFontSize').value) || 18,
     fontColor: $cnp('cnpFontColor').value,
     fontWeight: $cnp('cnpFontWeight').value,
-    showGuides: $cnp('cnpShowGuides').checked
+    showGuides: $cnp('cnpShowGuides').checked,
+    namesOnly: $cnp('cnpNamesOnly').checked
   };
 }
 
@@ -10169,6 +10183,8 @@ function cnpRefreshAll(){
 
   $cnp('cnpMetaSize').textContent = cfg.width + '" x ' + cfg.height + '"';
   $cnp('cnpMetaMargin').textContent = cfg.marginLeft + '" left / ' + cfg.marginTop + '" top';
+  const paperHint = $cnp('cnpPaperSizeHint');
+  if(paperHint) paperHint.textContent = cfg.width + 'in × ' + cfg.height + 'in';
 
   cnpBuildPrintRoot(cfg, names);
 }
@@ -10190,7 +10206,7 @@ function cnpBuildPrintRoot(cfg, names){
     card.style.width = cfg.width + 'in';
     card.style.height = cfg.height + 'in';
 
-    if(cnpCurrentImageSrc){
+    if(cnpCurrentImageSrc && !cfg.namesOnly){
       const img = document.createElement('img');
       img.src = cnpCurrentImageSrc;
       card.appendChild(img);
@@ -10238,7 +10254,7 @@ document.addEventListener('change', function(e){
   }
 });
 
-['cnpCardWidth','cnpCardHeight','cnpMarginLeft','cnpMarginTop','cnpFontFamily','cnpFontSize','cnpFontColor','cnpFontWeight','cnpShowGuides','cnpNamesInput']
+['cnpCardWidth','cnpCardHeight','cnpMarginLeft','cnpMarginTop','cnpFontFamily','cnpFontSize','cnpFontColor','cnpFontWeight','cnpShowGuides','cnpNamesInput','cnpNamesOnly']
   .forEach(id => { const el = document.getElementById(id); if(el) el.addEventListener('input', cnpRefreshAll); });
 
 window.addEventListener('resize', () => {
