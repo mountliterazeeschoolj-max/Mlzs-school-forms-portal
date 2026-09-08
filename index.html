@@ -588,7 +588,7 @@
 @media print{
   body *{visibility:hidden;}
   #cnpPrintRoot, #cnpPrintRoot *{visibility:visible;}
-  #cnpPrintRoot{position:absolute;top:0;left:0;margin:0;padding:0;}
+  #cnpPrintRoot{display:block !important;position:absolute;top:0;left:0;margin:0;padding:0;}
   .cnp-print-card{position:relative;overflow:hidden;page-break-after:always;box-shadow:none !important;}
   .cnp-print-card:last-child{page-break-after:auto;}
   .cnp-print-card img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;display:block;}
@@ -1906,6 +1906,11 @@
     </div>
     <div class="toolbar">
       <input type="text" id="searchBox" placeholder="Search..." oninput="currentPage=1; renderTable();">
+      <select id="staffStatusFilter" style="display:none;" onchange="currentPage=1; renderTable();">
+        <option value="all">All Staff</option>
+        <option value="active" selected>Active Staff Only</option>
+        <option value="resigned">Resigned Only</option>
+      </select>
       <button class="btn-secondary" id="refreshBtn" onclick="refreshCurrentTab()">Refresh</button>
       <button class="btn-primary" id="exportCsvBtn" onclick="exportAllCSV()">Export All to Excel (CSV)</button>
       <button class="btn-primary" id="exportFilesBtn" onclick="exportAllWithFiles()">Export All Data + Files (ZIP)</button>
@@ -2593,11 +2598,13 @@
 
       <div class="cnp-panel">
         <h2>5. Name(s) <span class="cnp-count-pill" id="cnpNameCountPill">1</span></h2>
+        <button type="button" class="btn-secondary" style="width:100%;margin-bottom:10px;" onclick="cnpLoadActiveStaff()">Load All Active Staff Names</button>
+        <div class="cnp-hint" id="cnpActiveStaffHint" style="margin-top:0;margin-bottom:10px;"></div>
         <div class="field">
           <label>One name per line</label>
           <textarea id="cnpNamesInput" placeholder="Mrs. Anita Sharma&#10;Mr. Rakesh Verma&#10;Ms. Priya Singh">Mrs. Anita Sharma</textarea>
         </div>
-        <div class="cnp-hint">Each line prints on its own card, using the same size and position above.</div>
+        <div class="cnp-hint">Each line prints on its own card, using the same size and position above. Use "Load All Active Staff Names" to pull the current staff list automatically instead of typing names.</div>
       </div>
 
       <button class="btn-primary" style="width:100%;" onclick="cnpPrintCards()">Print All Cards</button>
@@ -5262,6 +5269,60 @@ async function editTrainingHours(record){
   }
 }
 
+/* Marks a staff member as resigned so they drop out of "active staff" everywhere
+   (bulk card printing, active-only filters) without deleting their record. */
+async function resignStaff(record){
+  const today = new Date().toISOString().slice(0,10);
+  const input = prompt('Mark ' + (record.fullName || 'this staff member') + ' as resigned.\n\nDate of resignation (YYYY-MM-DD):', today);
+  if(input === null) return; // cancelled
+  const resignationDate = input.trim();
+  if(resignationDate && !/^\d{4}-\d{2}-\d{2}$/.test(resignationDate)){
+    alert('Please enter the date as YYYY-MM-DD.');
+    return;
+  }
+  if(!confirm(`Confirm: mark ${record.fullName || 'this staff member'} as resigned as of ${resignationDate || 'today'}?`)) return;
+
+  try{
+    const { error } = await supabaseClient.from('staff_records')
+      .update({ employment_status: 'resigned', resignation_date: resignationDate || today })
+      .eq('id', record._key);
+    if(error) throw error;
+
+    const idx = allRecords.findIndex(r => r._key === record._key);
+    if(idx !== -1){
+      allRecords[idx].employmentStatus = 'resigned';
+      allRecords[idx].resignationDate = resignationDate || today;
+    }
+    renderStats();
+    renderTable();
+  } catch(err){
+    console.error(err);
+    alert('Could not mark this staff member as resigned: ' + errMsg(err));
+  }
+}
+
+/* Reverses resignStaff — restores a resigned staff member to active status. */
+async function reactivateStaff(record){
+  if(!confirm('Reactivate ' + (record.fullName || 'this staff member') + '? They will count as active staff again.')) return;
+  try{
+    const { error } = await supabaseClient.from('staff_records')
+      .update({ employment_status: 'active', resignation_date: null })
+      .eq('id', record._key);
+    if(error) throw error;
+
+    const idx = allRecords.findIndex(r => r._key === record._key);
+    if(idx !== -1){
+      allRecords[idx].employmentStatus = 'active';
+      allRecords[idx].resignationDate = null;
+    }
+    renderStats();
+    renderTable();
+  } catch(err){
+    console.error(err);
+    alert('Could not reactivate this staff member: ' + errMsg(err));
+  }
+}
+
 function downloadStaffCSV(){
   const obj = collectStaffData();
   const headers = [
@@ -5377,6 +5438,7 @@ async function switchTab(tab){
   document.querySelector('#mainPanel > .table-container').style.display = isSpecial ? 'none' : '';
   document.getElementById('pageControls').style.display = isSpecial ? 'none' : 'flex';
   document.getElementById('searchBox').style.display = isSpecial ? 'none' : '';
+  document.getElementById('staffStatusFilter').style.display = (isSpecial || tab !== 'staff') ? 'none' : '';
   document.getElementById('exportCsvBtn').style.display = isSpecial ? 'none' : '';
   document.getElementById('exportFilesBtn').style.display = isSpecial ? 'none' : '';
 
@@ -5457,7 +5519,8 @@ function mapRow(row, tab){
       aadharNumber: row.aadhar_number, panNumber: row.pan_number, trainingHours: row.training_hours,
       photoFile: row.photo_path, aadharCardFrontFile: row.aadhar_card_front_path, aadharCardBackFile: row.aadhar_card_back_path,
       panCardFile: row.pan_card_path,
-      passbookFile: row.passbook_path, submittedAt: row.submitted_at
+      passbookFile: row.passbook_path, submittedAt: row.submitted_at,
+      employmentStatus: row.employment_status || 'active', resignationDate: row.resignation_date
     };
   }
 }
@@ -5504,8 +5567,12 @@ function renderStats(){
   } else {
     const bedYes = allRecords.filter(r => r.bed === 'Yes').length;
     const missingDocs = allRecords.filter(r => !r.aadharCardFrontFile || !r.aadharCardBackFile || !r.photoFile).length;
+    const activeCount = allRecords.filter(r => (r.employmentStatus || 'active') === 'active').length;
+    const resignedCount = allRecords.filter(r => r.employmentStatus === 'resigned').length;
     document.getElementById('statsRow').innerHTML = `
       <div class="stat-card"><div class="num">${total}</div><div class="label">Total Staff Records</div></div>
+      <div class="stat-card"><div class="num">${activeCount}</div><div class="label">Active Staff</div></div>
+      <div class="stat-card"><div class="num">${resignedCount}</div><div class="label">Resigned Staff</div></div>
       <div class="stat-card"><div class="num">${bedYes}</div><div class="label">B.Ed Qualified</div></div>
       <div class="stat-card"><div class="num">${missingDocs}</div><div class="label">Missing Documents</div></div>
     `;
@@ -5655,6 +5722,12 @@ function renderTable(){
     return Object.values(r).some(v => String(v).toLowerCase().includes(q));
   });
 
+  if(currentTab === 'staff'){
+    const statusFilter = document.getElementById('staffStatusFilter').value;
+    if(statusFilter === 'active') rows = rows.filter(r => (r.employmentStatus || 'active') === 'active');
+    else if(statusFilter === 'resigned') rows = rows.filter(r => r.employmentStatus === 'resigned');
+  }
+
   rows.sort((a,b) => {
     const av = (a[sortKey] || '').toString().toLowerCase();
     const bv = (b[sortKey] || '').toString().toLowerCase();
@@ -5687,7 +5760,7 @@ function renderTable(){
     ['subject2','Sub 2'], ['subject3','Sub 3'], ['subject4','Sub 4'],
     ['pwd','PWD'], ['aadharCardFrontFile','Aadhar (F)'], ['aadharCardBackFile','Aadhar (B)'], ['submittedAt','Submitted At']
   ] : [
-    ['fullName','Full Name'], ['designation','Designation'], ['gender','Gender'], ['dob','DOB'],
+    ['fullName','Full Name'], ['designation','Designation'], ['employmentStatus','Status'], ['gender','Gender'], ['dob','DOB'],
     ['contactNumber','Contact'], ['qualification','Qualification'], ['bed','B.Ed'],
     ['dateOfJoining','Joined'], ['subjectsTaught','Subjects'], ['classTaught','Class'],
     ['totalExperience','Experience'], ['trainingHours','Training Hours'], ['aadharCardFrontFile','Aadhar (F)'], ['aadharCardBackFile','Aadhar (B)'], ['panCardFile','PAN'],
@@ -5708,6 +5781,13 @@ function renderTable(){
       let val = r[key] || '';
       if(key === 'submittedAt' && val){ val = new Date(val).toLocaleString(); }
       if(key === 'trainingHours'){ val = val ? escapeHtml(val) : '<span class="badge">not set</span>'; }
+      if(key === 'employmentStatus'){
+        const resigned = val === 'resigned';
+        const dateStr = r.resignationDate ? ` (${escapeHtml(isoToDmy(r.resignationDate))})` : '';
+        val = resigned
+          ? `<span class="badge" style="background:#fbe4e2;color:#a02c1f;font-weight:700;">Resigned${dateStr}</span>`
+          : `<span class="badge" style="background:#e3f3e6;color:#1f7a34;font-weight:700;">Active</span>`;
+      }
       if(fileKeys.includes(key)){
         val = val ? `<span class="badge" style="cursor:pointer;text-decoration:underline;" onclick='viewDoc(${JSON.stringify(val)})'>view</span>` : '<span class="badge">missing</span>';
       }
@@ -5717,6 +5797,9 @@ function renderTable(){
     if(currentTab === 'staff'){
       actionBtns += ` <button class="tab-btn" onclick='editTrainingHours(${JSON.stringify(r)})'>${r.trainingHours ? 'Edit' : 'Add'} Training Hours</button>`;
       actionBtns += ` <button class="tab-btn" onclick='resendStaffMail(${JSON.stringify(r)})'>Resend Mail</button>`;
+      actionBtns += r.employmentStatus === 'resigned'
+        ? ` <button class="tab-btn" onclick='reactivateStaff(${JSON.stringify(r)})'>Reactivate</button>`
+        : ` <button class="tab-btn" style="color:#a02c1f;" onclick='resignStaff(${JSON.stringify(r)})'>Resign</button>`;
     }
     actionBtns += ` <button class="del-btn" onclick="deleteRecord('${r._key}')">Delete</button>`;
     html += `<td>${actionBtns}</td>`;
@@ -5836,13 +5919,13 @@ function getExportSpec(){
   } else {
     return {
       headers: [
-        'Full Name','Designation','Gender',"Father's/Husband's Name",'Relation','Date of Birth','Contact Number',
+        'Full Name','Designation','Employment Status','Resignation Date','Gender',"Father's/Husband's Name",'Relation','Date of Birth','Contact Number',
         "Father's/Husband's Number",'Email ID','Current Address','Full Address','Highest Qualification',
         'B.Ed','Date of Joining','Total Experience','Subjects Taught','Class Taught','CBSE Oasis ID',
         'Account Number','IFSC Code','Aadhar Number','PAN Number','Training Hours','Photo File','Aadhar Card Front File','Aadhar Card Back File','PAN Card File','Passbook File','Submitted At'
       ],
       keys: [
-        'fullName','designation','gender','parentName','parentRelation','dob','contactNumber','parentContactNumber','emailId',
+        'fullName','designation','employmentStatus','resignationDate','gender','parentName','parentRelation','dob','contactNumber','parentContactNumber','emailId',
         'currentAddress','fullAddress','qualification','bed','dateOfJoining','totalExperience',
         'subjectsTaught','classTaught','oasisId','accountNumber','ifscCode','aadharNumber','panNumber','trainingHours',
         'photoFile','aadharCardFrontFile','aadharCardBackFile','panCardFile','passbookFile','submittedAt'
@@ -10013,6 +10096,34 @@ function cnpGetNames(){
   return raw.length ? raw : [''];
 }
 
+/* Pulls every currently-active (non-resigned) staff member's name from staff_records
+   and drops them straight into the names box, one per line, ready to bulk-print. */
+async function cnpLoadActiveStaff(){
+  const hint = $cnp('cnpActiveStaffHint');
+  hint.textContent = 'Loading active staff…';
+  try{
+    const { data, error } = await supabaseClient
+      .from('staff_records')
+      .select('full_name, employment_status')
+      .order('full_name', { ascending: true });
+    if(error) throw error;
+    const activeNames = (data || [])
+      .filter(r => (r.employment_status || 'active') === 'active')
+      .map(r => (r.full_name || '').trim())
+      .filter(Boolean);
+    if(activeNames.length === 0){
+      hint.textContent = 'No active staff found.';
+      return;
+    }
+    $cnp('cnpNamesInput').value = activeNames.join('\n');
+    cnpRefreshAll();
+    hint.textContent = `Loaded ${activeNames.length} active staff name${activeNames.length === 1 ? '' : 's'}.`;
+  } catch(err){
+    console.error(err);
+    hint.textContent = 'Could not load staff: ' + errMsg(err);
+  }
+}
+
 function cnpRefreshAll(){
   cnpPopulateFonts();
   const cfg = cnpGetConfig();
@@ -10102,7 +10213,15 @@ function cnpBuildPrintRoot(cfg, names){
 
 function cnpPrintCards(){
   cnpRefreshAll();
-  window.print();
+  const imgs = Array.from(document.querySelectorAll('#cnpPrintRoot img'));
+  const pending = imgs.filter(img => !img.complete);
+  if(pending.length === 0){
+    window.print();
+    return;
+  }
+  let remaining = pending.length;
+  const done = () => { remaining--; if(remaining <= 0) window.print(); };
+  pending.forEach(img => { img.addEventListener('load', done, { once:true }); img.addEventListener('error', done, { once:true }); });
 }
 
 document.addEventListener('change', function(e){
