@@ -901,17 +901,17 @@
         </select>
       </div>
       <div class="field">
-        <label for="staffDob">Date of Birth</label>
-        <input type="text" id="staffDob" name="dob" placeholder="DD/MM/YYYY" inputmode="numeric" maxlength="10" oninput="formatDateInput(this)">
+        <label for="staffDob">Date of Birth<span class="required">*</span></label>
+        <input type="text" id="staffDob" name="dob" placeholder="DD/MM/YYYY" inputmode="numeric" maxlength="10" oninput="formatDateInput(this)" required>
       </div>
     </div>
     <div class="field" style="margin-bottom:14px;">
-      <label>Father's Name / Husband's Name</label>
+      <label>Father's Name / Husband's Name<span class="required">*</span></label>
       <div class="relation-choice">
-        <label><input type="radio" name="parentRelation" value="Father"> Father</label>
-        <label><input type="radio" name="parentRelation" value="Husband"> Husband</label>
+        <label><input type="radio" name="parentRelation" value="Father" required> Father</label>
+        <label><input type="radio" name="parentRelation" value="Husband" required> Husband</label>
       </div>
-      <input type="text" id="parentName" name="parentName" placeholder="Enter name">
+      <input type="text" id="parentName" name="parentName" placeholder="Enter name" required>
     </div>
 
     <div class="section-title">Contact Details</div>
@@ -921,55 +921,55 @@
         <input type="tel" id="contactNumber" name="contactNumber" placeholder="10-digit mobile number">
       </div>
       <div class="field">
-        <label for="parentContactNumber">Father's/Husband's Number</label>
-        <input type="tel" id="parentContactNumber" name="parentContactNumber">
+        <label for="parentContactNumber">Father's/Husband's Number<span class="required">*</span></label>
+        <input type="tel" id="parentContactNumber" name="parentContactNumber" required>
       </div>
     </div>
     <div class="row two">
       <div class="field">
-        <label for="emailId">Email ID</label>
-        <input type="text" id="emailId" name="emailId">
+        <label for="emailId">Email ID<span class="required">*</span></label>
+        <input type="text" id="emailId" name="emailId" required>
       </div>
     </div>
     <div class="field" style="margin-bottom:14px;">
-      <label for="currentAddress">Current Address</label>
-      <textarea id="currentAddress" name="currentAddress"></textarea>
+      <label for="currentAddress">Current Address<span class="required">*</span></label>
+      <textarea id="currentAddress" name="currentAddress" required></textarea>
     </div>
     <div class="field" style="margin-bottom:14px;">
-      <label for="fullAddress">Full (Permanent) Address</label>
-      <textarea id="fullAddress" name="fullAddress"></textarea>
+      <label for="fullAddress">Full (Permanent) Address<span class="required">*</span></label>
+      <textarea id="fullAddress" name="fullAddress" required></textarea>
     </div>
 
     <div class="section-title">Professional Details</div>
     <div class="row two">
       <div class="field">
-        <label for="qualification">Highest Qualification</label>
-        <input type="text" id="qualification" name="qualification">
+        <label for="qualification">Highest Qualification<span class="required">*</span></label>
+        <input type="text" id="qualification" name="qualification" required>
       </div>
       <fieldset style="margin:0;">
-        <legend>Professional Qualification (B.Ed)</legend>
+        <legend>Professional Qualification (B.Ed)<span class="required">*</span></legend>
         <div class="choice-group">
-          <label class="choice"><input type="radio" name="bed" value="Yes"> Yes</label>
-          <label class="choice"><input type="radio" name="bed" value="No"> No</label>
+          <label class="choice"><input type="radio" name="bed" value="Yes" required> Yes</label>
+          <label class="choice"><input type="radio" name="bed" value="No" required> No</label>
         </div>
       </fieldset>
     </div>
     <div class="row two">
       <fieldset style="margin:0;">
-        <legend>CTET Qualified</legend>
+        <legend>CTET Qualified<span class="required">*</span></legend>
         <div class="choice-group">
-          <label class="choice"><input type="radio" name="ctetQualified" value="Yes" onchange="toggleStfCtet(true)"> Yes</label>
-          <label class="choice"><input type="radio" name="ctetQualified" value="No" onchange="toggleStfCtet(false)"> No</label>
+          <label class="choice"><input type="radio" name="ctetQualified" value="Yes" onchange="toggleStfCtet(true)" required> Yes</label>
+          <label class="choice"><input type="radio" name="ctetQualified" value="No" onchange="toggleStfCtet(false)" required> No</label>
         </div>
         <div class="disability-extra" id="stfCtetExtra">
           <div class="row two" style="margin-bottom:0;">
             <div class="field">
-              <label for="ctetRollNumber">CTET Roll Number</label>
-              <input type="text" id="ctetRollNumber" name="ctetRollNumber">
+              <label for="ctetRollNumber">CTET Roll Number<span class="required">*</span></label>
+              <input type="text" id="ctetRollNumber" name="ctetRollNumber" required>
             </div>
             <div class="field">
-              <label for="ctetYear">CTET Year</label>
-              <input type="text" id="ctetYear" name="ctetYear" placeholder="e.g. 2022" inputmode="numeric" maxlength="4">
+              <label for="ctetYear">CTET Year<span class="required">*</span></label>
+              <input type="text" id="ctetYear" name="ctetYear" placeholder="e.g. 2022" inputmode="numeric" maxlength="4" required>
             </div>
           </div>
         </div>
@@ -977,22 +977,22 @@
     </div>
     <div class="row two">
       <div class="field">
-        <label for="dateOfJoining">Date of Joining (This Institution)</label>
-        <input type="text" id="dateOfJoining" name="dateOfJoining" placeholder="DD/MM/YYYY" inputmode="numeric" maxlength="10" oninput="formatDateInput(this)">
+        <label for="dateOfJoining">Date of Joining (This Institution)<span class="required">*</span></label>
+        <input type="text" id="dateOfJoining" name="dateOfJoining" placeholder="DD/MM/YYYY" inputmode="numeric" maxlength="10" oninput="formatDateInput(this)" required>
       </div>
       <div class="field">
-        <label for="totalExperience">Total Experience (In Years)</label>
-        <input type="text" id="totalExperience" name="totalExperience">
+        <label for="totalExperience">Total Experience (In Years)<span class="required">*</span></label>
+        <input type="text" id="totalExperience" name="totalExperience" required>
       </div>
     </div>
     <div class="row two">
       <div class="field">
-        <label for="subjectsTaught">Subjects Taught</label>
-        <input type="text" id="subjectsTaught" name="subjectsTaught">
+        <label for="subjectsTaught">Subjects Taught<span class="required">*</span></label>
+        <input type="text" id="subjectsTaught" name="subjectsTaught" required>
       </div>
     </div>
     <fieldset style="margin:0 0 14px;">
-      <legend>Select Classes Taught</legend>
+      <legend>Select Classes Taught<span class="required">*</span></legend>
       <div class="choice-group">
         <label class="choice"><input type="checkbox" name="classTaught" value="KG-NURSERY"> KG-NURSERY</label>
         <label class="choice"><input type="checkbox" name="classTaught" value="CLASS I"> CLASS I</label>
@@ -1017,22 +1017,22 @@
     <div class="section-title">Bank &amp; Identification Details</div>
     <div class="row two">
       <div class="field">
-        <label for="accountNumber">Account Number (Canara Bank only)</label>
-        <input type="text" id="accountNumber" name="accountNumber">
+        <label for="accountNumber">Account Number (Canara Bank only)<span class="required">*</span></label>
+        <input type="text" id="accountNumber" name="accountNumber" required>
       </div>
       <div class="field">
-        <label for="ifscCode">IFSC Code</label>
-        <input type="text" id="ifscCode" name="ifscCode">
+        <label for="ifscCode">IFSC Code<span class="required">*</span></label>
+        <input type="text" id="ifscCode" name="ifscCode" required>
       </div>
     </div>
     <div class="row two">
       <div class="field">
-        <label for="aadharNumber">Aadhar Card Number</label>
-        <input type="text" id="aadharNumber" name="aadharNumber">
+        <label for="aadharNumber">Aadhar Card Number<span class="required">*</span></label>
+        <input type="text" id="aadharNumber" name="aadharNumber" required>
       </div>
       <div class="field">
-        <label for="panNumber">PAN Card Number</label>
-        <input type="text" id="panNumber" name="panNumber">
+        <label for="panNumber">PAN Card Number<span class="required">*</span></label>
+        <input type="text" id="panNumber" name="panNumber" required>
       </div>
     </div>
 
@@ -1040,34 +1040,34 @@
     <div class="upload-grid">
       <div class="photo-slot">
         <div class="photo-preview" id="stfPhotoPreview">Passport size photo</div>
-        <label class="upload-label">Upload Photo
+        <label class="upload-label">Upload Photo<span class="required">*</span>
           <input type="file" accept="image/*" onchange="handleStfPhoto(event)">
         </label>
       </div>
       <div class="doc-list">
         <div class="doc-item">
-          <span class="doc-name">Aadhar Card (Front)</span>
+          <span class="doc-name">Aadhar Card (Front)<span class="required">*</span></span>
           <label class="upload-label">Attach
             <input type="file" accept="image/*,application/pdf" onchange="handleStfDoc(event,'aadharCardFront')">
           </label>
           <span class="doc-status" id="stf-status-aadharCardFront">Not attached</span>
         </div>
         <div class="doc-item">
-          <span class="doc-name">Aadhar Card (Back)</span>
+          <span class="doc-name">Aadhar Card (Back)<span class="required">*</span></span>
           <label class="upload-label">Attach
             <input type="file" accept="image/*,application/pdf" onchange="handleStfDoc(event,'aadharCardBack')">
           </label>
           <span class="doc-status" id="stf-status-aadharCardBack">Not attached</span>
         </div>
         <div class="doc-item">
-          <span class="doc-name">PAN Card</span>
+          <span class="doc-name">PAN Card<span class="required">*</span></span>
           <label class="upload-label">Attach
             <input type="file" accept="image/*,application/pdf" onchange="handleStfDoc(event,'panCard')">
           </label>
           <span class="doc-status" id="stf-status-panCard">Not attached</span>
         </div>
         <div class="doc-item">
-          <span class="doc-name">Bank Passbook Photo (Canara Bank Only)</span>
+          <span class="doc-name">Bank Passbook Photo (Canara Bank Only)<span class="required">*</span></span>
           <label class="upload-label">Attach
             <input type="file" accept="image/*,application/pdf" onchange="handleStfDoc(event,'passbook')">
           </label>
@@ -4550,11 +4550,39 @@ async function submitStaffData(){
   if(!obj.fullName || !obj.fullName.trim()) errors.push('Full Name is required.');
   if(!obj.designation || !obj.designation.trim()) errors.push('Designation is required.');
   if(!obj.gender) errors.push('Please select Gender.');
+  if(!obj.dob || !obj.dob.trim()) errors.push('Date of Birth is required.');
+  else if(!isValidDate(obj.dob)) errors.push('Date of Birth is not a valid date (use DD/MM/YYYY, not in the future).');
+  if(!obj.parentRelation) errors.push("Please select Father or Husband.");
+  if(!obj.parentName || !obj.parentName.trim()) errors.push("Father's Name / Husband's Name is required.");
   if(!obj.contactNumber) errors.push('Contact Number is required.');
   else if(!isValidMobile(obj.contactNumber)) errors.push('Contact Number must be a valid 10-digit number.');
-  if(obj.parentContactNumber && !isValidMobile(obj.parentContactNumber)) errors.push("Father's/Husband's Number must be a valid 10-digit number.");
-  if(obj.dob && !isValidDate(obj.dob)) errors.push('Date of Birth is not a valid date (use DD/MM/YYYY, not in the future).');
-  if(obj.emailId && !isValidEmail(obj.emailId)) errors.push('Email ID looks invalid.');
+  if(!obj.parentContactNumber || !obj.parentContactNumber.trim()) errors.push("Father's/Husband's Number is required.");
+  else if(!isValidMobile(obj.parentContactNumber)) errors.push("Father's/Husband's Number must be a valid 10-digit number.");
+  if(!obj.emailId || !obj.emailId.trim()) errors.push('Email ID is required.');
+  else if(!isValidEmail(obj.emailId)) errors.push('Email ID looks invalid.');
+  if(!obj.currentAddress || !obj.currentAddress.trim()) errors.push('Current Address is required.');
+  if(!obj.fullAddress || !obj.fullAddress.trim()) errors.push('Full (Permanent) Address is required.');
+  if(!obj.qualification || !obj.qualification.trim()) errors.push('Highest Qualification is required.');
+  if(!obj.bed) errors.push('Please select Professional Qualification (B.Ed).');
+  if(!obj.ctetQualified) errors.push('Please select CTET Qualified.');
+  else if(obj.ctetQualified === 'Yes'){
+    if(!obj.ctetRollNumber || !obj.ctetRollNumber.trim()) errors.push('CTET Roll Number is required.');
+    if(!obj.ctetYear || !obj.ctetYear.trim()) errors.push('CTET Year is required.');
+  }
+  if(!obj.dateOfJoining || !obj.dateOfJoining.trim()) errors.push('Date of Joining is required.');
+  else if(!isValidDate(obj.dateOfJoining)) errors.push('Date of Joining is not a valid date (use DD/MM/YYYY).');
+  if(!obj.totalExperience || !obj.totalExperience.trim()) errors.push('Total Experience is required.');
+  if(!obj.subjectsTaught || !obj.subjectsTaught.trim()) errors.push('Subjects Taught is required.');
+  if(!obj.classTaught || !obj.classTaught.trim()) errors.push('Please select at least one Class Taught.');
+  if(!obj.accountNumber || !obj.accountNumber.trim()) errors.push('Account Number is required.');
+  if(!obj.ifscCode || !obj.ifscCode.trim()) errors.push('IFSC Code is required.');
+  if(!obj.aadharNumber || !obj.aadharNumber.trim()) errors.push('Aadhar Card Number is required.');
+  if(!obj.panNumber || !obj.panNumber.trim()) errors.push('PAN Card Number is required.');
+  if(!stfFiles.photo) errors.push('Please upload your Photo.');
+  if(!stfFiles.aadharCardFront) errors.push('Please attach Aadhar Card (Front).');
+  if(!stfFiles.aadharCardBack) errors.push('Please attach Aadhar Card (Back).');
+  if(!stfFiles.panCard) errors.push('Please attach PAN Card.');
+  if(!stfFiles.passbook) errors.push('Please attach Bank Passbook Photo.');
   [stfFiles.photo, stfFiles.aadharCardFront, stfFiles.aadharCardBack, stfFiles.panCard, stfFiles.passbook].forEach(f => {
     const sizeErr = checkFileSize(f);
     if(sizeErr) errors.push(sizeErr);
