@@ -955,6 +955,27 @@
       </fieldset>
     </div>
     <div class="row two">
+      <fieldset style="margin:0;">
+        <legend>CTET Qualified</legend>
+        <div class="choice-group">
+          <label class="choice"><input type="radio" name="ctetQualified" value="Yes" onchange="toggleStfCtet(true)"> Yes</label>
+          <label class="choice"><input type="radio" name="ctetQualified" value="No" onchange="toggleStfCtet(false)"> No</label>
+        </div>
+        <div class="disability-extra" id="stfCtetExtra">
+          <div class="row two" style="margin-bottom:0;">
+            <div class="field">
+              <label for="ctetRollNumber">CTET Roll Number</label>
+              <input type="text" id="ctetRollNumber" name="ctetRollNumber">
+            </div>
+            <div class="field">
+              <label for="ctetYear">CTET Year</label>
+              <input type="text" id="ctetYear" name="ctetYear" placeholder="e.g. 2022" inputmode="numeric" maxlength="4">
+            </div>
+          </div>
+        </div>
+      </fieldset>
+    </div>
+    <div class="row two">
       <div class="field">
         <label for="dateOfJoining">Date of Joining (This Institution)</label>
         <input type="text" id="dateOfJoining" name="dateOfJoining" placeholder="DD/MM/YYYY" inputmode="numeric" maxlength="10" oninput="formatDateInput(this)">
@@ -1625,6 +1646,27 @@
         <div class="choice-group">
           <label class="choice"><input type="radio" name="seBed" value="Yes"> Yes</label>
           <label class="choice"><input type="radio" name="seBed" value="No"> No</label>
+        </div>
+      </fieldset>
+    </div>
+    <div class="row two">
+      <fieldset style="margin:0;">
+        <legend>CTET Qualified</legend>
+        <div class="choice-group">
+          <label class="choice"><input type="radio" name="seCtetQualified" value="Yes" onchange="toggleSeCtet(true)"> Yes</label>
+          <label class="choice"><input type="radio" name="seCtetQualified" value="No" onchange="toggleSeCtet(false)"> No</label>
+        </div>
+        <div class="disability-extra" id="seCtetExtra">
+          <div class="row two" style="margin-bottom:0;">
+            <div class="field">
+              <label for="seCtetRollNumber">CTET Roll Number</label>
+              <input type="text" id="seCtetRollNumber">
+            </div>
+            <div class="field">
+              <label for="seCtetYear">CTET Year</label>
+              <input type="text" id="seCtetYear" placeholder="e.g. 2022" inputmode="numeric" maxlength="4">
+            </div>
+          </div>
         </div>
       </fieldset>
     </div>
@@ -4380,6 +4422,20 @@ function submitClass11Email(){
 /* ============ STAFF FORM LOGIC ============ */
 const stfFiles = { photo: null, aadharCardFront: null, aadharCardBack: null, panCard: null, passbook: null };
 
+function toggleStfCtet(show){
+  const el = document.getElementById('stfCtetExtra');
+  if(!el) return;
+  if(show){
+    el.classList.add('show');
+  } else {
+    el.classList.remove('show');
+    const roll = document.getElementById('ctetRollNumber');
+    const year = document.getElementById('ctetYear');
+    if(roll) roll.value = '';
+    if(year) year.value = '';
+  }
+}
+
 async function handleStfPhoto(event){
   const file = event.target.files[0];
   if(!file) return;
@@ -4524,6 +4580,7 @@ async function submitStaffData(){
       contact_number: obj.contactNumber || '', parent_contact_number: obj.parentContactNumber || '',
       email_id: obj.emailId || '', current_address: obj.currentAddress || '', full_address: obj.fullAddress || '',
       qualification: obj.qualification || '', bed: obj.bed || '',
+      ctet_qualified: obj.ctetQualified || '', ctet_roll_number: obj.ctetRollNumber || '', ctet_year: obj.ctetYear || '',
       date_of_joining: obj.dateOfJoining || '', total_experience: obj.totalExperience || '',
       subjects_taught: obj.subjectsTaught || '', class_taught: obj.classTaught || '',
       oasis_id: obj.oasisId || '', account_number: obj.accountNumber || '', ifsc_code: obj.ifscCode || '',
@@ -4544,6 +4601,7 @@ async function submitStaffData(){
     if(error) throw error;
 
     document.getElementById('staffForm').reset();
+    toggleStfCtet(false);
     clearDraft('draft_staff_form');
     stfFiles.photo = null; stfFiles.aadharCardFront = null; stfFiles.aadharCardBack = null;
     stfFiles.panCard = null; stfFiles.passbook = null;
@@ -5005,6 +5063,20 @@ function openStaffFormForFill(email, fullName){
   if(note) note.style.display = email ? 'block' : 'none';
 }
 
+function toggleSeCtet(show){
+  const el = document.getElementById('seCtetExtra');
+  if(!el) return;
+  if(show){
+    el.classList.add('show');
+  } else {
+    el.classList.remove('show');
+    const roll = document.getElementById('seCtetRollNumber');
+    const year = document.getElementById('seCtetYear');
+    if(roll) roll.value = '';
+    if(year) year.value = '';
+  }
+}
+
 function populateStaffEditForm(r){
   const set = (id, val) => { const el = document.getElementById(id); if(el) el.value = val || ''; };
   set('seFullName', r.full_name);
@@ -5028,6 +5100,10 @@ function populateStaffEditForm(r){
   document.getElementById('seOasisDisplay').textContent = r.oasis_id || '—';
   document.querySelectorAll('input[name="seParentRelation"]').forEach(el => { el.checked = (el.value === r.parent_relation); });
   document.querySelectorAll('input[name="seBed"]').forEach(el => { el.checked = (el.value === r.bed); });
+  document.querySelectorAll('input[name="seCtetQualified"]').forEach(el => { el.checked = (el.value === r.ctet_qualified); });
+  set('seCtetRollNumber', r.ctet_roll_number);
+  set('seCtetYear', r.ctet_year);
+  toggleSeCtet(r.ctet_qualified === 'Yes');
   const taught = (r.class_taught || '').split(',').map(s => s.trim());
   document.querySelectorAll('input[name="seClassTaught"]').forEach(el => { el.checked = taught.includes(el.value); });
   const photoPreview = document.getElementById('sePhotoPreview');
@@ -5094,12 +5170,14 @@ async function saveStaffEdit(){
     const classTaught = Array.from(document.querySelectorAll('input[name="seClassTaught"]:checked')).map(el => el.value).join(', ');
     const parentRelationEl = document.querySelector('input[name="seParentRelation"]:checked');
     const bedEl = document.querySelector('input[name="seBed"]:checked');
+    const ctetEl = document.querySelector('input[name="seCtetQualified"]:checked');
     const update = {
       full_name: fullName, designation, gender,
       parent_name: get('seParentName'), parent_relation: parentRelationEl ? parentRelationEl.value : '',
       dob, contact_number: contactNumber, parent_contact_number: parentContactNumber,
       current_address: get('seCurrentAddress'), full_address: get('seFullAddress'),
       qualification: get('seQualification'), bed: bedEl ? bedEl.value : '',
+      ctet_qualified: ctetEl ? ctetEl.value : '', ctet_roll_number: get('seCtetRollNumber'), ctet_year: get('seCtetYear'),
       date_of_joining: get('seDateOfJoining'), total_experience: get('seTotalExperience'),
       subjects_taught: get('seSubjectsTaught'), class_taught: classTaught,
       account_number: get('seAccountNumber'), ifsc_code: get('seIfscCode'),
@@ -5348,13 +5426,13 @@ function downloadStaffCSV(){
   const headers = [
     'Full Name','Designation','Gender',"Father's/Husband's Name",'Relation','Date of Birth','Contact Number',
     "Father's/Husband's Number",'Email ID','Current Address','Full Address','Highest Qualification',
-    'B.Ed','Date of Joining','Total Experience','Subjects Taught','Class Taught','CBSE Oasis ID',
+    'B.Ed','CTET Qualified','CTET Roll Number','CTET Year','Date of Joining','Total Experience','Subjects Taught','Class Taught','CBSE Oasis ID',
     'Account Number','IFSC Code','Aadhar Number','PAN Number','Photo File','Aadhar Card Front File','Aadhar Card Back File','PAN Card File','Passbook File'
   ];
   const row = [
     obj.fullName, obj.designation, obj.gender, obj.parentName, obj.parentRelation, obj.dob, obj.contactNumber,
     obj.parentContactNumber, obj.emailId, obj.currentAddress, obj.fullAddress, obj.qualification,
-    obj.bed, obj.dateOfJoining, obj.totalExperience, obj.subjectsTaught, obj.classTaught, obj.oasisId,
+    obj.bed, obj.ctetQualified, obj.ctetRollNumber, obj.ctetYear, obj.dateOfJoining, obj.totalExperience, obj.subjectsTaught, obj.classTaught, obj.oasisId,
     obj.accountNumber, obj.ifscCode, obj.aadharNumber, obj.panNumber,
     stfFiles.photo ? stfFiles.photo.name : '',
     stfFiles.aadharCardFront ? stfFiles.aadharCardFront.name : '',
@@ -5394,7 +5472,9 @@ function submitStaffEmail(){
     'Contact Number: ' + (obj.contactNumber || ''), "Father's/Husband's Number: " + (obj.parentContactNumber || ''),
     'Email ID: ' + (obj.emailId || ''), 'Current Address: ' + (obj.currentAddress || ''),
     'Full Address: ' + (obj.fullAddress || ''), 'Highest Qualification: ' + (obj.qualification || ''),
-    'B.Ed: ' + (obj.bed || ''), 'Date of Joining: ' + (obj.dateOfJoining || ''),
+    'B.Ed: ' + (obj.bed || ''),
+    'CTET Qualified: ' + (obj.ctetQualified || '') + (obj.ctetQualified === 'Yes' ? (' (Roll No: ' + (obj.ctetRollNumber || '') + ', Year: ' + (obj.ctetYear || '') + ')') : ''),
+    'Date of Joining: ' + (obj.dateOfJoining || ''),
     'Total Experience: ' + (obj.totalExperience || ''), 'Subjects Taught: ' + (obj.subjectsTaught || ''),
     'Class Taught: ' + (obj.classTaught || ''), 'CBSE Oasis ID: ' + oasisIdLine,
     'Account Number: ' + (obj.accountNumber || ''), 'IFSC Code: ' + (obj.ifscCode || ''),
@@ -5533,7 +5613,9 @@ function mapRow(row, tab){
       parentName: row.parent_name, parentRelation: row.parent_relation, dob: row.dob, contactNumber: row.contact_number,
       parentContactNumber: row.parent_contact_number, emailId: row.email_id,
       currentAddress: row.current_address, fullAddress: row.full_address,
-      qualification: row.qualification, bed: row.bed, dateOfJoining: row.date_of_joining,
+      qualification: row.qualification, bed: row.bed,
+      ctetQualified: row.ctet_qualified, ctetRollNumber: row.ctet_roll_number, ctetYear: row.ctet_year,
+      dateOfJoining: row.date_of_joining,
       totalExperience: row.total_experience, subjectsTaught: row.subjects_taught, classTaught: row.class_taught,
       oasisId: row.oasis_id, accountNumber: row.account_number, ifscCode: row.ifsc_code,
       aadharNumber: row.aadhar_number, panNumber: row.pan_number, trainingHours: row.training_hours,
@@ -5586,6 +5668,7 @@ function renderStats(){
     `;
   } else {
     const bedYes = allRecords.filter(r => r.bed === 'Yes').length;
+    const ctetYes = allRecords.filter(r => r.ctetQualified === 'Yes').length;
     const missingDocs = allRecords.filter(r => !r.aadharCardFrontFile || !r.aadharCardBackFile || !r.photoFile).length;
     const activeCount = allRecords.filter(r => (r.employmentStatus || 'active') === 'active').length;
     const resignedCount = allRecords.filter(r => r.employmentStatus === 'resigned').length;
@@ -5594,6 +5677,7 @@ function renderStats(){
       <div class="stat-card"><div class="num">${activeCount}</div><div class="label">Active Staff</div></div>
       <div class="stat-card"><div class="num">${resignedCount}</div><div class="label">Resigned Staff</div></div>
       <div class="stat-card"><div class="num">${bedYes}</div><div class="label">B.Ed Qualified</div></div>
+      <div class="stat-card"><div class="num">${ctetYes}</div><div class="label">CTET Qualified</div></div>
       <div class="stat-card"><div class="num">${missingDocs}</div><div class="label">Missing Documents</div></div>
     `;
   }
@@ -5781,7 +5865,7 @@ function renderTable(){
     ['pwd','PWD'], ['aadharCardFrontFile','Aadhar (F)'], ['aadharCardBackFile','Aadhar (B)'], ['submittedAt','Submitted At']
   ] : [
     ['fullName','Full Name'], ['designation','Designation'], ['employmentStatus','Status'], ['gender','Gender'], ['dob','DOB'],
-    ['contactNumber','Contact'], ['qualification','Qualification'], ['bed','B.Ed'],
+    ['contactNumber','Contact'], ['qualification','Qualification'], ['bed','B.Ed'], ['ctetQualified','CTET'],
     ['dateOfJoining','Joined'], ['subjectsTaught','Subjects'], ['classTaught','Class'],
     ['totalExperience','Experience'], ['trainingHours','Training Hours'], ['aadharCardFrontFile','Aadhar (F)'], ['aadharCardBackFile','Aadhar (B)'], ['panCardFile','PAN'],
     ['submittedAt','Submitted At']
@@ -5941,12 +6025,12 @@ function getExportSpec(){
       headers: [
         'Full Name','Designation','Employment Status','Resignation Date','Gender',"Father's/Husband's Name",'Relation','Date of Birth','Contact Number',
         "Father's/Husband's Number",'Email ID','Current Address','Full Address','Highest Qualification',
-        'B.Ed','Date of Joining','Total Experience','Subjects Taught','Class Taught','CBSE Oasis ID',
+        'B.Ed','CTET Qualified','CTET Roll Number','CTET Year','Date of Joining','Total Experience','Subjects Taught','Class Taught','CBSE Oasis ID',
         'Account Number','IFSC Code','Aadhar Number','PAN Number','Training Hours','Photo File','Aadhar Card Front File','Aadhar Card Back File','PAN Card File','Passbook File','Submitted At'
       ],
       keys: [
         'fullName','designation','employmentStatus','resignationDate','gender','parentName','parentRelation','dob','contactNumber','parentContactNumber','emailId',
-        'currentAddress','fullAddress','qualification','bed','dateOfJoining','totalExperience',
+        'currentAddress','fullAddress','qualification','bed','ctetQualified','ctetRollNumber','ctetYear','dateOfJoining','totalExperience',
         'subjectsTaught','classTaught','oasisId','accountNumber','ifscCode','aadharNumber','panNumber','trainingHours',
         'photoFile','aadharCardFrontFile','aadharCardBackFile','panCardFile','passbookFile','submittedAt'
       ],
