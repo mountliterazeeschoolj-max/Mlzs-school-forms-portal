@@ -1599,72 +1599,72 @@
         </select>
       </div>
       <div class="field">
-        <label for="seDob">Date of Birth</label>
-        <input type="text" id="seDob" placeholder="DD/MM/YYYY" inputmode="numeric" maxlength="10" oninput="formatDateInput(this)">
+        <label for="seDob">Date of Birth<span class="required">*</span></label>
+        <input type="text" id="seDob" placeholder="DD/MM/YYYY" inputmode="numeric" maxlength="10" oninput="formatDateInput(this)" required>
       </div>
     </div>
     <div class="field" style="margin-bottom:14px;">
-      <label>Father's Name / Husband's Name</label>
+      <label>Father's Name / Husband's Name<span class="required">*</span></label>
       <div class="relation-choice">
-        <label><input type="radio" name="seParentRelation" value="Father"> Father</label>
-        <label><input type="radio" name="seParentRelation" value="Husband"> Husband</label>
+        <label><input type="radio" name="seParentRelation" value="Father" required> Father</label>
+        <label><input type="radio" name="seParentRelation" value="Husband" required> Husband</label>
       </div>
-      <input type="text" id="seParentName" placeholder="Enter name">
+      <input type="text" id="seParentName" placeholder="Enter name" required>
     </div>
 
     <div class="section-title">Contact Details</div>
     <div class="row two">
       <div class="field">
         <label for="seContactNumber">Contact Number<span class="required">*</span></label>
-        <input type="tel" id="seContactNumber" placeholder="10-digit mobile number">
+        <input type="tel" id="seContactNumber" placeholder="10-digit mobile number" required>
       </div>
       <div class="field">
-        <label for="seParentContactNumber">Father's/Husband's Number</label>
-        <input type="tel" id="seParentContactNumber">
+        <label for="seParentContactNumber">Father's/Husband's Number<span class="required">*</span></label>
+        <input type="tel" id="seParentContactNumber" required>
       </div>
     </div>
     <div class="note" style="background:none;border:none;padding:0;margin-bottom:14px;">
       Email: <strong id="seEmailDisplay"></strong> (this is your login email and can't be changed here — contact the school office if it needs to change)
     </div>
     <div class="field" style="margin-bottom:14px;">
-      <label for="seCurrentAddress">Current Address</label>
-      <textarea id="seCurrentAddress"></textarea>
+      <label for="seCurrentAddress">Current Address<span class="required">*</span></label>
+      <textarea id="seCurrentAddress" required></textarea>
     </div>
     <div class="field" style="margin-bottom:14px;">
-      <label for="seFullAddress">Full (Permanent) Address</label>
-      <textarea id="seFullAddress"></textarea>
+      <label for="seFullAddress">Full (Permanent) Address<span class="required">*</span></label>
+      <textarea id="seFullAddress" required></textarea>
     </div>
 
     <div class="section-title">Professional Details</div>
     <div class="row two">
       <div class="field">
-        <label for="seQualification">Highest Qualification</label>
-        <input type="text" id="seQualification">
+        <label for="seQualification">Highest Qualification<span class="required">*</span></label>
+        <input type="text" id="seQualification" required>
       </div>
       <fieldset style="margin:0;">
-        <legend>Professional Qualification (B.Ed)</legend>
+        <legend>Professional Qualification (B.Ed)<span class="required">*</span></legend>
         <div class="choice-group">
-          <label class="choice"><input type="radio" name="seBed" value="Yes"> Yes</label>
-          <label class="choice"><input type="radio" name="seBed" value="No"> No</label>
+          <label class="choice"><input type="radio" name="seBed" value="Yes" required> Yes</label>
+          <label class="choice"><input type="radio" name="seBed" value="No" required> No</label>
         </div>
       </fieldset>
     </div>
     <div class="row two">
       <fieldset style="margin:0;">
-        <legend>CTET Qualified</legend>
+        <legend>CTET Qualified<span class="required">*</span></legend>
         <div class="choice-group">
-          <label class="choice"><input type="radio" name="seCtetQualified" value="Yes" onchange="toggleSeCtet(true)"> Yes</label>
-          <label class="choice"><input type="radio" name="seCtetQualified" value="No" onchange="toggleSeCtet(false)"> No</label>
+          <label class="choice"><input type="radio" name="seCtetQualified" value="Yes" onchange="toggleSeCtet(true)" required> Yes</label>
+          <label class="choice"><input type="radio" name="seCtetQualified" value="No" onchange="toggleSeCtet(false)" required> No</label>
         </div>
         <div class="disability-extra" id="seCtetExtra">
           <div class="row two" style="margin-bottom:0;">
             <div class="field">
-              <label for="seCtetRollNumber">CTET Roll Number</label>
-              <input type="text" id="seCtetRollNumber">
+              <label for="seCtetRollNumber">CTET Roll Number<span class="required">*</span></label>
+              <input type="text" id="seCtetRollNumber" required>
             </div>
             <div class="field">
-              <label for="seCtetYear">CTET Year</label>
-              <input type="text" id="seCtetYear" placeholder="e.g. 2022" inputmode="numeric" maxlength="4">
+              <label for="seCtetYear">CTET Year<span class="required">*</span></label>
+              <input type="text" id="seCtetYear" placeholder="e.g. 2022" inputmode="numeric" maxlength="4" required>
             </div>
           </div>
         </div>
@@ -1672,22 +1672,22 @@
     </div>
     <div class="row two">
       <div class="field">
-        <label for="seDateOfJoining">Date of Joining (This Institution)</label>
-        <input type="text" id="seDateOfJoining" placeholder="DD/MM/YYYY" inputmode="numeric" maxlength="10" oninput="formatDateInput(this)">
+        <label for="seDateOfJoining">Date of Joining (This Institution)<span class="required">*</span></label>
+        <input type="text" id="seDateOfJoining" placeholder="DD/MM/YYYY" inputmode="numeric" maxlength="10" oninput="formatDateInput(this)" required>
       </div>
       <div class="field">
-        <label for="seTotalExperience">Total Experience (In Years)</label>
-        <input type="text" id="seTotalExperience">
+        <label for="seTotalExperience">Total Experience (In Years)<span class="required">*</span></label>
+        <input type="text" id="seTotalExperience" required>
       </div>
     </div>
     <div class="row two">
       <div class="field">
-        <label for="seSubjectsTaught">Subjects Taught</label>
-        <input type="text" id="seSubjectsTaught">
+        <label for="seSubjectsTaught">Subjects Taught<span class="required">*</span></label>
+        <input type="text" id="seSubjectsTaught" required>
       </div>
     </div>
     <fieldset style="margin:0 0 14px;">
-      <legend>Select Classes Taught</legend>
+      <legend>Select Classes Taught<span class="required">*</span></legend>
       <div class="choice-group">
         <label class="choice"><input type="checkbox" name="seClassTaught" value="KG-NURSERY"> KG-NURSERY</label>
         <label class="choice"><input type="checkbox" name="seClassTaught" value="CLASS I"> CLASS I</label>
@@ -1711,22 +1711,22 @@
     <div class="section-title">Bank &amp; Identification Details</div>
     <div class="row two">
       <div class="field">
-        <label for="seAccountNumber">Account Number (Canara Bank only)</label>
-        <input type="text" id="seAccountNumber">
+        <label for="seAccountNumber">Account Number (Canara Bank only)<span class="required">*</span></label>
+        <input type="text" id="seAccountNumber" required>
       </div>
       <div class="field">
-        <label for="seIfscCode">IFSC Code</label>
-        <input type="text" id="seIfscCode">
+        <label for="seIfscCode">IFSC Code<span class="required">*</span></label>
+        <input type="text" id="seIfscCode" required>
       </div>
     </div>
     <div class="row two">
       <div class="field">
-        <label for="seAadharNumber">Aadhar Card Number</label>
-        <input type="text" id="seAadharNumber">
+        <label for="seAadharNumber">Aadhar Card Number<span class="required">*</span></label>
+        <input type="text" id="seAadharNumber" required>
       </div>
       <div class="field">
-        <label for="sePanNumber">PAN Card Number</label>
-        <input type="text" id="sePanNumber">
+        <label for="sePanNumber">PAN Card Number<span class="required">*</span></label>
+        <input type="text" id="sePanNumber" required>
       </div>
     </div>
 
@@ -5174,14 +5174,53 @@ async function saveStaffEdit(){
   const contactNumber = get('seContactNumber');
   const parentContactNumber = get('seParentContactNumber');
   const dob = get('seDob');
+  const parentName = get('seParentName');
+  const currentAddress = get('seCurrentAddress');
+  const fullAddress = get('seFullAddress');
+  const qualification = get('seQualification');
+  const dateOfJoining = get('seDateOfJoining');
+  const totalExperience = get('seTotalExperience');
+  const subjectsTaught = get('seSubjectsTaught');
+  const accountNumber = get('seAccountNumber');
+  const ifscCode = get('seIfscCode');
+  const aadharNumber = get('seAadharNumber');
+  const panNumber = get('sePanNumber');
+  const ctetRollNumber = get('seCtetRollNumber');
+  const ctetYear = get('seCtetYear');
+  const classTaughtChecked = document.querySelectorAll('input[name="seClassTaught"]:checked').length;
+  const parentRelationEl = document.querySelector('input[name="seParentRelation"]:checked');
+  const bedEl = document.querySelector('input[name="seBed"]:checked');
+  const ctetEl = document.querySelector('input[name="seCtetQualified"]:checked');
   const errors = [];
   if(!fullName) errors.push('Full Name is required.');
   if(!designation) errors.push('Designation is required.');
   if(!gender) errors.push('Please select Gender.');
+  if(!dob) errors.push('Date of Birth is required.');
+  else if(!isValidDate(dob)) errors.push('Date of Birth is not a valid date (use DD/MM/YYYY, not in the future).');
+  if(!parentRelationEl) errors.push('Please select Father or Husband.');
+  if(!parentName) errors.push("Father's Name / Husband's Name is required.");
   if(!contactNumber) errors.push('Contact Number is required.');
   else if(!isValidMobile(contactNumber)) errors.push('Contact Number must be a valid 10-digit number.');
-  if(parentContactNumber && !isValidMobile(parentContactNumber)) errors.push("Father's/Husband's Number must be a valid 10-digit number.");
-  if(dob && !isValidDate(dob)) errors.push('Date of Birth is not a valid date (use DD/MM/YYYY, not in the future).');
+  if(!parentContactNumber) errors.push("Father's/Husband's Number is required.");
+  else if(!isValidMobile(parentContactNumber)) errors.push("Father's/Husband's Number must be a valid 10-digit number.");
+  if(!currentAddress) errors.push('Current Address is required.');
+  if(!fullAddress) errors.push('Full (Permanent) Address is required.');
+  if(!qualification) errors.push('Highest Qualification is required.');
+  if(!bedEl) errors.push('Please select Professional Qualification (B.Ed).');
+  if(!ctetEl) errors.push('Please select CTET Qualified.');
+  else if(ctetEl.value === 'Yes'){
+    if(!ctetRollNumber) errors.push('CTET Roll Number is required.');
+    if(!ctetYear) errors.push('CTET Year is required.');
+  }
+  if(!dateOfJoining) errors.push('Date of Joining is required.');
+  else if(!isValidDate(dateOfJoining)) errors.push('Date of Joining is not a valid date (use DD/MM/YYYY).');
+  if(!totalExperience) errors.push('Total Experience is required.');
+  if(!subjectsTaught) errors.push('Subjects Taught is required.');
+  if(!classTaughtChecked) errors.push('Please select at least one Class Taught.');
+  if(!accountNumber) errors.push('Account Number is required.');
+  if(!ifscCode) errors.push('IFSC Code is required.');
+  if(!aadharNumber) errors.push('Aadhar Card Number is required.');
+  if(!panNumber) errors.push('PAN Card Number is required.');
   if(errors.length){ showValidationErrors('seStatusMsg', errors); return; }
 
   setSubmitBusy('seSaveBtn', true, 'Saving…', 'Save Changes');
@@ -5196,9 +5235,6 @@ async function saveStaffEdit(){
       uploadFile(seFiles.passbook, folder)
     ]);
     const classTaught = Array.from(document.querySelectorAll('input[name="seClassTaught"]:checked')).map(el => el.value).join(', ');
-    const parentRelationEl = document.querySelector('input[name="seParentRelation"]:checked');
-    const bedEl = document.querySelector('input[name="seBed"]:checked');
-    const ctetEl = document.querySelector('input[name="seCtetQualified"]:checked');
     const update = {
       full_name: fullName, designation, gender,
       parent_name: get('seParentName'), parent_relation: parentRelationEl ? parentRelationEl.value : '',
