@@ -6770,6 +6770,20 @@ function ttWeekdayForDate(date){
   return day >= 1 && day <= 6 ? day : null;
 }
 
+/* Fetch every row of a table (Supabase returns at most ~1000 rows per request). */
+async function ttFetchAll(table, orderCols){
+  const out = []; let from = 0;
+  while(true){
+    let q = supabaseClient.from(table).select('*');
+    (orderCols || []).forEach(c => { q = q.order(c); });
+    const { data, error } = await q.range(from, from + 999);
+    if(error) return { data:null, error };
+    if(!data || !data.length) break;
+    out.push(...data); from += data.length;
+    if(data.length < 2) break;
+  }
+  return { data:out, error:null };
+}
 async function loadTimetable(){
   try{
     const [classGroupsRes, classesRes, subjectsRes, periodsRes, timetableRes, teachersRes, requirementsRes, assignmentsRes, templatesRes, templateDaysRes, specialDaysRes] = await Promise.all([
@@ -6777,9 +6791,9 @@ async function loadTimetable(){
       supabaseClient.from('tt_classes').select('*').order('sort_order').order('class_section'),
       supabaseClient.from('tt_subjects').select('*').order('name'),
       supabaseClient.from('tt_periods').select('*').order('period_no'),
-      supabaseClient.from('tt_timetable').select('*'),
+      ttFetchAll('tt_timetable', ['id']),
       supabaseClient.from('staff_records').select('id,full_name,designation,subjects_taught').order('full_name'),
-      supabaseClient.from('tt_class_subject_requirements').select('*'),
+      ttFetchAll('tt_class_subject_requirements', ['class_section','subject_id']),
       supabaseClient.from('tt_teacher_assignments').select('*'),
       supabaseClient.from('tt_period_templates').select('*').order('sort_order').order('name'),
       supabaseClient.from('tt_period_template_days').select('*'),
