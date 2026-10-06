@@ -430,6 +430,9 @@
   @media print{body *{visibility:hidden;}#ttPrintArea,#ttPrintArea *{visibility:visible;}#ttPrintArea{position:absolute;left:0;top:0;width:100%;}}
 
 
+  .ct-grid th,.ct-grid td{text-align:center;font-size:12.5px;padding:8px 6px;}
+  .ct-grid td.hl{background:#fff3c4;font-weight:800;color:#7a5200;}
+  .ct-grid th.ct-int,.ct-grid td.ct-int{background:#eef2f6;color:var(--muted);font-size:10px;letter-spacing:2px;writing-mode:vertical-rl;padding:0 4px;}
   /* ---- Free Periods finder ---- */
   .fp-chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
   .fp-chip{border:1px solid #c5d4df;background:#fff;color:var(--accent);border-radius:18px;padding:6px 13px;font-size:12.5px;font-weight:700;cursor:pointer;user-select:none;}
@@ -2109,6 +2112,7 @@
       <button class="tab-btn" id="ttViewBuilder" onclick="switchTTView('builder')">Timetable Builder</button>
       <button class="tab-btn" id="ttViewTeachers" onclick="switchTTView('teachers')">Timetable Teachers</button>
       <button class="tab-btn" id="ttViewSubs" onclick="switchTTView('substitutes')">Substitutes</button>
+      <button class="tab-btn" id="ttViewClass" onclick="switchTTView('classtt')">Class Timetables</button>
       <button class="tab-btn" id="ttViewFree" onclick="switchTTView('free')">Free Periods</button>
       <button class="tab-btn" id="ttViewReports" onclick="switchTTView('reports')">Reports</button>
     </div>
@@ -2225,6 +2229,17 @@
       </div>
     </div>
 
+
+    <div id="ttClassView" style="display:none;">
+      <div class="fee-panel">
+        <h2>Class Timetables <span style="font-weight:400;color:var(--muted);font-size:13px;">Session 2026-27 &middot; Classes 1&ndash;8</span></h2>
+        <p class="fs-modal-sub">Loaded from the handwritten class timetable sheets. Pick a class and section; use the highlight box to see where a subject falls.</p>
+        <div class="fp-row"><span class="fp-label">Class</span><div class="fp-chips" id="ctClassChips"></div></div>
+        <div class="fp-row"><span class="fp-label">Section</span><div class="fp-chips" id="ctSecChips"></div></div>
+        <div class="fee-actions"><select id="ctHighlight" onchange="ctRender()"></select><button class="btn-secondary" onclick="ctPrint()">Print</button></div>
+        <div class="table-container"><div id="ctArea"></div></div>
+      </div>
+    </div>
 
     <div id="ttFreeView" style="display:none;">
       <div class="fee-panel">
@@ -6799,6 +6814,8 @@ function switchTTView(view){
   document.getElementById('ttViewSubs').classList.toggle('active', view === 'substitutes');
   document.getElementById('ttViewReports').classList.toggle('active', view === 'reports');
   document.getElementById('ttViewFree').classList.toggle('active', view === 'free');
+  document.getElementById('ttViewClass').classList.toggle('active', view === 'classtt');
+  document.getElementById('ttClassView').style.display = view === 'classtt' ? 'block' : 'none';
   document.getElementById('ttFreeView').style.display = view === 'free' ? 'block' : 'none';
   document.getElementById('ttSetupView').style.display = view === 'setup' ? 'block' : 'none';
   document.getElementById('ttBuilderView').style.display = view === 'builder' ? 'block' : 'none';
@@ -6811,6 +6828,7 @@ function switchTTView(view){
   else if(view === 'substitutes'){ loadTTSubsForDate(); renderTTBulkAttendance(); }
   else if(view === 'reports'){ ttRenderReportControls(); }
   else if(view === 'free'){ fpInit(); }
+  else if(view === 'classtt'){ ctInit(); }
 }
 
 /* ---- Setup: classes (groups) & their sections, subjects, periods ---- */
@@ -7839,6 +7857,57 @@ function printTTSubs(){
   document.body.appendChild(wrap);
   window.print();
   wrap.remove();
+}
+
+/* ============ CLASS TIMETABLES (Session 2026-27, classes 1-8) ============ */
+const CT_RAW = ["1 Coral|Shweta Tiwari|Eng,AI/Rob,Hindi,Hindi,Math,GK,Music,Dance;\",Eng,\",\",\",Music,EVS,\";\",\",\",\",\",LangL,P.Safety,EVS;\",\",\",\",StoryT,Games,GK,Math;\",\",\",\",\",Art,Math,Comp(L);Comp,EVS,EVS,Games,Art,PPA,PPA,Math","1 Emerald|Ankita Srivastava|Eng,Eng,StoryT,Math,Hindi,Hindi,Art,EVS;\",AI/Rob,GK,\",\",\",StoryT,\";\",Eng,Art,\",\",\",Music,\";\",\",Dance,Music,\",\",LangL,Math;\",\",GK,Comp(L),\",\",Games,\";EVS,Dance,Games,Comp,P.Safety,PPA,PPA,\"","1 Ruby|Mona Suneja|Eng,Eng,Hindi,Hindi,Math,Music,GK,EVS;\",\",\",\",\",Comp,Music,EVS;\",AI/Rob,\",\",\",GK,StoryT,LangL;\",Eng,\",\",Dance,Art,Games,Math;\",\",\",\",EVS,PPA,PPA,\";EVS,Games,P.Safety,StoryT,Dance,Art,Comp(L),\"","1 Sapphire|Anwar Kazmi|Eng,Eng,Math,Games,Hindi,Comp(L),Comp,EVS;\",\",\",GK,\",Hindi,Eng,\";\",\",\",Music,\",\",P.Safety,\";\",AI/Rob,Art,GK,\",\",StoryT,Math;\",EVS,Games,Art,\",\",Dance,\";LangL,StoryT,Dance,Hindi,Music,PPA,PPA,\"","2 Coral|Anushka Sharma|EVS,Games,LangL,Math,Art/Craft,Eng,Hindi,EVS;\",\",Eng,\",\",\",\",\";\",Music,GK,\",\",\",\",StoryT;AI/Rob,Comp,Comp(L),\",Eng,GK/PS,\",Math;EVS,\",StoryT,\",Dance,Eng,\",\";\",GK,Comp,\",Hindi,\",\",Dance","2 Emerald|Anupama Silvester|LangL,Hindi,Comp,Dance,EVS,Math,GK,Hindi;Eng,\",\",Games,\",\",Art/Craft,Math;\",\",\",Dance,\",\",\",Music;\",\",Eng,Comp(L),\",\",Math,Games;\",\",GK/PS,EVS,AI/Rob,\",Art/Craft,StoryT;\",\",Eng,\",EVS,\",GK,\"","2 Ruby|Rabiya Sheikh|Eng,Math,EVS,Art/Craft,StoryT,Hindi,Comp(L),Math;LangL,\",\",GK,\",\",\",Art/Craft;Eng,\",\",EVS,Games,\",\",Math;\",\",\",Hindi,GK,EVS,\",Hindi;\",\",AI/Rob,Dance,GK/PS,Hindi,Music,Eng;\",\",EVS,Art/Craft,Eng,\",Dance,Games","2 Sapphire|Shubhangi Verma|Math,Comp(L),Dance,Eng,Hindi,EVS,EVS,Eng;\",\",Hindi,\",\",\",AI/Rob,\";\",\",StoryT,\",\",Art/Craft,EVS,GK;\",Music,\",\",\",Comp,\",Dance;\",Art/Craft,Math,\",\",Games,\",GK;\",\",\",LangL,\",\",\",GK/PS","2 Topaz|Neha Khare|Math,Eng,Games,EVS,EVS,Math,Hindi,LangL;EVS,Art/Craft,Math,EVS,Games,\",\",Eng;Music,Dance,Eng,Eng,GK,\",\",EVS;EVS,\",Math,\",StoryT,Comp(L),\",Art;AI/Rob,GK,\",\",Comp,\",\",Hindi;EVS,StoryT,\",\",\",GK/PS,\",Art","3 Coral|Pooja Bahuguna|Comp,Math,AI/Rob,StoryT,LangL,Eng,Dance,Hindi;\",\",EVS,Comp(L),Eng,\",\",\";\",\",\",StoryT,\",Music,Math,\";GK,\",\",Games,\",Art/Craft,EVS,\";\",\",\",Games,\",\",\",\";P.Safety,\",\",Hindi,\",\",Math,\"","3 Emerald|Noopur Bhatnagar|EVS,Hindi,Art/Craft,Math,Games,Dance,Eng,Comp;\",\",Math,\",Dance,Comp,\",GK;\",\",\",\",Comp,GK,\",AI/Rob;\",\",Art/Craft,\",Games,P.Safety,\",EVS;\",\",\",\",LangL,StoryT,\",Music;\",\",Hindi,\",Comp(L),\",\",Eng","3 Ruby|Prachi Verma|Math,Hindi,EVS,LangL,Comp,EVS,StoryT,Eng;\",\",Comp(L),Eng,GK,\",Music,EVS;\",\",GK,\",Dance,\",Art/Craft,Eng;\",\",Math,\",Comp,\",P.Safety,StoryT;\",\",\",\",Games,\",Art/Craft,Dance;\",Comp,Hindi,\",\",AI/Rob,Art/Craft,Hindi","3 Sapphire|Rizwan Beg|Hindi,GK,Math,Math,EVS,Art/Craft,Eng,Hindi;\",\",Dance,\",\",AI/Rob,\",Games;\",P.Safety,Math,\",\",Comp,\",\";\",StoryT,Comp,\",\",EVS,\",LangL;\",\",\",\",Art/Craft,Music,\",EVS;\",Eng,Comp(L),\",EVS,Dance,Art/Craft,\"","3 Topaz|Shivangi Sirothiya|Math,Eng,EVS,Art/Craft,Dance,StoryT,Hindi,P.Safety;\",\",Music,Math,Art/Craft,EVS,\",Comp;\",\",EVS,Eng,StoryT,Dance,\",Hindi;\",\",AI/Rob,EVS,Comp,Hindi,Eng,Art/Craft;\",Games,EVS,Eng,GK,Hindi,Comp,Math;Games,LangL,\",EVS,Hindi,Math,Hindi,Comp(L)","4 Coral|Sanskriti Kheterpal|Eng,GK,Hindi,AI/Rob,Art/Craft,Math,Music,Math;\",\",\",EVS,Math,\",DCP,EVS;LangL,GK/PS,\",\",Art/Craft,\",Dance,FLIP;Eng,Comp,\",\",\",\",\",Hindi;\",Comp(L),\",\",Games,\",StoryT,Eng;\",\",\",\",\",\",\",\"","4 Emerald|Ishika Saxena|Math,Hindi,Eng,GK,Games,Eng,EVS,Art/Craft;\",\",Math,Dance,GK,\",\",Games;\",\",LangL,GK/PS,Comp(L),\",AI/Rob,DCP;\",\",FLIP,Art/Craft,\",\",EVS,Music;\",\",Dance,StoryT,\",\",\",EVS;\",\",StoryT,Art/Craft,Math,\",\",Hindi","4 Ruby|Ayushi Shrivastava|EVS,Eng,GK,Art/Craft,Hindi,Math,Math,Comp;AI/Rob,\",\",StoryT,\",Dance,\",Comp(L);EVS,\",Art/Craft,GK/PS,\",Games,LangL,Math;\",\",Eng,Dance,\",StoryT,Math,\";\",\",Games,DCP,\",EVS,\",Art/Craft;\",\",Hindi,Comp,\",FLIP,\",Music","4 Sapphire|Akanksha Chaurasiya|Comp,Math,Math,Eng,EVS,Games,Hindi,FLIP;\",\",StoryT,AI/Rob,LangL,Hindi,\",GK;DCP,\",Dance,Eng,EVS,StoryT,\",Art/Craft;Comp(L),\",Eng,\",\",Games,\",Art/Craft;GK,\",\",\",\",Dance,\",Math;GK/PS,\",Art/Craft,\",\",Music,\",EVS","5 Coral|Shivani Saxena|AI/Rob,Math,Dance,Hindi,Eng,Comp,Eng,GK;EVS,\",Eng,\",\",Comp(L),FLIP,Art/Craft;\",\",EVS,\",\",Art/Craft,Comp,Games;\",\",DCP,\",LangL,Music,Math,Dance;\",\",Math,\",Eng,GK,Hindi,Lib;\",\",GK/PS,\",\",Art/Craft,Games,\"","5 Emerald|Rajni Rajput|Hindi,Comp,Math,Eng,Hindi,EVS,Art/Craft,Math;\",Comp(L),Games,\",Art/Craft,\",Math,\";\",\",Dance,\",Lib,\",EVS,\";\",GK,FLIP,\",Music,\",GK,\";\",GK/PS,Eng,\",Lib,\",Dance,\";\",Art/Craft,Games,\",DCP,LangL,AI/Rob,\"","5 Ruby|Chanpreet|Eng,Dance,EVS,Games,Math,Lib,Math,Hindi;\",Eng,\",Music,\",Art/Craft,Lib,\";\",EVS,Math,Art/Craft,\",Hindi,Dance,\";\",\",GK,Games,\",Comp,Eng,\";LangL,FLIP,Art/Craft,GK,\",Comp(L),AI/Rob,\";Eng,EVS,EVS,GK/PS,\",\",DCP,\"","5 Sapphire|Deepak Bachwani|Math,Hindi,Games,Comp,EVS,GK,Lib,Eng;\",\",Art/Craft,\",\",\",Eng,\";\",\",Games,Comp(L),\",Dance,Art/Craft,\";\",\",Art/Craft,GK/PS,\",Hindi,AI/Rob,\";\",\",FLIP,Math,\",Dance,LangL,DCP;\",\",Eng,Music,\",Lib,Math,Eng","6 A|Pooja Saxena|Eng,Hindi,Sans,DCP,Math,Science,GK,S.St;\",\",ASL,Art/Craft,\",\",Dance,\";\",\",Music,Sans,\",\",Lib,\";\",\",Comp,Art/Craft,\",\",Games,\";\",\",Comp(L),Sans,\",\",FLIP,\";\",\",AI/Rob,Games,\",Science,GK,\"","6 B|Neelam Singh|S.St,Sans,Science,Sans,Dance,Math,Eng,Hindi;\",\",\",DCP,Lib,\",\",\";\",ASL,\",Comp,GK,\",\",\";Music,Comp(L),\",S.St,Games,\",\",\";S.St,GK,\",Art/Craft,FLIP,\",\",\";\",Games,Science,Art/Craft,AI/Rob,\",\",\"","6 C|Kaashif Zia|Math,Art/Craft,Hindi,FLIP,Eng,S.St,GK,Science;\",\",\",Games,\",\",Comp(L),\";\",Games,\",Math,\",\",Comp,\";\",Sans,\",GK,\",\",Dance,\";Music,\",\",AI/Rob,\",\",Lib,\";Math,\",ASL,Hindi,\",\",DCP,Science","6 D|Brinda Dalmotra|Sci,GK,Math,Dance,S.St,Hindi,Eng,Art/Craft;Sci,Music,\",Hindi,\",ASL,\",\";Sci,Comp(L),\",FLIP,\",Hindi,\",Lib;\",GK,\",Comp,\",\",\",Sans;\",AI/Rob,\",Games,\",\",\",\";Sci,DCP,\",Games,\",\",\",\"","7 A|Shikha Shivani|S.St,DCP,Comp,Eng,Science,Dance,Hindi,Math;\",GK,Comp(L),\",\",Lib,\",\";\",Art/Craft,AI/Rob,\",\",Sans,\",\";\",\",FLIP,\",\",GK,\",\";\",Games,ASL,\",\",Sans,\",\";\",Music,Sans,\",Science,Games,\",\"","7 B|Gaurav Gupta|Math,Games,Hindi,S.St,FLIP,Sans,Science,Eng;\",DCP,\",\",Sans,GK,\",\";\",Games,\",\",\",GK,\",\";\",ASL,\",\",Lib,Comp,\",\";\",Dance,\",\",Art/Craft,AI/Rob,\",\";\",Art/Craft,\",\",Music,Comp(L),Science,\"","7 C|Ankush Namdeo|Eng,S.St,Math,Science,Art/Craft,AI/Rob,GK,Hindi;\",\",\",\",Games,Comp,\",\";\",\",\",Art/Craft,Science,ASL,FLIP,\";\",\",\",Sans,\",Lib,DCP,\";\",\",\",\",\",Games,Comp(L),\";\",\",\",\",Science,Dance,Music,\"","7 D|Geeta Saxena|Hindi,Math,Games,Eng,AI/Rob,Sansk,Science,S.St;\",\",\",\",GK,\",\",\";\",\",Art/Craft,\",DCP,\",\",\";\",\",Eng,\",Art/Craft,Dance,\",\";\",\",S.St,FLIP,Music,GK,\",Comp;\",\",\",Eng,Lib,Science,ASL,Comp(L)","8 A|Kirti Nigam|Hindi,Math,Games,S.St,Eng,Comp(L),Science,Sansk;\",Games,Math,\",\",\",\",\";\",Math,GK,\",\",\",\",\";\",\",\",\",\",AI/Rob,\",FLIP;\",\",Dance,\",\",Lib,\",Art/Craft;\",\",Music,Art/Craft,\",ASL,Science,S.St","8 B|Divya Verma|S.St,Eng,GK,Science,Hindi,Art/Craft,Math,Comp;\",\",\",\",\",\",\",Sans;\",\",Games,\",\",Lib,\",Dance;\",\",Music,\",\",Sans,\",Comp(L);\",\",Games,\",\",\",\",Comp(L);\",\",ASL,Science,\",FLIP,\",AI/Rob","8 C|Vikesh Chaursiya|Sans,Hindi,Science,Art/Craft,S.St,Math,Games,Eng;\",\",\",\",\",\",GK,\";\",\",\",AI/Rob,\",\",FLIP,\";Lib,\",\",Comp,\",\",Music,\";Comp(L),\",\",ASL,Math,Games,S.St,\";Comp(L),\",Science,GK,S.St,Math,Dance,\"","8 D|Sandhya Jaiswal|Math,S.St,Science,Games,Art/Craft,Eng,Sansk,Hindi;\",\",\",GK,ASL,\",\",\";\",\",\",Art/Craft,Comp,\",\",\";\",\",\",Dance,AI/Rob,\",Lib,\";\",\",\",Games,Comp(L),\",GK,\";Music,\",Science,Math,Comp(L),\",FLIP,\"","8 E|Zareen Zehra|Sci,Eng,Sans,Hindi,Lib,S.St,AI/Rob,Math;\",\",\",\",Dance,\",Comp,\";\",\",\",\",Music,\",Comp(L),\";\",\",GK,\",Games,\",Comp(L),\";\",\",ASL,\",Games,\",Art/Craft,\";Sci,\",FLIP,\",GK,\",Art/Craft,\""];
+const CT_NAMES = { LangL:'Lang L', StoryT:'Story T', 'P.Safety':'P. Safety', 'S.St':'S.St', Sans:'Sanskrit', Sansk:'Sanskrit', Sci:'Science', 'GK/PS':'GK / PS', 'AI/Rob':'AI / Rob', 'Art/Craft':'Art / Craft' };
+let ctSections = [], ctClass = null, ctSection = null, ctReady = false;
+function ctParse(){
+  ctSections = CT_RAW.map(line => {
+    const [name, teacher, rows] = line.split('|');
+    const grid = [];
+    rows.split(';').forEach((r, d) => {
+      const cells = r.split(',');
+      grid.push(cells.map((c, p) => c === '"' ? (grid[d-1] ? grid[d-1][p] : '') : c));
+    });
+    const sp = name.indexOf(' ');
+    return { cls:name.slice(0, sp), sec:name.slice(sp+1), teacher, grid };
+  });
+}
+function ctLabel(s){ return CT_NAMES[s] || s; }
+function ctInit(){
+  if(!ctReady){
+    ctParse();
+    ctClass = ctSections[0].cls; ctSection = ctSections[0].sec;
+    const subs = new Set(); ctSections.forEach(s => s.grid.forEach(r => r.forEach(c => subs.add(c))));
+    document.getElementById('ctHighlight').innerHTML = '<option value="">Highlight subject…</option>' + [...subs].sort().map(s => `<option value="${escapeHtml(s)}">${escapeHtml(ctLabel(s))}</option>`).join('');
+    ctReady = true;
+  }
+  ctRender();
+}
+function ctPickClass(c){ ctClass = c; const secs = ctSections.filter(s => s.cls === c); if(!secs.some(s => s.sec === ctSection)) ctSection = secs[0].sec; ctRender(); }
+function ctPickSec(s){ ctSection = s; ctRender(); }
+function ctRender(){
+  const classes = [...new Set(ctSections.map(s => s.cls))];
+  document.getElementById('ctClassChips').innerHTML = classes.map(c => `<span class="fp-chip${c === ctClass ? ' on' : ''}" onclick="ctPickClass('${c}')">${c}</span>`).join('');
+  document.getElementById('ctSecChips').innerHTML = ctSections.filter(s => s.cls === ctClass).map(s => `<span class="fp-chip${s.sec === ctSection ? ' on' : ''}" onclick="ctPickSec('${s.sec}')">${escapeHtml(s.sec)}</span>`).join('');
+  const sec = ctSections.find(s => s.cls === ctClass && s.sec === ctSection); if(!sec) return;
+  const hl = document.getElementById('ctHighlight').value;
+  const days = ['Mon','Tue','Wed','Thurs','Fri','Sat'];
+  const cell = (c) => `<td class="${hl && c === hl ? 'hl' : ''}">${escapeHtml(ctLabel(c))}</td>`;
+  let html = `<div style="padding:10px 14px;font-weight:700;">Class ${escapeHtml(ctClass)} &ndash; ${escapeHtml(ctSection)} <span style="font-weight:400;color:var(--muted);">&nbsp;Class Teacher: ${escapeHtml(sec.teacher)}</span></div>`;
+  html += '<table class="ct-grid"><thead><tr><th>Period</th>' + [1,2,3].map(p => `<th>${p}</th>`).join('') + '<th class="ct-int">INTERVAL</th>' + [4,5,6,7,8].map(p => `<th>${p}</th>`).join('') + '</tr></thead><tbody>';
+  sec.grid.forEach((row, d) => {
+    html += `<tr><th style="text-align:left;">${days[d]}</th>` + row.slice(0,3).map(cell).join('') + (d === 0 ? '<td class="ct-int" rowspan="6">INTERVAL</td>' : '') + row.slice(3).map(cell).join('') + '</tr>';
+  });
+  document.getElementById('ctArea').innerHTML = html + '</tbody></table>';
+}
+function ctPrint(){
+  const existing = document.getElementById('ttPrintArea'); if(existing) existing.remove();
+  const wrap = document.createElement('div'); wrap.id = 'ttPrintArea'; wrap.style.padding = '24px';
+  wrap.innerHTML = '<h2>Class Timetable Session 2026-27</h2>' + document.getElementById('ctArea').innerHTML;
+  document.body.appendChild(wrap); window.print(); wrap.remove();
 }
 
 /* ============ FREE PERIODS (Session 2026-27) ============ */
