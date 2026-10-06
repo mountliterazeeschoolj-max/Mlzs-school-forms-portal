@@ -2230,6 +2230,7 @@
       <div class="fee-panel">
         <h2>Find Free Teachers</h2>
         <p class="fs-modal-sub">Session 2026-27 free-period chart (8-period time table). Pick a day and period(s) to see who is free &mdash; handy for arranging substitutes.</p>
+        <div id="fpSourceNote" class="note" style="display:none;margin-bottom:12px;"></div>
         <div class="fp-row"><span class="fp-label">Day</span><div class="fp-chips" id="fpDayChips"></div></div>
         <div class="fp-row"><span class="fp-label">Period</span><div class="fp-chips" id="fpPeriodChips"></div></div>
         <div class="fee-actions">
@@ -2252,7 +2253,9 @@
       </div>
       <div class="fee-panel">
         <h2>Full Free Period Chart</h2>
-        <p class="fs-modal-sub">All teachers, all days. Use the search box above to narrow the finder; this chart always lists everyone.</p>
+        <p class="fs-modal-sub">All teachers, all days. Click <strong>Edit</strong> on a row to change their free periods, or add a new teacher. Changes are saved to the database (table <code>tt_free_periods</code>), so you can also edit them directly in the Supabase Table Editor.</p>
+        <div class="fee-actions"><button class="btn-primary" onclick="fpEdit(-1)">+ Add Teacher</button><button class="btn-secondary" onclick="fpLoad(true)">Refresh</button><button class="btn-secondary" id="fpSeedBtn" style="display:none;" onclick="fpSeed()">Import built-in chart into database</button></div>
+        <div id="fpEditor" style="display:none;"></div>
         <div class="table-container"><div id="fpFullArea"></div></div>
       </div>
     </div>
@@ -7840,20 +7843,61 @@ function printTTSubs(){
 
 /* ============ FREE PERIODS (Session 2026-27) ============ */
 const FP_DAYS = ['Mon','Tue','Wed','Thurs','Fri','Sat'];
+const FP_COLS = ['mon','tue','wed','thu','fri','sat'];
 const FP_PERIODS = [1,2,3,4,5,6,7,8];
-const FP_DATA = [{"n":"Shweta Tiwari","ct":"1A","d":[[3,4,7,8],[3,4,6,8],[3,4],[3,4,6],[3,4,6,8],[1,4,5]]},{"n":"Ankita Srivastava","ct":"1B","d":[[5,6,7],[5,6],[3,5,6,7],[3,4,5,6],[4,5,6,7],[2,3,4]]},{"n":"Mona Suneja","ct":"1C","d":[[3,4,6],[3,4,6,7],[3,4],[3,4,5,6,7],[3,4],[2,5,6,7]]},{"n":"Anwar Kazmi","ct":"1D","d":[[4,5,6,7],[5,6],[4,5,6],[3,5,6],[3,4,5,6,7],[3,4,5]]},{"n":"Anushka Sharma","ct":"2A","d":[[2,4],[2,4],[2,6,8],[2,4,8],[2,6,8],[2,6,8]]},{"n":"Anupama Silvester","ct":"2B","d":[[2,3],[2,3,8],[2,3,6],[2,6],[2,3,6,8],[6,7]]},{"n":"Rabiya Sheikh","ct":"2C","d":[[2,5],[2,5],[2,3,5,8],[2,3,6,8],[2,3],[2,3]]},{"n":"Shubhangi Verma","ct":"2D","d":[[3,5,7],[3,5,7],[3,5,7],[3,5],[5,7],[5,7,8]]},{"n":"Neha Khare","ct":"2E","d":[[3,4],[4,8],[3,4,8],[3,6],[3,4],[2,4]]},{"n":"Pooja Bahuguna","ct":"3A","d":[[3,4,6],[2,5],[2,5],[1,8],[1,3,7],[6,8]]},{"n":"Nupur Bhatnagar","ct":"3B","d":[[2,4],[2,3,5],[2,3,4],[2,4],[2,3,4],[2,3,4]]},{"n":"Prachi Verma","ct":"3C","d":[[5,8],[5,6,8],[5,6,7],[5,6],[5,6],[3,5,6,8]]},{"n":"Rizwan Beg","ct":"3D","d":[[3,5,7],[3,5],[3],[4,7,8],[1,7],[1,8]]},{"n":"Shivangi Sirothiya","ct":"3E","d":[[1,6,7,8],[3,5,7,8],[1,5,6,7],[5,6,8],[2,5,6,7,8],[5,6,7,8]]},{"n":"Sanskriti Kheterpal","ct":"4A","d":[[3,6,8],[6,7,8],[3,6,8],[6,7,8],[6,7],[3,7]]},{"n":"Ishika Saxena","ct":"4B","d":[[5,7],[7,8],[5,8],[3,5,7,8],[3,5,7,8],[3,8]]},{"n":"Ayushi Shrivastava","ct":"4C","d":[[2,7,8],[2,7],[2,6,8],[2,8],[2,5],[2,7,8]]},{"n":"Akshita Rathore","ct":"4D","d":[[3,5,7],[1,4,7],[1,5,7],[1,4,5,8],[4,6,7],[4,6,7]]},{"n":"Shivani Saxena","ct":"5A","d":[[2,4,7,8],[2,4,8],[4,8],[4,8],[4,8],[4,8]]},{"n":"Rajni Rajput","ct":"5B","d":[[6,8],[5,6,8],[5,6],[5,7],[5,8],[5,6]]},{"n":"Chanpreet","ct":"5C","d":[[2,5],[3,4],[2,5,7],[2,5],[2,5,8],[2,5,7]]},{"n":"Deepak Bachwani","ct":"5D","d":[[4,6],[3,4,6],[4,6],[3,4,6],[6,7],[3,4,6]]},{"n":"Pooja Saxena","ct":"6A","d":[[2,3,6],[2,6],[3,6],[3,6],[2,6],[2,6]]},{"n":"Neelam Singh","ct":"6B","d":[[3,4,5,6],[3,4],[2,3,4],[1,5,7],[3,4],[2,3,4,6,7]]},{"n":"Kaashif Zia","ct":"6C","d":[[4,5,7],[4,5,7],[5,7],[4,5,7],[4,6,7],[4,5,7]]},{"n":"Brinda Dalmotra","ct":"6D","d":[[2,5,6],[2,5,6],[2,4,6],[2,4,6],[2,4,6],[2,4,6]]},{"n":"Shikha Shivani","ct":"7A","d":[[3,7,8],[3,7,8],[3,5,7,8],[5,7,8],[3,5,7,8],[5,8]]},{"n":"Gaurav Gupta","ct":"7B","d":[[2,4,5,6],[2,4,5],[2,4,5,6],[2,4,5,6],[2,4,5,6],[2,4,5,6]]},{"n":"Ankush Namdeo","ct":"7C","d":[[3,4,6,8],[3,4,8],[3,4,8],[3,4,6,8],[4,6,8],[3,4,8]]},{"n":"Geeta Saxena","ct":"7D","d":[[3,4,7],[3,6,7],[3,4,7],[3,4,7],[3,4,7],[3,4,7]]},{"n":"Kirti Nigam","ct":"8A","d":[[1,2,4,5],[1,2,4,5],[1,2],[1,2],[6,7],[6,7]]},{"n":"Divya Verma","ct":"8B","d":[[2,6,7,8],[2,6,8],[2,6,8],[2,6,7],[2,3,5,6,8],[2,3,7]]},{"n":"Vikesh Chaursiya","ct":"8C","d":[[1,2,4,8],[1,2,4,8],[1,2,4,8],[2,4,8],[1,2,4,8],[1,2,4,8]]},{"n":"Sandhya Jaiswal","ct":"8D","d":[[3,4,8],[2,7,8],[2,3,4,7],[3,4,7,8],[3,4,8],[1,3,8]]},{"n":"Zareen Zehra","ct":"8E","d":[[2,6,8],[2,5,6,8],[2,5,6,8],[2,5,6,8],[2,5,6,8],[2,5,7,8]]},{"n":"Anita","ct":"","d":[[1,7],[1,7],[1,7],[1,7],[1,7],[1,5,6,7]]},{"n":"Yogmaya Mishra","ct":"","d":[[1,3,4,6],[1,3,4],[1,3,4],[1,3,4],[1,3,4,6],[1,4,6]]},{"n":"Shusma Khare","ct":"","d":[[1,4,5,6,7],[1,4,5,6,7],[1,4,5,6,7],[1,4,5,7],[1,4,7],[1,3,7]]},{"n":"Saumya Mishra","ct":"","d":[[2,5,6],[2,5,6],[2,5,6],[2,5,6],[2,5,6],[2,5,6]]},{"n":"Poonam Sharma","ct":"","d":[[1,5,7],[1,3,4,6,7],[1,2,3,7],[1,3,4,5,7],[1,3,5],[1,4,5,7]]},{"n":"Hema Suman","ct":"","d":[[1,6],[1,8],[1,8],[1,8],[1,8],[1,3,6,8]]},{"n":"Abhishek Mishra","ct":"","d":[[2,4,5],[2,4,5],[2,4,5],[1,2,3,5,7,8],[1,2,3,5],[1,2,3,5,6,7,8]]},{"n":"Uday Sen","ct":"","d":[[1,3],[1,3,7],[1,3],[1,3,7],[1,8],[1,4,6,7,8]]},{"n":"Sadhana Mishra","ct":"","d":[[1,7,8],[1,5,8],[1,6,8],[1,5,8],[1,5],[1,4]]},{"n":"Anshika Gupta","ct":"","d":[[4,5],[5,7],[6,7,8],[2,3,8],[2,3,5,6],[2,3,7]]},{"n":"Deeksha Tripathi","ct":"","d":[[1,4,5],[1,7],[1,7,8],[2,8],[7,8],[2,5,8]]},{"n":"Rajni","ct":"","d":[[1,2,3,8],[1,2,6,7,8],[1,2,7],[1,4,7],[1,5],[1,4,5]]},{"n":"Shruti Nigam","ct":"","d":[[1],[1],[1],[8],[],[7]]},{"n":"Dance (TGT)","ct":"","d":[[1,7],[1,6],[1,2,5],[1,3,5],[1,5,8],[1,5,8]]},{"n":"Pooja Tiwari","ct":"","d":[[1,2],[1,2],[1,8],[1,6],[1,2],[1,4]]},{"n":"Prabhat","ct":"","d":[[1,6,7],[1,2,3,4,6,7],[1,2,3,4,5,6,7,8],[1,2,3,5,6,7,8],[1,5,6,7,8],[1,2,3,4,5,6,7,8]]},{"n":"Naveen Sharma","ct":"","d":[[1,2,3,4,5,6,7,8],[1,3,4,5,6,7,8],[1,2,4,6,7,8],[2,4,5,6,8],[2,3,4,6,7,8],[4,6,8]]},{"n":"Ashish Shukla","ct":"","d":[[1,2,3,4,5,8],[1,2,3,4,5,8],[3,5,6],[1,3,5,6,7,8],[1,2,3,4,5,6,8],[1,2,3,4,6,7,8]]},{"n":"Vivek Sharma","ct":"","d":[[1,2,3,4,5,6,8],[1,2,5,6,8],[1,2,3,4,5,7,8],[1,2,3,4,7],[1,2,3,4,5,7],[1,2,3,5,7]]},{"n":"Poonam Divgaiya","ct":"","d":[[1,6,7,8],[1,3,6],[1,2,3,4,7],[1,2,3,4],[1,2,4,8],[1,7]]},{"n":"Vikash rawat","ct":"","d":[[1,2,4,7,8],[1,2,5,6,7],[1,4,5,7,8],[1,2,3,8],[1,6,7,8],[6,7,8]]},{"n":"Vikram Parihar","ct":"","d":[[1,5,6,7,8],[1,2,4,6,7,8],[1,4,5,6,7],[1,2,3,6,7,8],[1,7,8],[1,2,3,5,8]]},{"n":"Priyanka Mishra","ct":"","d":[[1,2,3,8],[1,3,4,6],[1,2,4,8],[1,2,4,5,7],[1,3,8],[1,3]]},{"n":"Akanksha Chaurasiya","ct":"","d":[[1,2,3,6],[1,2,4,7],[1,2],[1,2,6],[1,2,4,5,6],[1,5,7,8]]},{"n":"Spardha Dubey","ct":"","d":[[1,6,7],[1,3,6,7],[1,5,6,8],[1,7],[1,2,8],[1,3,5]]},{"n":"Paras Verma","ct":"","d":[[1,3,7,8],[1,3,7,8],[1,3,7],[1,6,8],[1,3,4],[1,3,6,8]]},{"n":"Kratika Rao","ct":"","d":[[1,2,3,5,7],[1,2,3,7],[1,2,3,5,7],[1,2,5,7],[1,2,3,5,7],[1,2,3,5]]},{"n":"Sagar Verma","ct":"9A","d":[[3,5,6,8],[3,5,6,8],[3,5,6,8],[3,5,6,8],[3,5,6,8],[3,6,8]]},{"n":"Ragini Shrivastava","ct":"9B","d":[[4,6],[4,6],[4,6],[3,7],[3,7],[3,7]]},{"n":"Savitri Shrivastava","ct":"9C","d":[[2,7,8],[2,7,8],[6,7,8],[4,6,8],[4,7,8],[4,7,8]]},{"n":"Saba Siddqui","ct":"9D","d":[[2,5,8],[2,5,8],[2,5,6],[2,3,5],[2,3,5],[2,3,5]]},{"n":"R.K Khattri","ct":"9E","d":[[4,7],[4,7],[4,7],[4,6],[4,6],[4,6]]},{"n":"Surendra Kumar","ct":"9F","d":[[3,4],[3,4,8],[4,7],[3,4,6],[4,6],[3,4,6]]},{"n":"Rohit Kesariya","ct":"10A","d":[[5,7,8],[5,7,8],[5,7,8],[3,6,7,8],[3,6,7,8],[3,6,7,8]]},{"n":"Pratik Bachwani","ct":"10B","d":[[3,6,8],[3,6,8],[3,6,8],[4,6,8],[3,6,7],[6,7,8]]},{"n":"Hasim","ct":"10C","d":[[2,6],[2,5,8],[6,8],[2,6,8],[2,6,8],[2,6]]},{"n":"Jamil Ansari","ct":"10D","d":[[4,6,7],[3,4,6,7],[3,4,6,8],[3,6,7],[1,3,4,6,7],[1,3,6,7,8]]},{"n":"Ameen Khan","ct":"10E","d":[[4,6,7],[4,6,7],[4,6,7,8],[3,4,7,8],[3,4,7,8],[6,7,8]]},{"n":"Sanjay Gupta","ct":"11A1","d":[[6,7,8],[6,7,8],[6,7,8],[6,7,8],[6,7,8],[6,7,8]]},{"n":"Ajay Pathak","ct":"11A2","d":[[3,5,8],[3,5,8],[5,6],[6,8],[2,6,8],[2,3]]},{"n":"Mansi Saxena","ct":"11B","d":[[6,7,8],[6,7],[6,7,8],[6,7],[6,7,8],[6,7,8]]},{"n":"Sonali Dailwar","ct":"11C","d":[[3,6],[3,6,8],[3,6],[4,5,8],[4,5,7],[4,5]]},{"n":"Saurabh Awasthi","ct":"12A1","d":[[2,7,8],[2,7,8],[2,7,8],[2,6,7],[6,7,8],[2,7,8]]},{"n":"Vinita Dixit","ct":"12A2","d":[[7,8],[7,8],[7,8],[6,7],[7,8],[7,8]]},{"n":"Dipali Bhaway","ct":"12B","d":[[5,6,7,8],[4,5,6,7,8],[5,6,8],[6,7,8],[5,7,8],[5,6,8]]},{"n":"Rajat Sahney","ct":"12C","d":[[5,6,8],[5,6],[2,5,6,8],[2,7,8],[2,5,6,8],[2,5,6]]},{"n":"Gautam Dubey","ct":"","d":[[1,3,6,7],[1,3,6],[1,2,3,7],[1,2,3,5,7,8],[1,3,4,5,7,8],[1,3,4,6]]},{"n":"Praved Pathak","ct":"","d":[[4,6,7,8],[4,6,7,8],[4,6,7,8],[4,6,7,8],[4,6,7,8],[4,6,7,8]]},{"n":"Kavita Naryani","ct":"","d":[[1,3,4,6,7,8],[1,3,4,6,7,8],[1,3,4,6,7,8],[1,3,4,6,7,8],[1,3,4,6,7,8],[1,3,4,6,7,8]]},{"n":"Ravindra Namdev","ct":"","d":[[1,7,8],[1,6,7],[1,6,7,8],[1,6],[1,3,6],[1,3,6,8]]},{"n":"Brijendra P.S.C","ct":"","d":[[1,3,6,8],[1,7,8],[1,3,8],[1,7,8],[6,7],[2,7]]},{"n":"Atif Edrees","ct":"","d":[[1,2,5,7,8],[1,4,6,8],[1,4,5,7,8],[1,4,6,8],[1,4,8],[1,4,6,7,8]]},{"n":"PTI3","ct":"","d":[[1,2,5,6,8],[1,3,4,5,6,8],[1,2,3,4,5,8],[1,5,7,8],[1],[1,2,4,5,6,7,8]]},{"n":"Sanjeev Shrivastav","ct":"","d":[[1,2,3,4,5,6,7,8],[1,2,3,4,5,6,7,8],[1,2,3,4,5,6,7,8],[1,2,3,4,5,6,7,8],[1,2,3,4,5,6,7,8],[1,2,3,4,5,6,7,8]]},{"n":"Saurabh Kumar Jha","ct":"","d":[[],[],[],[],[],[1]]},{"n":"Dharmendra Dev Singh","ct":"10 C","d":[[1,2,3,8],[1,3,6,7,8],[1,3,6,7],[1,4,5,7],[1,2,7],[1,2,7]]},{"n":"Saurabh Azad","ct":"","d":[[1,3,7,8],[1,3,7,8],[1,3,7,8],[1,3,7,8],[1,3,7,8],[1,3,7,8]]},{"n":"Neeeraj Parasar","ct":"","d":[[],[],[],[],[],[]]}];
+const FP_BUILTIN = [{"n":"Shweta Tiwari","ct":"1A","d":[[3,4,7,8],[3,4,6,8],[3,4],[3,4,6],[3,4,6,8],[1,4,5]]},{"n":"Ankita Srivastava","ct":"1B","d":[[5,6,7],[5,6],[3,5,6,7],[3,4,5,6],[4,5,6,7],[2,3,4]]},{"n":"Mona Suneja","ct":"1C","d":[[3,4,6],[3,4,6,7],[3,4],[3,4,5,6,7],[3,4],[2,5,6,7]]},{"n":"Anwar Kazmi","ct":"1D","d":[[4,5,6,7],[5,6],[4,5,6],[3,5,6],[3,4,5,6,7],[3,4,5]]},{"n":"Anushka Sharma","ct":"2A","d":[[2,4],[2,4],[2,6,8],[2,4,8],[2,6,8],[2,6,8]]},{"n":"Anupama Silvester","ct":"2B","d":[[2,3],[2,3,8],[2,3,6],[2,6],[2,3,6,8],[6,7]]},{"n":"Rabiya Sheikh","ct":"2C","d":[[2,5],[2,5],[2,3,5,8],[2,3,6,8],[2,3],[2,3]]},{"n":"Shubhangi Verma","ct":"2D","d":[[3,5,7],[3,5,7],[3,5,7],[3,5],[5,7],[5,7,8]]},{"n":"Neha Khare","ct":"2E","d":[[3,4],[4,8],[3,4,8],[3,6],[3,4],[2,4]]},{"n":"Pooja Bahuguna","ct":"3A","d":[[3,4,6],[2,5],[2,5],[1,8],[1,3,7],[6,8]]},{"n":"Nupur Bhatnagar","ct":"3B","d":[[2,4],[2,3,5],[2,3,4],[2,4],[2,3,4],[2,3,4]]},{"n":"Prachi Verma","ct":"3C","d":[[5,8],[5,6,8],[5,6,7],[5,6],[5,6],[3,5,6,8]]},{"n":"Rizwan Beg","ct":"3D","d":[[3,5,7],[3,5],[3],[4,7,8],[1,7],[1,8]]},{"n":"Shivangi Sirothiya","ct":"3E","d":[[1,6,7,8],[3,5,7,8],[1,5,6,7],[5,6,8],[2,5,6,7,8],[5,6,7,8]]},{"n":"Sanskriti Kheterpal","ct":"4A","d":[[3,6,8],[6,7,8],[3,6,8],[6,7,8],[6,7],[3,7]]},{"n":"Ishika Saxena","ct":"4B","d":[[5,7],[7,8],[5,8],[3,5,7,8],[3,5,7,8],[3,8]]},{"n":"Ayushi Shrivastava","ct":"4C","d":[[2,7,8],[2,7],[2,6,8],[2,8],[2,5],[2,7,8]]},{"n":"Akshita Rathore","ct":"4D","d":[[3,5,7],[1,4,7],[1,5,7],[1,4,5,8],[4,6,7],[4,6,7]]},{"n":"Shivani Saxena","ct":"5A","d":[[2,4,7,8],[2,4,8],[4,8],[4,8],[4,8],[4,8]]},{"n":"Rajni Rajput","ct":"5B","d":[[6,8],[5,6,8],[5,6],[5,7],[5,8],[5,6]]},{"n":"Chanpreet","ct":"5C","d":[[2,5],[3,4],[2,5,7],[2,5],[2,5,8],[2,5,7]]},{"n":"Deepak Bachwani","ct":"5D","d":[[4,6],[3,4,6],[4,6],[3,4,6],[6,7],[3,4,6]]},{"n":"Pooja Saxena","ct":"6A","d":[[2,3,6],[2,6],[3,6],[3,6],[2,6],[2,6]]},{"n":"Neelam Singh","ct":"6B","d":[[3,4,5,6],[3,4],[2,3,4],[1,5,7],[3,4],[2,3,4,6,7]]},{"n":"Kaashif Zia","ct":"6C","d":[[4,5,7],[4,5,7],[5,7],[4,5,7],[4,6,7],[4,5,7]]},{"n":"Brinda Dalmotra","ct":"6D","d":[[2,5,6],[2,5,6],[2,4,6],[2,4,6],[2,4,6],[2,4,6]]},{"n":"Shikha Shivani","ct":"7A","d":[[3,7,8],[3,7,8],[3,5,7,8],[5,7,8],[3,5,7,8],[5,8]]},{"n":"Gaurav Gupta","ct":"7B","d":[[2,4,5,6],[2,4,5],[2,4,5,6],[2,4,5,6],[2,4,5,6],[2,4,5,6]]},{"n":"Ankush Namdeo","ct":"7C","d":[[3,4,6,8],[3,4,8],[3,4,8],[3,4,6,8],[4,6,8],[3,4,8]]},{"n":"Geeta Saxena","ct":"7D","d":[[3,4,7],[3,6,7],[3,4,7],[3,4,7],[3,4,7],[3,4,7]]},{"n":"Kirti Nigam","ct":"8A","d":[[1,2,4,5],[1,2,4,5],[1,2],[1,2],[6,7],[6,7]]},{"n":"Divya Verma","ct":"8B","d":[[2,6,7,8],[2,6,8],[2,6,8],[2,6,7],[2,3,5,6,8],[2,3,7]]},{"n":"Vikesh Chaursiya","ct":"8C","d":[[1,2,4,8],[1,2,4,8],[1,2,4,8],[2,4,8],[1,2,4,8],[1,2,4,8]]},{"n":"Sandhya Jaiswal","ct":"8D","d":[[3,4,8],[2,7,8],[2,3,4,7],[3,4,7,8],[3,4,8],[1,3,8]]},{"n":"Zareen Zehra","ct":"8E","d":[[2,6,8],[2,5,6,8],[2,5,6,8],[2,5,6,8],[2,5,6,8],[2,5,7,8]]},{"n":"Anita","ct":"","d":[[1,7],[1,7],[1,7],[1,7],[1,7],[1,5,6,7]]},{"n":"Yogmaya Mishra","ct":"","d":[[1,3,4,6],[1,3,4],[1,3,4],[1,3,4],[1,3,4,6],[1,4,6]]},{"n":"Shusma Khare","ct":"","d":[[1,4,5,6,7],[1,4,5,6,7],[1,4,5,6,7],[1,4,5,7],[1,4,7],[1,3,7]]},{"n":"Saumya Mishra","ct":"","d":[[2,5,6],[2,5,6],[2,5,6],[2,5,6],[2,5,6],[2,5,6]]},{"n":"Poonam Sharma","ct":"","d":[[1,5,7],[1,3,4,6,7],[1,2,3,7],[1,3,4,5,7],[1,3,5],[1,4,5,7]]},{"n":"Hema Suman","ct":"","d":[[1,6],[1,8],[1,8],[1,8],[1,8],[1,3,6,8]]},{"n":"Abhishek Mishra","ct":"","d":[[2,4,5],[2,4,5],[2,4,5],[1,2,3,5,7,8],[1,2,3,5],[1,2,3,5,6,7,8]]},{"n":"Uday Sen","ct":"","d":[[1,3],[1,3,7],[1,3],[1,3,7],[1,8],[1,4,6,7,8]]},{"n":"Sadhana Mishra","ct":"","d":[[1,7,8],[1,5,8],[1,6,8],[1,5,8],[1,5],[1,4]]},{"n":"Anshika Gupta","ct":"","d":[[4,5],[5,7],[6,7,8],[2,3,8],[2,3,5,6],[2,3,7]]},{"n":"Deeksha Tripathi","ct":"","d":[[1,4,5],[1,7],[1,7,8],[2,8],[7,8],[2,5,8]]},{"n":"Rajni","ct":"","d":[[1,2,3,8],[1,2,6,7,8],[1,2,7],[1,4,7],[1,5],[1,4,5]]},{"n":"Shruti Nigam","ct":"","d":[[1],[1],[1],[8],[],[7]]},{"n":"Dance (TGT)","ct":"","d":[[1,7],[1,6],[1,2,5],[1,3,5],[1,5,8],[1,5,8]]},{"n":"Pooja Tiwari","ct":"","d":[[1,2],[1,2],[1,8],[1,6],[1,2],[1,4]]},{"n":"Prabhat","ct":"","d":[[1,6,7],[1,2,3,4,6,7],[1,2,3,4,5,6,7,8],[1,2,3,5,6,7,8],[1,5,6,7,8],[1,2,3,4,5,6,7,8]]},{"n":"Naveen Sharma","ct":"","d":[[1,2,3,4,5,6,7,8],[1,3,4,5,6,7,8],[1,2,4,6,7,8],[2,4,5,6,8],[2,3,4,6,7,8],[4,6,8]]},{"n":"Ashish Shukla","ct":"","d":[[1,2,3,4,5,8],[1,2,3,4,5,8],[3,5,6],[1,3,5,6,7,8],[1,2,3,4,5,6,8],[1,2,3,4,6,7,8]]},{"n":"Vivek Sharma","ct":"","d":[[1,2,3,4,5,6,8],[1,2,5,6,8],[1,2,3,4,5,7,8],[1,2,3,4,7],[1,2,3,4,5,7],[1,2,3,5,7]]},{"n":"Poonam Divgaiya","ct":"","d":[[1,6,7,8],[1,3,6],[1,2,3,4,7],[1,2,3,4],[1,2,4,8],[1,7]]},{"n":"Vikash rawat","ct":"","d":[[1,2,4,7,8],[1,2,5,6,7],[1,4,5,7,8],[1,2,3,8],[1,6,7,8],[6,7,8]]},{"n":"Vikram Parihar","ct":"","d":[[1,5,6,7,8],[1,2,4,6,7,8],[1,4,5,6,7],[1,2,3,6,7,8],[1,7,8],[1,2,3,5,8]]},{"n":"Priyanka Mishra","ct":"","d":[[1,2,3,8],[1,3,4,6],[1,2,4,8],[1,2,4,5,7],[1,3,8],[1,3]]},{"n":"Akanksha Chaurasiya","ct":"","d":[[1,2,3,6],[1,2,4,7],[1,2],[1,2,6],[1,2,4,5,6],[1,5,7,8]]},{"n":"Spardha Dubey","ct":"","d":[[1,6,7],[1,3,6,7],[1,5,6,8],[1,7],[1,2,8],[1,3,5]]},{"n":"Paras Verma","ct":"","d":[[1,3,7,8],[1,3,7,8],[1,3,7],[1,6,8],[1,3,4],[1,3,6,8]]},{"n":"Kratika Rao","ct":"","d":[[1,2,3,5,7],[1,2,3,7],[1,2,3,5,7],[1,2,5,7],[1,2,3,5,7],[1,2,3,5]]},{"n":"Sagar Verma","ct":"9A","d":[[3,5,6,8],[3,5,6,8],[3,5,6,8],[3,5,6,8],[3,5,6,8],[3,6,8]]},{"n":"Ragini Shrivastava","ct":"9B","d":[[4,6],[4,6],[4,6],[3,7],[3,7],[3,7]]},{"n":"Savitri Shrivastava","ct":"9C","d":[[2,7,8],[2,7,8],[6,7,8],[4,6,8],[4,7,8],[4,7,8]]},{"n":"Saba Siddqui","ct":"9D","d":[[2,5,8],[2,5,8],[2,5,6],[2,3,5],[2,3,5],[2,3,5]]},{"n":"R.K Khattri","ct":"9E","d":[[4,7],[4,7],[4,7],[4,6],[4,6],[4,6]]},{"n":"Surendra Kumar","ct":"9F","d":[[3,4],[3,4,8],[4,7],[3,4,6],[4,6],[3,4,6]]},{"n":"Rohit Kesariya","ct":"10A","d":[[5,7,8],[5,7,8],[5,7,8],[3,6,7,8],[3,6,7,8],[3,6,7,8]]},{"n":"Pratik Bachwani","ct":"10B","d":[[3,6,8],[3,6,8],[3,6,8],[4,6,8],[3,6,7],[6,7,8]]},{"n":"Hasim","ct":"10C","d":[[2,6],[2,5,8],[6,8],[2,6,8],[2,6,8],[2,6]]},{"n":"Jamil Ansari","ct":"10D","d":[[4,6,7],[3,4,6,7],[3,4,6,8],[3,6,7],[1,3,4,6,7],[1,3,6,7,8]]},{"n":"Ameen Khan","ct":"10E","d":[[4,6,7],[4,6,7],[4,6,7,8],[3,4,7,8],[3,4,7,8],[6,7,8]]},{"n":"Sanjay Gupta","ct":"11A1","d":[[6,7,8],[6,7,8],[6,7,8],[6,7,8],[6,7,8],[6,7,8]]},{"n":"Ajay Pathak","ct":"11A2","d":[[3,5,8],[3,5,8],[5,6],[6,8],[2,6,8],[2,3]]},{"n":"Mansi Saxena","ct":"11B","d":[[6,7,8],[6,7],[6,7,8],[6,7],[6,7,8],[6,7,8]]},{"n":"Sonali Dailwar","ct":"11C","d":[[3,6],[3,6,8],[3,6],[4,5,8],[4,5,7],[4,5]]},{"n":"Saurabh Awasthi","ct":"12A1","d":[[2,7,8],[2,7,8],[2,7,8],[2,6,7],[6,7,8],[2,7,8]]},{"n":"Vinita Dixit","ct":"12A2","d":[[7,8],[7,8],[7,8],[6,7],[7,8],[7,8]]},{"n":"Dipali Bhaway","ct":"12B","d":[[5,6,7,8],[4,5,6,7,8],[5,6,8],[6,7,8],[5,7,8],[5,6,8]]},{"n":"Rajat Sahney","ct":"12C","d":[[5,6,8],[5,6],[2,5,6,8],[2,7,8],[2,5,6,8],[2,5,6]]},{"n":"Gautam Dubey","ct":"","d":[[1,3,6,7],[1,3,6],[1,2,3,7],[1,2,3,5,7,8],[1,3,4,5,7,8],[1,3,4,6]]},{"n":"Praved Pathak","ct":"","d":[[4,6,7,8],[4,6,7,8],[4,6,7,8],[4,6,7,8],[4,6,7,8],[4,6,7,8]]},{"n":"Kavita Naryani","ct":"","d":[[1,3,4,6,7,8],[1,3,4,6,7,8],[1,3,4,6,7,8],[1,3,4,6,7,8],[1,3,4,6,7,8],[1,3,4,6,7,8]]},{"n":"Ravindra Namdev","ct":"","d":[[1,7,8],[1,6,7],[1,6,7,8],[1,6],[1,3,6],[1,3,6,8]]},{"n":"Brijendra P.S.C","ct":"","d":[[1,3,6,8],[1,7,8],[1,3,8],[1,7,8],[6,7],[2,7]]},{"n":"Atif Edrees","ct":"","d":[[1,2,5,7,8],[1,4,6,8],[1,4,5,7,8],[1,4,6,8],[1,4,8],[1,4,6,7,8]]},{"n":"PTI3","ct":"","d":[[1,2,5,6,8],[1,3,4,5,6,8],[1,2,3,4,5,8],[1,5,7,8],[1],[1,2,4,5,6,7,8]]},{"n":"Sanjeev Shrivastav","ct":"","d":[[1,2,3,4,5,6,7,8],[1,2,3,4,5,6,7,8],[1,2,3,4,5,6,7,8],[1,2,3,4,5,6,7,8],[1,2,3,4,5,6,7,8],[1,2,3,4,5,6,7,8]]},{"n":"Saurabh Kumar Jha","ct":"","d":[[],[],[],[],[],[1]]},{"n":"Dharmendra Dev Singh","ct":"10 C","d":[[1,2,3,8],[1,3,6,7,8],[1,3,6,7],[1,4,5,7],[1,2,7],[1,2,7]]},{"n":"Saurabh Azad","ct":"","d":[[1,3,7,8],[1,3,7,8],[1,3,7,8],[1,3,7,8],[1,3,7,8],[1,3,7,8]]},{"n":"Neeeraj Parasar","ct":"","d":[[],[],[],[],[],[]]}];
+let fpData = FP_BUILTIN.map((t,i) => ({ id:null, n:t.n, ct:t.ct, d:t.d.map(a => a.slice()) }));
+let fpFromDb = false, fpDbMissing = false;
 let fpDay = null, fpSelPeriods = new Set(), fpReady = false;
 
-function fpInit(){
+function fpParse(v){ return [...new Set(String(v || '').match(/\d+/g) || [])].map(Number).filter(n => n >= 1 && n <= 8).sort((a,b) => a-b); }
+async function fpLoad(force){
+  const note = document.getElementById('fpSourceNote'), seed = document.getElementById('fpSeedBtn');
+  try{
+    const { data, error } = await supabaseClient.from('tt_free_periods').select('*').order('sort_order').order('id');
+    if(error) throw error;
+    fpDbMissing = false;
+    if(data && data.length){
+      fpFromDb = true;
+      fpData = data.map(r => ({ id:r.id, sort:r.sort_order, n:r.teacher_name, ct:r.class_teacher || '', d:FP_COLS.map(c => fpParse(r[c])) }));
+      note.style.display = 'none'; seed.style.display = 'none';
+    } else {
+      fpFromDb = false;
+      fpData = FP_BUILTIN.map((t,i) => ({ id:null, n:t.n, ct:t.ct, d:t.d.map(a => a.slice()) }));
+      note.style.display = 'block'; note.innerHTML = 'The database table is empty, so the built-in chart is shown. Click <strong>Import built-in chart into database</strong> below to start editing.';
+      seed.style.display = '';
+    }
+  }catch(err){
+    fpFromDb = false; fpDbMissing = true;
+    fpData = FP_BUILTIN.map((t,i) => ({ id:null, n:t.n, ct:t.ct, d:t.d.map(a => a.slice()) }));
+    note.style.display = 'block';
+    note.innerHTML = 'Showing the built-in chart (read-only). To enable editing, run <code>free_periods_setup.sql</code> once in Supabase &rarr; SQL Editor, then click Refresh. <span style="opacity:.7">(' + escapeHtml(errMsg(err)) + ')</span>';
+    seed.style.display = 'none';
+  }
+  if(fpReady){ fpFillTeacherSelect(); fpRenderFinder(); fpRenderFull(); fpRenderTeacher(); }
+}
+async function fpSeed(){
+  if(!confirm('Import the built-in free-period chart (' + FP_BUILTIN.length + ' teachers) into the database?')) return;
+  const recs = FP_BUILTIN.map((t,i) => { const r = { sort_order:i+1, teacher_name:t.n, class_teacher:t.ct }; FP_COLS.forEach((c,k) => r[c] = t.d[k].join(',')); return r; });
+  const { error } = await supabaseClient.from('tt_free_periods').insert(recs);
+  if(error){ alert('Import failed: ' + errMsg(error)); return; }
+  await fpLoad();
+}
+function fpFillTeacherSelect(){
+  const sel = document.getElementById('fpTeacherSelect'), cur = sel.value;
+  sel.innerHTML = '<option value="">— Select teacher —</option>' + fpData.map((t,i) => `<option value="${i}">${escapeHtml(t.n)}${t.ct ? ' (' + escapeHtml(t.ct) + ')' : ''}</option>`).join('');
+  if(cur !== '' && fpData[Number(cur)]) sel.value = cur;
+}
+async function fpInit(){
   if(!fpReady){
-    const jsDay = new Date().getDay(); // 0=Sun
+    const jsDay = new Date().getDay();
     fpDay = jsDay >= 1 && jsDay <= 6 ? jsDay - 1 : 0;
     document.getElementById('fpDayChips').innerHTML = FP_DAYS.map((d,i) => `<span class="fp-chip" data-day="${i}" onclick="fpPickDay(${i})">${d}</span>`).join('');
     document.getElementById('fpPeriodChips').innerHTML = `<span class="fp-chip" id="fpAllChip" onclick="fpPickAllPeriods()">All</span>` + FP_PERIODS.map(p => `<span class="fp-chip" data-p="${p}" onclick="fpTogglePeriod(${p})">P${p}</span>`).join('');
-    document.getElementById('fpTeacherSelect').innerHTML = '<option value="">— Select teacher —</option>' + FP_DATA.map((t,i) => `<option value="${i}">${escapeHtml(t.n)}${t.ct ? ' (' + escapeHtml(t.ct) + ')' : ''}</option>`).join('');
     fpReady = true;
   }
-  fpRenderFinder(); fpRenderFull();
+  fpFillTeacherSelect(); fpRenderFinder(); fpRenderFull();
+  await fpLoad();
 }
 function fpPickDay(i){ fpDay = i; fpRenderFinder(); }
 function fpTogglePeriod(p){ if(fpSelPeriods.has(p)) fpSelPeriods.delete(p); else fpSelPeriods.add(p); fpRenderFinder(); }
@@ -7864,7 +7908,7 @@ function fpMatches(){
   const q = document.getElementById('fpSearch').value.trim().toLowerCase();
   const sel = [...fpSelPeriods].sort((a,b) => a-b);
   const out = [];
-  FP_DATA.forEach(t => {
+  fpData.forEach(t => {
     if(kind === 'ct' && !t.ct) return;
     if(kind === 'nonct' && t.ct) return;
     if(q && !(t.n.toLowerCase().includes(q) || t.ct.toLowerCase().includes(q))) return;
@@ -7893,14 +7937,62 @@ function fpRenderFinder(){
 function fpRenderTeacher(){
   const idx = document.getElementById('fpTeacherSelect').value;
   const area = document.getElementById('fpTeacherArea');
-  if(idx === ''){ area.innerHTML = '<div class="empty">Choose a teacher to see their free periods across the week.</div>'; return; }
-  const t = FP_DATA[Number(idx)];
+  if(idx === '' || !fpData[Number(idx)]){ area.innerHTML = '<div class="empty">Choose a teacher to see their free periods across the week.</div>'; return; }
+  const t = fpData[Number(idx)];
   area.innerHTML = '<table class="fp-grid"><thead><tr><th>Day</th>' + FP_PERIODS.map(p => `<th>P${p}</th>`).join('') + '</tr></thead><tbody>' +
     FP_DAYS.map((d,i) => `<tr><th style="text-align:left;">${d}</th>` + FP_PERIODS.map(p => (t.d[i] || []).includes(p) ? '<td class="free">Free</td>' : '<td class="busy">·</td>').join('') + '</tr>').join('') + '</tbody></table>';
 }
 function fpRenderFull(){
-  document.getElementById('fpFullArea').innerHTML = '<table><thead><tr><th>S.N</th><th>Teacher</th><th>CT</th>' + FP_DAYS.map(d => `<th>${d}</th>`).join('') + '</tr></thead><tbody>' +
-    FP_DATA.map((t,i) => `<tr><td>${i+1}</td><td><strong>${escapeHtml(t.n)}</strong></td><td>${escapeHtml(t.ct)}</td>` + t.d.map(a => `<td>${a.length ? a.join(', ') : '<span class="fp-none">—</span>'}</td>`).join('') + '</tr>').join('') + '</tbody></table>';
+  const canEdit = fpFromDb;
+  document.getElementById('fpFullArea').innerHTML = '<table><thead><tr><th>S.N</th><th>Teacher</th><th>CT</th>' + FP_DAYS.map(d => `<th>${d}</th>`).join('') + (canEdit ? '<th>Action</th>' : '') + '</tr></thead><tbody>' +
+    fpData.map((t,i) => `<tr><td>${i+1}</td><td><strong>${escapeHtml(t.n)}</strong></td><td>${escapeHtml(t.ct)}</td>` + t.d.map(a => `<td>${a.length ? a.join(', ') : '<span class="fp-none">—</span>'}</td>`).join('') + (canEdit ? `<td style="white-space:nowrap;"><button class="btn-secondary" style="padding:5px 10px;font-size:12px;" onclick="fpEdit(${i})">Edit</button></td>` : '') + '</tr>').join('') + '</tbody></table>';
+}
+/* ---- Editing ---- */
+let fpEditIdx = -1;
+function fpEdit(i){
+  if(!fpFromDb){
+    alert(fpDbMissing ? 'Editing needs the database table. Run free_periods_setup.sql once in Supabase (SQL Editor), then click Refresh.' : 'Import the built-in chart into the database first (button below), then you can edit.');
+    return;
+  }
+  fpEditIdx = i;
+  const t = i >= 0 ? fpData[i] : { n:'', ct:'', d:[[],[],[],[],[],[]] };
+  const box = document.getElementById('fpEditor');
+  box.style.display = 'block';
+  box.innerHTML = `<div class="fee-panel" style="border:2px solid var(--accent);margin-bottom:14px;">
+    <h2>${i >= 0 ? 'Edit free periods' : 'Add teacher'}</h2>
+    <div class="fee-actions">
+      <input type="text" id="fpEdName" placeholder="Teacher name" value="${escapeHtml(t.n)}" style="min-width:240px;">
+      <input type="text" id="fpEdCt" placeholder="Class teacher of (e.g. 5A) — optional" value="${escapeHtml(t.ct)}" style="min-width:240px;">
+    </div>
+    <div class="table-container"><table class="fp-grid"><thead><tr><th>Day</th>${FP_PERIODS.map(p => `<th>P${p}</th>`).join('')}<th>Set</th></tr></thead><tbody>` +
+    FP_DAYS.map((d,k) => `<tr><th style="text-align:left;">${d}</th>${FP_PERIODS.map(p => `<td><input type="checkbox" data-d="${k}" data-p="${p}" ${(t.d[k] || []).includes(p) ? 'checked' : ''}></td>`).join('')}<td style="white-space:nowrap;"><a href="javascript:void(0)" onclick="fpEdRow(${k},true)">all</a> · <a href="javascript:void(0)" onclick="fpEdRow(${k},false)">none</a></td></tr>`).join('') +
+    `</tbody></table></div>
+    <div class="fee-actions" style="margin:12px 0 0;">
+      <button class="btn-primary" onclick="fpEdSave()">Save</button>
+      <button class="btn-secondary" onclick="fpEdCancel()">Cancel</button>
+      ${i >= 0 ? '<button class="btn-secondary" style="color:#b1392d;border-color:#e0b4ae;" onclick="fpEdDelete()">Delete teacher</button>' : ''}
+    </div></div>`;
+  box.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+function fpEdRow(k, on){ document.querySelectorAll('#fpEditor input[data-d="' + k + '"]').forEach(c => c.checked = on); }
+function fpEdCancel(){ document.getElementById('fpEditor').style.display = 'none'; fpEditIdx = -1; }
+async function fpEdSave(){
+  const name = document.getElementById('fpEdName').value.trim();
+  if(!name){ alert('Please enter the teacher name.'); return; }
+  const rec = { teacher_name:name, class_teacher:document.getElementById('fpEdCt').value.trim() };
+  FP_COLS.forEach((c,k) => { rec[c] = [...document.querySelectorAll('#fpEditor input[data-d="' + k + '"]:checked')].map(x => x.dataset.p).join(','); });
+  let error;
+  if(fpEditIdx >= 0){ ({ error } = await supabaseClient.from('tt_free_periods').update(rec).eq('id', fpData[fpEditIdx].id)); }
+  else { rec.sort_order = fpData.reduce((m,t) => Math.max(m, t.sort || 0), 0) + 1; ({ error } = await supabaseClient.from('tt_free_periods').insert(rec)); }
+  if(error){ alert('Could not save: ' + errMsg(error)); return; }
+  fpEdCancel(); await fpLoad();
+}
+async function fpEdDelete(){
+  const t = fpData[fpEditIdx];
+  if(!t || !confirm('Delete ' + t.n + ' from the free-period chart?')) return;
+  const { error } = await supabaseClient.from('tt_free_periods').delete().eq('id', t.id);
+  if(error){ alert('Could not delete: ' + errMsg(error)); return; }
+  fpEdCancel(); await fpLoad();
 }
 function fpExportCsv(){
   const rows = fpMatches();
