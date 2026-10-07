@@ -1,0 +1,8 @@
+{
+  "name": "Mount Litera Zee School Forms Portal",
+  "description": "Forms and registrations portal for Mount Litera Zee School, Jhansi, featuring Class IX and XI registration, Staff Data Bank, and admin management.",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
