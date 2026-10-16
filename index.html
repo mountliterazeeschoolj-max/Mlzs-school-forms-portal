@@ -552,6 +552,15 @@
   .gate2 .note.error{background:#fdecea;border-color:#f3b4ac;color:#9a2a20;font-weight:600;}
   .gate2 .note.success{background:#e9f7ef;border-color:#a8ddc0;color:#1e7d43;font-weight:600;}
 
+  /* Continue with Google */
+  .gate2-or{display:flex;align-items:center;gap:10px;margin:16px 0 12px;font-size:11.5px;font-weight:700;color:#8092b3;text-transform:uppercase;letter-spacing:.6px;}
+  .gate2-or::before,.gate2-or::after{content:'';flex:1;height:1px;background:#dfe7f7;}
+  .gate2 button.gate2-google{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:12px 14px;border-radius:14px;border:1.5px solid #dfe7f7;background:#fff;color:#1b2b4b;font-size:14.5px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 4px 12px -6px rgba(31,66,135,.25);transition:background .15s ease, transform .1s ease;}
+  .gate2 button.gate2-google:hover{background:#f6f9ff;}
+  .gate2 button.gate2-google:active{transform:translateY(1px);}
+  .gate2 button.gate2-google:disabled{opacity:.65;cursor:default;}
+  .gate2 button.gate2-google svg{width:18px;height:18px;flex-shrink:0;}
+
   /* Desktop: card sits comfortably centered without excess top space */
   @media (min-width:641px){
     .gate2{margin:6vh auto 40px;}
@@ -1504,6 +1513,12 @@
   </div>
 
   <button class="gate2-btn" id="staffLoginBtn" onclick="staffLogin()">Log In</button>
+
+  <div class="gate2-or"><span>or</span></div>
+  <button type="button" class="gate2-google" id="staffGoogleBtn" onclick="staffGoogleSignIn()">
+    <svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+  <span id="staffGoogleBtnLabel">Continue with Google</span>
+  </button>
 
   <div class="gate2-links">
     <a class="row" onclick="staffSendPasswordReset()">
@@ -3857,6 +3872,13 @@ async function checkExistingSession(){
   try{
     const { data } = await supabaseClient.auth.getSession();
     if(data && data.session){
+      /* Returning from "Continue with Google" on the staff login screen: send them to
+         their own Staff Data Bank record rather than running the admin-role check. */
+      if(sessionStorage.getItem('staffGoogleOAuthPending')){
+        sessionStorage.removeItem('staffGoogleOAuthPending');
+        await loadMyStaffRecord();
+        return;
+      }
       const role = await verifyAdminSessionOrRejectAccess();
       if(!role) return;
       currentPortalRole = role;
@@ -3865,6 +3887,7 @@ async function checkExistingSession(){
       switchTab(role === 'RM' ? 'admission' : 'overview');
     }
   } catch(err){ /* not logged in, stay on landing view */ }
+  sessionStorage.removeItem('staffGoogleOAuthPending');
 }
 checkExistingSession();
 loadFormSettings();
@@ -4904,6 +4927,7 @@ function setStaffAuthMode(mode){
     ? 'Register with your email to fill in and manage your own Staff Data Bank record.'
     : 'Log in to view and update your own Staff Data Bank record.';
   document.getElementById('staffLoginBtn').textContent = isRegister ? 'Create Account' : 'Log In';
+  document.getElementById('staffGoogleBtnLabel').textContent = isRegister ? 'Sign up with Google' : 'Continue with Google';
   document.getElementById('staffFullNameField').style.display = isRegister ? 'block' : 'none';
   document.getElementById('staffPasswordHint').style.display = isRegister ? 'block' : 'none';
   document.getElementById('staffConfirmPasswordField').style.display = isRegister ? 'block' : 'none';
@@ -4937,6 +4961,38 @@ function showStaffLoginNote(msg, type){
   el.textContent = msg;
   el.className = 'note' + (type ? (' ' + type) : ' error');
   el.style.display = 'block';
+}
+
+/* Google sign-in / sign-up for staff. Supabase creates the account automatically on first
+   Google login, so one button serves both "Log In" and "Create Account". Google redirects
+   back to this page; the flag below tells checkExistingSession() that the returning session
+   is a staff login (not an admin one) so it is routed to the staff record instead of being
+   rejected by the admin-role check. Needs the Google provider enabled in Supabase. */
+const STAFF_GOOGLE_FLAG = 'staffGoogleOAuthPending';
+
+async function staffGoogleSignIn(){
+  const btn = document.getElementById('staffGoogleBtn');
+  btn.disabled = true;
+  try{
+    sessionStorage.setItem(STAFF_GOOGLE_FLAG, '1');
+    const { error } = await supabaseClient.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin + window.location.pathname,
+        queryParams: { prompt: 'select_account' }
+      }
+    });
+    if(error){
+      sessionStorage.removeItem(STAFF_GOOGLE_FLAG);
+      showStaffLoginNote('Could not start Google sign-in: ' + errMsg(error));
+      btn.disabled = false;
+    }
+    /* On success the browser navigates away to Google, so nothing more to do here. */
+  } catch(err){
+    sessionStorage.removeItem(STAFF_GOOGLE_FLAG);
+    showStaffLoginNote('Could not reach the server: ' + errMsg(err));
+    btn.disabled = false;
+  }
 }
 
 async function staffLogin(){
