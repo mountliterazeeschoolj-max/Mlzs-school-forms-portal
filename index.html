@@ -2352,6 +2352,7 @@
       <button class="tab-btn" id="attViewMarkEmployee" onclick="switchAttView('markemployee')">Mark Employee</button>
       <button class="tab-btn" id="attViewEmployeeTracker" onclick="switchAttView('employeetracker')">Employee Tracker</button>
       <button class="tab-btn" id="attViewReports" onclick="switchAttView('reports')">Reports</button>
+      <button class="tab-btn" id="attViewFace" onclick="openFaceAttendance()">Face Attendance &#8599;</button>
     </div>
 
     <div id="attSetupView">
@@ -9276,6 +9277,16 @@ async function loadAttendance(){
   } catch(err){
     alert('Could not load attendance data: ' + errMsg(err));
   }
+}
+
+/* Face Attendance runs as its own service (see /face-attendance). Set its public address here once deployed. */
+const FACE_ATTENDANCE_URL = "";   // e.g. "https://attendance.yourschool.in"
+async function openFaceAttendance(){
+  if(!FACE_ATTENDANCE_URL){ alert('Face Attendance is not set up yet. Deploy the service and set FACE_ATTENDANCE_URL in index.html.'); return; }
+  const { data } = await supabaseClient.auth.getSession();
+  if(!data || !data.session){ alert('Please sign in again.'); return; }
+  // The token travels in the URL fragment, so it is never sent to a server log; the service verifies it with Supabase.
+  window.open(FACE_ATTENDANCE_URL + '/sso#token=' + encodeURIComponent(data.session.access_token), '_blank', 'noopener');
 }
 
 function switchAttView(view){

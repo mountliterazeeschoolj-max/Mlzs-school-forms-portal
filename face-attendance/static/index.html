@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Attendance console</title>
+<style>
+  :root{--bg:#f4f5f2;--panel:#fff;--ink:#1c2420;--mute:#64706a;--line:#dde1dc;--accent:#14654f;
+        --late:#a86a12;--out:#4a5a8a;--bad:#a8382f}
+  @media (prefers-color-scheme:dark){:root{--bg:#141815;--panel:#1d231f;--ink:#e8ece9;--mute:#98a39d;
+        --line:#2e3631;--accent:#4fb08f;--late:#e0a24a;--out:#8fa2d8;--bad:#e5766c}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+  header{display:flex;align-items:center;gap:24px;padding:14px 24px;background:var(--panel);
+         border-bottom:1px solid var(--line);flex-wrap:wrap}
+  h1{font-size:18px;margin:0;font-weight:650;letter-spacing:-.01em}
+  nav{display:flex;gap:4px}
+  nav button{background:none;border:0;padding:8px 14px;font:inherit;color:var(--mute);cursor:pointer;
+             border-bottom:2px solid transparent}
+  nav button.on{color:var(--ink);border-color:var(--accent);font-weight:600}
+  button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  main{padding:24px;max-width:1200px;margin:auto}
+  section{display:none}section.on{display:block}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:16px}
+  .cam{background:#000;border-radius:6px;overflow:hidden;position:relative;min-height:200px}
+  .cam img{width:100%;display:block}
+  .cam b{position:absolute;left:0;top:0;padding:4px 10px;background:rgba(0,0,0,.65);color:#fff;font-size:13px;font-weight:500}
+  .bar{display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin-bottom:16px}
+  label{display:flex;flex-direction:column;font-size:13px;color:var(--mute);gap:4px}
+  input,select{font:inherit;padding:7px 10px;border:1px solid var(--line);border-radius:4px;background:var(--panel);color:var(--ink)}
+  .btn{padding:8px 16px;border:0;border-radius:4px;background:var(--accent);color:#fff;font:inherit;cursor:pointer;font-weight:600}
+  .btn.ghost{background:none;color:var(--ink);border:1px solid var(--line);font-weight:500;padding:5px 10px;font-size:13px}
+  table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line)}
+  th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);font-size:14px}
+  th{color:var(--mute);font-weight:500;font-size:13px}
+  td.num{font-variant-numeric:tabular-nums}
+  .tag{padding:2px 8px;border-radius:10px;font-size:12px;font-weight:600;border:1px solid currentColor}
+  .ON_TIME{color:var(--accent)}.LATE{color:var(--late)}.CHECKED_OUT{color:var(--out)}
+  .empty{padding:28px;color:var(--mute);text-align:center}
+  .panel{background:var(--panel);border:1px solid var(--line);padding:16px;border-radius:6px;margin-bottom:20px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Attendance console</h1>
+  <nav id="tabs">
+    <button data-t="live" class="on">Live cameras</button>
+    <button data-t="log">Attendance</button>
+    <button data-t="emp">Employees</button>
+    <button data-t="cams">Cameras</button>
+  </nav>
+</header>
+<main>
+<section id="live" class="on"><div class="grid" id="grid"></div></section>
+
+<section id="log">
+  <div class="bar">
+    <label>Date<input type="date" id="fDate"></label>
+    <label>Designation<select id="fDept"><option value="">All designations</option></select></label>
+    <button class="btn" id="export">Export to CSV</button>
+  </div>
+  <table><thead><tr><th>Staff ID</th><th>Name</th><th>Check-in</th><th>Check-out</th><th>Total hours</th><th>Status</th></tr></thead>
+  <tbody id="logBody"></tbody></table>
+</section>
+
+<section id="emp">
+  <p style="color:var(--mute);margin-top:0">Staff come from the portal's Staff Data Bank. Add 3 to 5 clear photos per person (or capture from a camera) so the cameras can recognise them.</p>
+  <div class="bar"><label>Capture from camera<select id="capCam"></select></label>
+    <label>Search<input id="empSearch" placeholder="Name"></label></div>
+  <table><thead><tr><th>Staff ID</th><th>Name</th><th>Designation</th><th>Face photos</th><th></th></tr></thead>
+  <tbody id="empBody"></tbody></table>
+</section>
+
+<section id="cams">
+  <form class="panel bar" id="camForm">
+    <label>Name<input name="name" required placeholder="Main entrance"></label>
+    <label style="min-width:340px">RTSP URL or USB index<input name="source" required placeholder="rtsp://user:pass@192.168.1.20:554/stream or 0"></label>
+    <label>Zone<select name="zone"><option>CHECK_IN</option><option>CHECK_OUT</option><option selected>BOTH</option></select></label>
+    <button class="btn">Add camera</button>
+  </form>
+  <table><thead><tr><th>Name</th><th>Source</th><th>Zone</th><th>State</th><th></th></tr></thead>
+  <tbody id="camBody"></tbody></table>
+</section>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+async function api(url, opt) {
+  const r = await fetch(url, opt);
+  if (!r.ok) { const e = await r.json().catch(() => ({})); alert(e.detail?.[0]?.msg || e.detail || r.statusText); throw new Error(url); }
+  return r.json();
+}
+const today = new Date(Date.now() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
+$("#fDate").value = today;
+let tab = "live", timer;
+
+document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => show(b.dataset.t));
+function show(t) {
+  tab = t;
+  document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.t === t));
+  document.querySelectorAll("section").forEach(s => s.classList.toggle("on", s.id === t));
+  clearInterval(timer);
+  ({live: loadLive, log: loadLog, emp: loadEmp, cams: loadCams})[t]();
+  if (t === "log") timer = setInterval(loadLog, 5000);
+  if (t !== "live") $("#grid").innerHTML = "";          // close MJPEG connections when hidden
+}
+
+async function loadLive() {
+  const cams = await api("/api/cameras");
+  $("#grid").innerHTML = cams.length ? cams.map(c =>
+    `<div class="cam"><b>${esc(c.name)} (${c.zone})</b><img src="/api/cameras/${c.id}/stream" alt="Live feed from ${esc(c.name)}"></div>`).join("")
+    : `<div class="empty">No cameras yet. Add one on the Cameras tab.</div>`;
+}
+
+async function loadLog() {
+  const q = new URLSearchParams({day: $("#fDate").value, department: $("#fDept").value});
+  const depts = await api("/api/departments"), keep = $("#fDept").value;
+  $("#fDept").innerHTML = `<option value="">All designations</option>` + depts.map(d => `<option ${d===keep?"selected":""}>${esc(d)}</option>`).join("");
+  const rows = await api("/api/attendance?" + q);
+  $("#logBody").innerHTML = rows.length ? rows.map(r => `<tr><td>${esc(r.emp_code)}</td><td>${esc(r.name)}</td>
+    <td class="num">${r.check_in}</td><td class="num">${r.check_out || "-"}</td><td class="num">${r.total_hours === "" ? "-" : r.total_hours}</td>
+    <td><span class="tag ${r.status}">${r.status.replace("_", " ")}</span>${r.status === "CHECKED_OUT" && r.was_late ? ' <span class="tag LATE">arrived late</span>' : ""}</td></tr>`).join("")
+    : `<tr><td colspan="6" class="empty">No attendance logged for this date.</td></tr>`;
+}
+$("#fDate").onchange = $("#fDept").onchange = loadLog;
+$("#export").onclick = () => location.href = "/api/attendance/export.csv?" + new URLSearchParams({day: $("#fDate").value, department: $("#fDept").value});
+
+let staffList = [];
+async function loadEmp() {
+  const [emps, cams] = await Promise.all([api("/api/staff"), api("/api/cameras")]);
+  staffList = emps;
+  $("#capCam").innerHTML = cams.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join("");
+  renderEmp();
+}
+function renderEmp() {
+  const q = $("#empSearch").value.toLowerCase();
+  const rows = staffList.filter(e => e.full_name.toLowerCase().includes(q));
+  $("#empBody").innerHTML = rows.length ? rows.map(e => `<tr><td>${esc(e.emp_code)}</td><td>${esc(e.full_name)}</td>
+    <td>${esc(e.department)}</td><td>${e.photos}</td>
+    <td><button class="btn ghost" onclick="capture('${e.id}')">Capture from camera</button>
+        <label style="display:inline"><input type="file" accept="image/*" multiple hidden onchange="addPhotos('${e.id}', this)"><span class="btn ghost">Add photos</span></label>
+        ${e.photos ? `<button class="btn ghost" onclick="removeFaces('${e.id}')">Delete face data</button>` : ""}</td></tr>`).join("")
+    : `<tr><td colspan="5" class="empty">No staff found.</td></tr>`;
+}
+$("#empSearch").oninput = renderEmp;
+async function capture(id) {
+  const cam = $("#capCam").value; if (!cam) return alert("Add a camera first.");
+  const r = await api(`/api/staff/${id}/capture/${cam}`, {method: "POST"});
+  alert(`Snapshot enrolled. ${r.photos} photo(s) on file.`); loadEmp();
+}
+async function addPhotos(id, input) {
+  const fd = new FormData(); [...input.files].forEach(f => fd.append("photos", f));
+  const r = await api(`/api/staff/${id}/photos`, {method: "POST", body: fd});
+  alert(`${r.photos_ok} photo(s) enrolled, ${r.photos_without_face} had no face.`); loadEmp();
+}
+async function removeFaces(id) {
+  if (confirm("Delete this person's face data? Their staff record and attendance history are kept.")) { await api(`/api/staff/${id}/faces`, {method: "DELETE"}); loadEmp(); }
+}
+
+async function loadCams() {
+  const cams = await api("/api/cameras");
+  $("#camBody").innerHTML = cams.length ? cams.map(c => `<tr><td>${esc(c.name)}</td>
+    <td>${esc(c.source.replace(/\/\/[^@/]*@/, "//***@"))}</td><td>${c.zone}</td>
+    <td>${c.connected ? "Connected" : "Connecting or offline"}</td>
+    <td><button class="btn ghost" onclick="removeCam(${c.id})">Remove</button></td></tr>`).join("")
+    : `<tr><td colspan="5" class="empty">No cameras yet.</td></tr>`;
+}
+$("#camForm").onsubmit = async ev => {
+  ev.preventDefault();
+  await api("/api/cameras", {method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(Object.fromEntries(new FormData(ev.target)))});
+  ev.target.reset(); loadCams();
+};
+async function removeCam(id) { if (confirm("Remove this camera?")) { await api("/api/cameras/" + id, {method: "DELETE"}); loadCams(); } }
+
+show("live");
+</script>
+</body>
+</html>
