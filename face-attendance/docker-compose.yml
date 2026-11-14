@@ -1,20 +1,12 @@
+# Runs the app only, listening on this computer's port 8000. HTTPS is provided by Tailscale Funnel
+# (`sudo tailscale funnel --bg 8000`), see README.md.
 services:
   app:
-    image: ghcr.io/mountliterazeeschoolj-max/mlzs-face-attendance:latest   # built by GitHub Actions; or use `build: .`
-    # build: .
+    build: .
     restart: unless-stopped
     env_file: .env
+    ports: ["127.0.0.1:8000:8000"]
     volumes:
       - modelcache:/root/.insightface      # face model (downloaded once)
-    expose: ["8000"]                       # not published; only Caddy can reach it
-  caddy:
-    image: caddy:2
-    restart: unless-stopped
-    ports: ["80:80", "443:443"]
-    environment:
-      DOMAIN: ${DOMAIN}
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddydata:/data
-    depends_on: [app]
-volumes: {modelcache: {}, caddydata: {}}
+volumes:
+  modelcache: {}

@@ -8,12 +8,12 @@ Camera-based check-in/out for staff, wired into the school portal's Supabase dat
   cameras in `face_cameras`. These tables are locked from the public anon key.
 - Only portal admins (`admin_emails`, role ADMIN) can open the console: Portal > Attendance > Face Attendance.
 
-## Deploy (needs a small always-on server with Docker, ideally 4 GB RAM, on the same network as the cameras
-or able to reach them)
-1. `cp .env.example .env` and fill in `DOMAIN`, `DATABASE_URL` (Supabase session-pooler string + DB password),
-   `SUPABASE_ANON_KEY`.
-2. `docker compose up -d` (the image is built by GitHub Actions; or uncomment `build: .`).
-3. Set `FACE_ATTENDANCE_URL` in the portal's `index.html` to `https://<DOMAIN>`.
-4. Console > Cameras: add each camera (RTSP URL or USB index). Console > Staff: add 3 to 5 photos per person.
+## Deploy (always-on school computer + Tailscale Funnel for free HTTPS)
+1. `cp .env.example .env` and fill in `DATABASE_URL` (Supabase session-pooler string + DB password, URL-encode
+   special characters) and `SUPABASE_ANON_KEY`.
+2. `docker compose up -d --build`
+3. `sudo tailscale funnel --bg 8000` and note the https address it prints.
+4. Put that address in `face-config.js` in the portal repo root.
+5. Portal > Attendance > Face Attendance. Add cameras and 3 to 5 photos per staff member.
 
-Database migrations are already applied to Supabase (`face_attendance_tables`, `face_mark_attendance_no_substitute_sync`).
+Database migrations are already applied to Supabase (see `supabase/`).
