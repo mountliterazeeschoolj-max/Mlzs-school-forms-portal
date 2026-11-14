@@ -6,6 +6,7 @@
 <title>Mount Litera Zee School, Jhansi - Forms Portal</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="face-config.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Allura&family=Arimo:wght@400;700&family=Bebas+Neue&family=Caveat:wght@400;700&family=Cinzel:wght@400;700&family=Cormorant+Garamond:wght@400;700&family=Dancing+Script:wght@400;700&family=EB+Garamond:wght@400;700&family=Great+Vibes&family=Lato:wght@400;700&family=Lobster&family=Merriweather:wght@400;700&family=Montserrat:wght@400;700&family=Mrs+Saint+Delafield&family=Nunito:wght@400;700&family=Old+Standard+TT:wght@400;700&family=Open+Sans:wght@400;700&family=Oswald:wght@400;700&family=Pacifico&family=Parisienne&family=Playfair+Display:wght@400;700&family=Poppins:wght@400;700&family=Quicksand:wght@400;700&family=Raleway:wght@400;700&family=Roboto:wght@400;700&family=Sacramento&family=Satisfy&family=Tangerine:wght@400;700&family=Ubuntu:wght@400;700&display=swap" rel="stylesheet">
@@ -9280,9 +9281,9 @@ async function loadAttendance(){
 }
 
 /* Face Attendance runs as its own service (see /face-attendance). Set its public address here once deployed. */
-const FACE_ATTENDANCE_URL = "";   // e.g. "https://attendance.yourschool.in"
+const FACE_ATTENDANCE_URL = window.FACE_ATTENDANCE_URL || "";   // set in face-config.js
 async function openFaceAttendance(){
-  if(!FACE_ATTENDANCE_URL){ alert('Face Attendance is not set up yet. Deploy the service and set FACE_ATTENDANCE_URL in index.html.'); return; }
+  if(!FACE_ATTENDANCE_URL){ alert('Face Attendance is not set up yet. Deploy the service and set the address in face-config.js.'); return; }
   const { data } = await supabaseClient.auth.getSession();
   if(!data || !data.session){ alert('Please sign in again.'); return; }
   // The token travels in the URL fragment, so it is never sent to a server log; the service verifies it with Supabase.
