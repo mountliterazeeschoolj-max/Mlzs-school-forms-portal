@@ -2450,17 +2450,24 @@
 
     <div id="attDayFinderView" style="display:none;">
       <div class="fee-panel">
-        <h2>Day &amp; Month Attendance Finder</h2>
-        <p class="fs-modal-sub">Pick a month and a day to see that day's status and class-wise student attendance, plus the month's daily average.</p>
+        <h2>Interactive Day &amp; Month Attendance Lookup</h2>
+        <p class="fs-modal-sub">Select a month and day to see that day's status and Boys / Girls attendance for every class. Present counts as 1 and Half-day as 0.5. Students need a Gender set (Fees → Edit Student, or a Gender column in bulk import) to be counted as Boys or Girls.</p>
         <div class="fee-actions">
           <label style="display:flex;align-items:center;gap:6px;">Month <select id="attDFMonth" onchange="attDayFinderMonthChanged()"></select></label>
-          <label style="display:flex;align-items:center;gap:6px;">Day <select id="attDFDay" onchange="attLoadDayFinder()"></select></label>
+          <label style="display:flex;align-items:center;gap:6px;">Day <select id="attDFDay" onchange="attRenderDayFinder()"></select></label>
+          <label style="display:flex;align-items:center;gap:6px;">Day type <select id="attDFDayType"></select></label>
+          <button class="btn-primary" onclick="attDFSaveDayType()">Save Day Type</button>
+          <button class="btn-secondary" onclick="attDFClearDayType()">Reset to Auto</button>
           <button class="btn-secondary" onclick="attLoadDayFinder(true)">Refresh</button>
           <button class="btn-secondary" onclick="attDayFinderExport()">Export CSV</button>
         </div>
         <div id="attDFSummary"></div>
-        <div class="table-container"><div id="attDFArea"><div class="empty">Pick a month and day.</div></div></div>
+        <div class="table-container"><div id="attDFArea"><div class="loading">Loading...</div></div></div>
       </div>
+      <div class="fee-panel"><h2>Session Snapshot</h2><div id="attDFKpis"></div></div>
+      <div class="fee-panel"><h2>1. Month-by-Month Attendance Summary</h2><div class="table-container"><div id="attDFMonthTable"></div></div></div>
+      <div class="fee-panel"><h2>2. Class-wise &amp; Wing-wise Average Daily Attendance Across Months</h2><div class="table-container"><div id="attDFClassTable"></div></div></div>
+      <div class="fee-panel"><h2>3. Daily Register — Section-wise (selected month)</h2><p class="fs-modal-sub">One row per date; each section shows Boys / Girls present.</p><div class="table-container"><div id="attDFRegister"></div></div></div>
     </div>
 
     <div id="attMarkEmployeeView" style="display:none;">
@@ -6570,11 +6577,12 @@ document.addEventListener('DOMContentLoaded', installModalCloseControls);
 function openFeeStudentDialog(id){
   const r = id ? feeRecords.find(x => x.id === id) : {};
   const field = (label,key,type='text') => `<div class="field"><label>${label}</label><input id="fs_${key}" type="${type}" value="${escapeHtml(r?.[key] ?? '')}"></div>`;
+  const genderField = `<div class="field"><label>Gender</label><select id="fs_gender"><option value="">— Select —</option><option value="Male" ${r?.gender==='Male'?'selected':''}>Male</option><option value="Female" ${r?.gender==='Female'?'selected':''}>Female</option></select></div>`;
   const classDatalist = `<datalist id="fs_class_datalist">${[...feeStructure.keys()].map(c => `<option value="${escapeHtml(c)}">`).join('')}</datalist>`;
   openFeeDialog(id ? 'Edit Fee Student' : 'Add Fee Student', `<div class="fee-form-grid">
     ${field('Admission No.','reg_no')}${field('Student Name','student_name')}
     <div class="field"><label>Class / Section</label><input id="fs_class_section" list="fs_class_datalist" value="${escapeHtml(r?.class_section ?? '')}" onchange="feeAutoFillFromStructure()">${classDatalist}</div>
-    ${field('Mobile','mobile_number','tel')}${field('Father Name','father_name')}${field('Mother Name','mother_name')}${field('Date of Birth','dob','date')}${field('Admission Date','admission_date','date')}${field('Category','category')}<div class="field full"><label>Address</label><textarea id="fs_address">${escapeHtml(r?.address ?? '')}</textarea></div>
+    ${genderField}${field('Mobile','mobile_number','tel')}${field('Father Name','father_name')}${field('Mother Name','mother_name')}${field('Date of Birth','dob','date')}${field('Admission Date','admission_date','date')}${field('Category','category')}<div class="field full"><label>Address</label><textarea id="fs_address">${escapeHtml(r?.address ?? '')}</textarea></div>
     ${field('Last Year Due','prev_session_fee','number')}${field('Q1 Fee','q1_fee','number')}${field('Q2 Fee','q2_fee','number')}${field('Q3 Fee','q3_fee','number')}${field('Q4 Fee','q4_fee','number')}${field('Bus Fee','bus_fee','number')}
     <div class="field full" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
       <button type="button" class="btn-secondary" onclick="feeAutoFillFromStructure(true)">Fetch Fees from Class Structure</button>
@@ -6596,9 +6604,10 @@ function feeAutoFillFromStructure(force){
 }
 
 async function saveFeeStudent(id){
-  const keys = ['reg_no','student_name','class_section','mobile_number','father_name','mother_name','dob','admission_date','category','address','prev_session_fee','q1_fee','q2_fee','q3_fee','q4_fee','bus_fee'];
+  const keys = ['reg_no','student_name','class_section','mobile_number','father_name','mother_name','dob','admission_date','category','address','prev_session_fee','q1_fee','q2_fee','q3_fee','q4_fee','bus_fee','gender'];
   const record = Object.fromEntries(keys.map(k => [k, document.getElementById('fs_'+k).value.trim()]));
   ['prev_session_fee','q1_fee','q2_fee','q3_fee','q4_fee','bus_fee'].forEach(k => record[k] = Number(record[k] || 0));
+  record.gender = record.gender || null;
   if(!record.reg_no || !record.student_name || !record.class_section){ alert('Admission number, student name and class are required.'); return; }
   try{
     const result = id ? await supabaseClient.from('student_fees').update(record).eq('id', id).select().single() : await supabaseClient.from('student_fees').insert(record).select().single();
@@ -6689,7 +6698,7 @@ function normaliseFeeDate(value){
 
 function openFeeBulkStudentDialog(){
   openFeeDialog('Bulk Add Students', `<p class="fs-modal-sub">Upload or paste CSV to add students from <strong>any/all classes in one go</strong> — just include a Class value per row, mixing as many different classes as you like in the same file. Required columns: <strong>Admission No, Student Name, Class</strong>. Optional: Father Name, Mother Name, DOB, Admission Date, Category, Mobile, Address, Last Year Due. Q1–Q4 and Bus Fee are automatically read from the current Fee Structure for each row's class; classes with no saved Fee Structure yet are imported with ₹0 fees (fix later via Edit Fee Structure).</p>
-    <div class="field">${csvFileInput('bulkStudentsFile')}<textarea id="bulkStudentsFile_text" placeholder="Admission No,Student Name,Class,Father Name,Mother Name,DOB,Admission Date,Category,Mobile,Address,Last Year Due"></textarea></div>
+    <div class="field">${csvFileInput('bulkStudentsFile')}<textarea id="bulkStudentsFile_text" placeholder="Admission No,Student Name,Class,Gender,Father Name,Mother Name,DOB,Admission Date,Category,Mobile,Address,Last Year Due"></textarea></div>
     <div class="actions"><button class="btn-secondary" onclick="closeFeeDialog()">Cancel</button><button class="btn-primary" onclick="saveBulkFeeStudents()">Import Students</button></div>`);
 }
 async function saveBulkFeeStudents(){
@@ -6707,7 +6716,9 @@ async function saveBulkFeeStudents(){
     if(!reg_no || !student_name || !class_section){ skipped.push(`Row ${index + 2}: missing required value`); return; }
     if(existing.has(reg_no)){ skipped.push(`Row ${index + 2}: admission no. ${reg_no} already exists`); return; }
     if(!schedule) notes.push(`Row ${index + 2}: no fee structure saved yet for "${class_section}" — imported with ₹0 fees`);
-    records.push({ reg_no, student_name, class_section, father_name:valueAt(headers,row,['father name','father']), mother_name:valueAt(headers,row,['mother name','mother']), dob:normaliseFeeDate(valueAt(headers,row,['dob','date of birth'])), admission_date:normaliseFeeDate(valueAt(headers,row,['admission date','admission'])), category:valueAt(headers,row,['category']) || null, mobile_number:valueAt(headers,row,['mobile','mobile number','mobile no']) || null, address:valueAt(headers,row,['address']) || null, prev_session_fee:Number(valueAt(headers,row,['last year due','previous session fee','prev session fee']) || 0), q1_fee:Number(schedule?.q1_fee || 0), q2_fee:Number(schedule?.q2_fee || 0), q3_fee:Number(schedule?.q3_fee || 0), q4_fee:Number(schedule?.q4_fee || 0), bus_fee:Number(schedule?.bus_fee || 0), fee_status:'DUE' });
+    const gRaw = valueAt(headers,row,['gender','sex']).toLowerCase();
+    const gender = /^(m|male|boy)$/.test(gRaw) ? 'Male' : /^(f|female|girl)$/.test(gRaw) ? 'Female' : null;
+    records.push({ reg_no, student_name, class_section, gender, father_name:valueAt(headers,row,['father name','father']), mother_name:valueAt(headers,row,['mother name','mother']), dob:normaliseFeeDate(valueAt(headers,row,['dob','date of birth'])), admission_date:normaliseFeeDate(valueAt(headers,row,['admission date','admission'])), category:valueAt(headers,row,['category']) || null, mobile_number:valueAt(headers,row,['mobile','mobile number','mobile no']) || null, address:valueAt(headers,row,['address']) || null, prev_session_fee:Number(valueAt(headers,row,['last year due','previous session fee','prev session fee']) || 0), q1_fee:Number(schedule?.q1_fee || 0), q2_fee:Number(schedule?.q2_fee || 0), q3_fee:Number(schedule?.q3_fee || 0), q4_fee:Number(schedule?.q4_fee || 0), bus_fee:Number(schedule?.bus_fee || 0), fee_status:'DUE' });
   });
   if(!records.length){ alert('No rows can be imported.\n' + skipped.join('\n')); return; }
   for(let i=0;i<records.length;i+=100){ const { error } = await supabaseClient.from('student_fees').insert(records.slice(i,i+100)); if(error){ alert('Import stopped: ' + errMsg(error)); return; } }
@@ -9259,7 +9270,7 @@ async function loadAttendance(){
     const [settingsRes, holidaysRes, studentsRes, staffRes] = await Promise.all([
       supabaseClient.from('att_settings').select('*').eq('id', 1).maybeSingle(),
       supabaseClient.from('att_holidays').select('*').order('holiday_date'),
-      supabaseClient.from('student_fees').select('id,reg_no,student_name,class_section').order('class_section'),
+      supabaseClient.from('student_fees').select('id,reg_no,student_name,class_section,gender').order('class_section'),
       supabaseClient.from('staff_records').select('id,full_name,designation').order('full_name')
     ]);
     if(settingsRes.error) throw settingsRes.error;
@@ -9573,137 +9584,239 @@ function attPrintMonthwise(){
   wrap.remove();
 }
 
-/* ---- Day & Month Finder (mirrors the school's attendance workbook dashboard) ---- */
-const ATT_DF_MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+/* ---- Day & Month Finder / Session Dashboard (mirrors the school's attendance workbook) ---- */
+const ATT_DF_MON = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+const ATT_DF_MONFULL = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
 const ATT_DF_ROMAN = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
 const ATT_DF_WINGS = [['PRIMARY (I–V)',1,5],['MIDDLE (VI–VIII)',6,8],['SECONDARY (IX–X)',9,10],['SR. SEC (XI–XII)',11,12]];
-let attDFMonthCache = {};   // 'YYYY-MM' -> rows (date, class_section, status)
-let attDFLast = null;       // for CSV export
+const ATT_DF_DAYTYPES = ['WORKING DAY','SUNDAY','HOLIDAY','SUMMER HOLIDAY','DIWALI HOLIDAY','PTM','EXAM DAY','HOLIDAY FOR EXAM','ANNUAL FUNCTION'];
+let attDFRows = null;        // whole session: [{date, class_section, status, student_fee_id}]
+let attDFSessionMonths = []; // ['2026-04', ... '2027-03']
+let attDFDayTypes = new Map();
+let attDFData = null;        // computed aggregates
+let attDFLast = null;
+const attAvgPos = a => { const v = a.filter(x => x > 0); return v.length ? v.reduce((x,y)=>x+y,0)/v.length : 0; };
+const attFmt = n => (Math.round(n*10)/10).toString();
 function attDFClassNumber(classSection){
   const name = splitClassSection(classSection).className.toUpperCase().replace(/^CLASS\s*/,'').trim();
   const i = ATT_DF_ROMAN.indexOf(name);
   if(i >= 0) return i + 1;
   const n = parseInt(name, 10);
-  return (n >= 1 && n <= 12) ? n : 0;   // 0 = Nursery / LKG / UKG / other
+  return (n >= 1 && n <= 12) ? n : 0;
 }
-function attInitDayFinder(){
+async function attInitDayFinder(){
   const monthSel = document.getElementById('attDFMonth');
   if(!monthSel.options.length){
     const now = new Date();
-    const startYear = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;   // April session start
-    const opts = [];
-    for(let i = 0; i < 12; i++){
-      const m = (3 + i) % 12, y = startYear + (3 + i >= 12 ? 1 : 0);
-      opts.push(`<option value="${y}-${String(m+1).padStart(2,'0')}">${ATT_DF_MONTHS[m]} ${y}</option>`);
-    }
-    monthSel.innerHTML = opts.join('');
+    const startYear = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+    attDFSessionMonths = Array.from({length:12}, (_,i) => { const m = (3+i)%12, y = startYear + (3+i>=12?1:0); return `${y}-${String(m+1).padStart(2,'0')}`; });
+    monthSel.innerHTML = attDFSessionMonths.map(v => `<option value="${v}">${ATT_DF_MON[Number(v.slice(5))-1]} ${v.slice(0,4)}</option>`).join('');
     const cur = now.toISOString().slice(0,7);
-    if([...monthSel.options].some(o => o.value === cur)) monthSel.value = cur;
-    attDayFinderMonthChanged(now.getDate());
+    if(attDFSessionMonths.includes(cur)) monthSel.value = cur;
+    document.getElementById('attDFDayType').innerHTML = '<option value="">Auto (from data / holidays)</option>' + ATT_DF_DAYTYPES.map(t => `<option>${t}</option>`).join('');
+    attDayFinderMonthChanged(now.getDate(), true);
   } else attLoadDayFinder();
 }
-function attDayFinderMonthChanged(preferredDay){
+function attDayFinderMonthChanged(preferredDay, skipLoad){
   const month = document.getElementById('attDFMonth').value;
   const daySel = document.getElementById('attDFDay');
   const prev = Number(preferredDay || daySel.value || 1);
   const days = attDaysInMonth(month);
   daySel.innerHTML = Array.from({length:31}, (_,i) => `<option value="${i+1}" ${i+1>days?'disabled':''}>${i+1}${i+1>days?' (n/a)':''}</option>`).join('');
   daySel.value = String(Math.min(prev, days));
-  attLoadDayFinder();
-}
-async function attDFFetchMonth(month, force){
-  if(!force && attDFMonthCache[month]) return attDFMonthCache[month];
-  const days = attDaysInMonth(month);
-  const rows = [];
-  for(let from = 0; ; from += 1000){
-    const { data, error } = await supabaseClient.from('att_student_attendance').select('attendance_date,class_section,status')
-      .gte('attendance_date', `${month}-01`).lte('attendance_date', `${month}-${String(days).padStart(2,'0')}`)
-      .order('id').range(from, from + 999);
-    if(error) throw error;
-    rows.push(...(data || []));
-    if(!data || data.length < 1000) break;
-  }
-  attDFMonthCache[month] = rows;
-  return rows;
+  if(attDFRows && !skipLoad) attRenderDayFinder(); else attLoadDayFinder();
 }
 async function attLoadDayFinder(force){
+  const area = document.getElementById('attDFArea');
+  try{
+    if(force === true || !attDFRows){
+      area.innerHTML = '<div class="loading">Loading the whole session...</div>';
+      const first = attDFSessionMonths[0], lastM = attDFSessionMonths[11];
+      const from = `${first}-01`, to = `${lastM}-${String(attDaysInMonth(lastM)).padStart(2,'0')}`;
+      const rows = [];
+      for(let off = 0; ; off += 1000){
+        const { data, error } = await supabaseClient.from('att_student_attendance').select('attendance_date,class_section,status,student_fee_id')
+          .gte('attendance_date', from).lte('attendance_date', to).order('id').range(off, off+999);
+        if(error) throw error;
+        rows.push(...(data||[]));
+        if(!data || data.length < 1000) break;
+      }
+      attDFRows = rows.map(r => ({ date:r.attendance_date, class_section:r.class_section, status:r.status, sid:r.student_fee_id }));
+      const dt = await supabaseClient.from('att_day_types').select('*');
+      if(dt.error) throw dt.error;
+      attDFDayTypes = new Map((dt.data||[]).map(r => [r.day_date, r.day_type]));
+      const h = await supabaseClient.from('att_holidays').select('*').order('holiday_date');
+      if(!h.error) attHolidays = h.data || [];
+      attDFCompute();
+    }
+    attRenderDayFinder();
+  } catch(err){ area.innerHTML = '<div class="empty">Could not load: ' + escapeHtml(errMsg(err)) + '</div>'; }
+}
+/* Build per-date aggregates: total / per class number / per section, each split Boys / Girls / Unspecified. */
+function attDFCompute(){
+  const gender = new Map(attStudents.map(s => [s.id, s.gender]));
+  const days = new Map();   // iso -> { tot:{b,g,u}, cls: Map(n->{b,g,u}), sec: Map(section->{b,g,u}) }
+  const sections = new Set();
+  const blank = () => ({ b:0, g:0, u:0 });
+  attDFRows.forEach(r => {
+    const v = r.status === 'PRESENT' ? 1 : r.status === 'HALF_DAY' ? 0.5 : 0;
+    if(!days.has(r.date)) days.set(r.date, { tot:blank(), cls:new Map(), sec:new Map(), marked:0 });
+    const d = days.get(r.date);
+    d.marked++;
+    const g = gender.get(r.sid); const k = g === 'Male' ? 'b' : g === 'Female' ? 'g' : 'u';
+    const n = attDFClassNumber(r.class_section) || r.class_section;
+    if(!d.cls.has(n)) d.cls.set(n, blank());
+    if(!d.sec.has(r.class_section)) d.sec.set(r.class_section, blank());
+    d.tot[k] += v; d.cls.get(n)[k] += v; d.sec.get(r.class_section)[k] += v;
+    sections.add(r.class_section);
+  });
+  attDFData = { days, sections:[...sections] };
+}
+const attSum = o => o.b + o.g + o.u;
+function attDFStatus(iso){
+  const dateObj = new Date(iso + 'T00:00:00');
+  const d = attDFData.days.get(iso);
+  const holiday = attHolidays.find(h => h.holiday_date === iso && (h.applies_to === 'BOTH' || h.applies_to === 'STUDENTS'));
+  const manual = attDFDayTypes.get(iso);
+  if(manual) return { text:manual, manual:true };
+  if(holiday) return { text:'HOLIDAY — ' + holiday.label };
+  if(d && attSum(d.tot) > 0) return { text:'WORKING DAY' };
+  if(dateObj.getDay() === 0) return { text:'SUNDAY' };
+  return { text:'NOT MARKED' };
+}
+function attRenderDayFinder(){
+  if(!attDFData) return;
   const month = document.getElementById('attDFMonth').value;
   const day = Number(document.getElementById('attDFDay').value);
-  const area = document.getElementById('attDFArea');
-  const summary = document.getElementById('attDFSummary');
-  if(!month || !day){ return; }
-  area.innerHTML = '<div class="loading">Loading...</div>'; summary.innerHTML = '';
-  try{
-    const dim = attDaysInMonth(month);
-    if(day > dim){ area.innerHTML = `<div class="empty">Date N/A — ${escapeHtml(month)} has only ${dim} days.</div>`; attDFLast = null; return; }
-    const rows = await attDFFetchMonth(month, force === true);
+  const area = document.getElementById('attDFArea'), summary = document.getElementById('attDFSummary');
+  const dim = attDaysInMonth(month);
+  const card = (label, val, extra='') => `<div style="flex:1;min-width:130px;padding:10px 14px;border:1px solid var(--border,#e5e7eb);border-radius:10px;"><div style="font-size:12px;opacity:.7;">${label}</div><div style="font-size:19px;font-weight:700;${extra}">${val}</div></div>`;
+  const clsHead = ['<th>Class</th>'].concat(Array.from({length:12}, (_,i) => `<th>Class ${i+1}</th>`)).concat(ATT_DF_WINGS.map(w => `<th>${w[0]}</th>`)).concat(['<th>GRAND TOTAL</th>']).join('');
+  let dayInfo = null;
+  if(day > dim){
+    summary.innerHTML = `<div style="display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 12px;">${card('Date & day', 'Date N/A for ' + escapeHtml(month))}${card('Day status','N/A (Invalid Day)')}</div>`;
+    area.innerHTML = '<div class="empty">Pick a valid day for this month.</div>'; attDFLast = null;
+  } else {
     const iso = `${month}-${String(day).padStart(2,'0')}`;
-    const dateObj = new Date(iso + 'T00:00:00');
-    const weekday = dateObj.toLocaleDateString('en-IN', { weekday:'long' });
-    const holiday = attHolidays.find(h => h.holiday_date === iso && (h.applies_to === 'BOTH' || h.applies_to === 'STUDENTS'));
-    const dayRows = rows.filter(r => r.attendance_date === iso);
-    let status, tone;
-    if(holiday){ status = 'Holiday — ' + holiday.label; tone = '#b45309'; }
-    else if(dateObj.getDay() === 0 && !dayRows.length){ status = 'Sunday'; tone = '#b45309'; }
-    else if(dayRows.length){ status = 'Working day (attendance recorded)'; tone = '#15803d'; }
-    else { status = 'Working day — attendance not marked'; tone = '#6b7280'; }
-
-    // per-class tallies for the selected day, and month daily-average present per class
-    const blank = () => ({ P:0, A:0, H:0 });
-    const dayBy = new Map(), perDay = new Map();   // class -> tally ; class -> Map(date -> presentCount)
-    rows.forEach(r => {
-      const c = r.class_section;
-      if(r.attendance_date === iso){ if(!dayBy.has(c)) dayBy.set(c, blank()); const t = dayBy.get(c); if(r.status==='PRESENT') t.P++; else if(r.status==='ABSENT') t.A++; else if(r.status==='HALF_DAY') t.H++; }
-      if(!perDay.has(c)) perDay.set(c, new Map());
-      const m = perDay.get(c); m.set(r.attendance_date, (m.get(r.attendance_date)||0) + (r.status==='PRESENT' ? 1 : r.status==='HALF_DAY' ? 0.5 : 0));
-    });
-    const classNums = new Map();   // number -> {label, day, monthPresentByDate:Map}
-    const addClass = (c) => {
-      const n = attDFClassNumber(c);
-      const key = n || c;
-      if(!classNums.has(key)) classNums.set(key, { n, label: n ? 'Class ' + ATT_DF_ROMAN[n-1] : c, day: blank(), byDate: new Map() });
-      return classNums.get(key);
-    };
-    dayBy.forEach((t,c) => { const e = addClass(c); e.day.P+=t.P; e.day.A+=t.A; e.day.H+=t.H; });
-    perDay.forEach((m,c) => { const e = addClass(c); m.forEach((v,d) => e.byDate.set(d, (e.byDate.get(d)||0) + v)); });
-    const entries = [...classNums.values()].sort((a,b) => (a.n||99) - (b.n||99) || a.label.localeCompare(b.label));
-    const avgOf = e => { const v = [...e.byDate.values()].filter(x => x > 0); return v.length ? v.reduce((a,b)=>a+b,0)/v.length : 0; };
-    const line = (label, d, avg) => { const tot = d.P + d.A + d.H; return { label, P:d.P, H:d.H, A:d.A, tot, pct: tot ? ((d.P + d.H*0.5)/tot*100) : 0, avg }; };
-    const table = entries.map(e => line(e.label, e.day, avgOf(e)));
-    const wings = ATT_DF_WINGS.map(([label,lo,hi]) => {
-      const m = entries.filter(e => e.n >= lo && e.n <= hi);
-      const d = m.reduce((a,e) => ({P:a.P+e.day.P, A:a.A+e.day.A, H:a.H+e.day.H}), blank());
-      const byDate = new Map(); m.forEach(e => e.byDate.forEach((v,k) => byDate.set(k,(byDate.get(k)||0)+v)));
-      const vals = [...byDate.values()].filter(x => x>0);
-      return line(label, d, vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0);
-    });
-    const gd = entries.reduce((a,e) => ({P:a.P+e.day.P, A:a.A+e.day.A, H:a.H+e.day.H}), blank());
-    const gByDate = new Map(); entries.forEach(e => e.byDate.forEach((v,k) => gByDate.set(k,(gByDate.get(k)||0)+v)));
-    const gv = [...gByDate.values()].filter(x => x>0);
-    const grand = line('GRAND TOTAL', gd, gv.length ? gv.reduce((a,b)=>a+b,0)/gv.length : 0);
-
-    const kpi = (label, val) => `<div style="flex:1;min-width:130px;padding:10px 14px;border:1px solid var(--border,#e5e7eb);border-radius:10px;"><div style="font-size:12px;opacity:.7;">${label}</div><div style="font-size:20px;font-weight:700;">${val}</div></div>`;
+    const weekday = new Date(iso+'T00:00:00').toLocaleDateString('en-IN', { weekday:'long' });
+    const st = attDFStatus(iso);
+    document.getElementById('attDFDayType').value = attDFDayTypes.get(iso) || '';
+    const d = attDFData.days.get(iso) || { tot:{b:0,g:0,u:0}, cls:new Map(), sec:new Map() };
+    const cell = n => d.cls.get(n) || {b:0,g:0,u:0};
+    const wingOf = (lo,hi) => { const o = {b:0,g:0,u:0}; for(let n=lo;n<=hi;n++){ const c = cell(n); o.b+=c.b; o.g+=c.g; o.u+=c.u; } return o; };
+    const cols = [...Array.from({length:12}, (_,i) => cell(i+1)), ...ATT_DF_WINGS.map(w => wingOf(w[1],w[2])), d.tot];
+    const row = (label, pick) => `<tr><td><b>${label}</b></td>${cols.map(c => `<td style="text-align:center;">${attFmt(pick(c))}</td>`).join('')}</tr>`;
+    // month daily average per class (days with >0 present)
+    const monthDates = Array.from({length:dim}, (_,i) => `${month}-${String(i+1).padStart(2,'0')}`);
+    const avgFor = (getter) => attAvgPos(monthDates.map(dt => { const x = attDFData.days.get(dt); return x ? getter(x) : 0; }));
+    const avgCells = [...Array.from({length:12}, (_,i) => avgFor(x => attSum(x.cls.get(i+1) || {b:0,g:0,u:0}))),
+      ...ATT_DF_WINGS.map(w => avgFor(x => { let t=0; for(let n=w[1];n<=w[2];n++) t += attSum(x.cls.get(n) || {b:0,g:0,u:0}); return t; })), avgFor(x => attSum(x.tot))];
+    const unspecified = d.tot.u > 0;
     summary.innerHTML = `<div style="display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 12px;">
-      ${kpi('Date', escapeHtml(isoToDmy(iso)) + ' (' + weekday + ')')}
-      <div style="flex:2;min-width:200px;padding:10px 14px;border:1px solid var(--border,#e5e7eb);border-radius:10px;"><div style="font-size:12px;opacity:.7;">Day status</div><div style="font-size:18px;font-weight:700;color:${tone};">${escapeHtml(status)}</div></div>
-      ${kpi('Present', grand.P)}${kpi('Half-day', grand.H)}${kpi('Absent', grand.A)}${kpi('% Present', grand.tot ? grand.pct.toFixed(1)+'%' : '—')}
-    </div>`;
-    const tr = (r, bold) => `<tr style="${bold?'font-weight:700;':''}"><td>${escapeHtml(r.label)}</td><td style="text-align:center;">${r.P}</td><td style="text-align:center;">${r.H}</td><td style="text-align:center;">${r.A}</td><td style="text-align:center;">${r.tot}</td><td style="text-align:center;">${r.tot ? r.pct.toFixed(1)+'%' : '—'}</td><td style="text-align:center;">${r.avg ? r.avg.toFixed(1) : '—'}</td></tr>`;
-    const head = '<thead><tr><th>Class / Wing</th><th>Present</th><th>Half-day</th><th>Absent</th><th>Marked</th><th>% Present</th><th>Month daily avg. present</th></tr></thead>';
-    area.innerHTML = table.length || dayRows.length
-      ? `<table class="tt-subs-table">${head}<tbody>${table.map(r=>tr(r)).join('')}${wings.map(r=>tr(r,true)).join('')}${tr(grand,true)}</tbody></table>
-         <p class="fs-modal-sub" style="margin-top:8px;">Half-day counts as 0.5 in % Present and in the month average. Month daily avg. is taken over days that have attendance recorded.</p>`
-      : '<div class="empty">No attendance has been recorded in this month yet.</div>';
-    attDFLast = { iso, status, headers:['Class / Wing','Present','Half-day','Absent','Marked','% Present','Month daily avg present'], rows:[...table,...wings,grand].map(r => [r.label,r.P,r.H,r.A,r.tot,r.tot?r.pct.toFixed(1)+'%':'',r.avg?r.avg.toFixed(1):'']) };
-  } catch(err){ area.innerHTML = '<div class="empty">Could not load: ' + escapeHtml(errMsg(err)) + '</div>'; }
+      ${card('Date & day', escapeHtml(isoToDmy(iso)) + ' (' + weekday + ')')}
+      ${card('Day status', escapeHtml(st.text) + (st.manual ? ' *' : ''), 'color:' + (st.text === 'WORKING DAY' ? '#15803d' : st.text === 'NOT MARKED' ? '#6b7280' : '#b45309'))}
+      ${card('Day boys', attFmt(d.tot.b))}${card('Day girls', attFmt(d.tot.g))}${card('Day total', attFmt(attSum(d.tot)))}</div>
+      ${unspecified ? `<p class="fs-modal-sub">${attFmt(d.tot.u)} present student(s) have no Gender set and are only counted in totals.</p>` : ''}${st.manual ? '<p class="fs-modal-sub">* Day type set manually.</p>' : ''}`;
+    area.innerHTML = `<table class="tt-subs-table"><thead><tr>${clsHead.replace('<th>Class</th>','<th>Selected day breakdown</th>')}</tr></thead><tbody>
+      ${row('Selected Day — BOYS', c => c.b)}${row('Selected Day — GIRLS', c => c.g)}${row('Selected Day — TOTAL', c => attSum(c))}
+      <tr><td><b>Selected Month — DAILY AVG.</b></td>${avgCells.map(v => `<td style="text-align:center;">${v ? attFmt(v) : 0}</td>`).join('')}</tr></tbody></table>`;
+    attDFLast = { iso, status: st.text, clsHead:['Selected day breakdown',...Array.from({length:12},(_,i)=>'Class '+(i+1)),...ATT_DF_WINGS.map(w=>w[0]),'GRAND TOTAL'],
+      rows:[['BOYS',...cols.map(c=>attFmt(c.b))],['GIRLS',...cols.map(c=>attFmt(c.g))],['TOTAL',...cols.map(c=>attFmt(attSum(c)))],['MONTH DAILY AVG',...avgCells.map(attFmt)]] };
+  }
+  attRenderDFSession(month);
+}
+function attRenderDFSession(selMonth){
+  const days = attDFData.days;
+  // ---- month-by-month
+  const monthRows = attDFSessionMonths.map(m => {
+    const dim = attDaysInMonth(m);
+    const dates = Array.from({length:dim}, (_,i) => `${m}-${String(i+1).padStart(2,'0')}`);
+    const vals = dates.map(dt => days.get(dt)).map(x => x || { tot:{b:0,g:0,u:0}, cls:new Map() });
+    const tot = vals.map(x => attSum(x.tot));
+    const working = tot.filter(v => v > 0).length;
+    const avgB = attAvgPos(vals.map(x => x.tot.b)), avgG = attAvgPos(vals.map(x => x.tot.g)), avgT = attAvgPos(tot);
+    const wd = tot.filter(v => v > 0);
+    return { m, label: ATT_DF_MONFULL[Number(m.slice(5))-1] + ' ' + m.slice(0,4), working, off: dim - working,
+      status: working === 0 ? 'Pending Entry' : working >= 15 ? 'Recorded' : 'Partial / Ongoing',
+      avgB, avgG, avgT, bp: avgT ? avgB/avgT : 0, gp: avgT ? avgG/avgT : 0, peak: wd.length ? Math.max(...wd) : 0, low: wd.length ? Math.min(...wd) : 0, cum: tot.reduce((a,b)=>a+b,0), vals };
+  });
+  const rec = monthRows.filter(r => r.avgT > 0);
+  const sAvg = k => rec.length ? rec.reduce((a,r)=>a+r[k],0)/rec.length : 0;
+  const totalWorking = monthRows.reduce((a,r)=>a+r.working,0);
+  const kpi = (label, val) => `<div style="flex:1;min-width:150px;padding:12px 14px;border:1px solid var(--border,#e5e7eb);border-radius:10px;"><div style="font-size:12px;opacity:.7;">${label}</div><div style="font-size:22px;font-weight:700;">${val}</div></div>`;
+  document.getElementById('attDFKpis').innerHTML = `<div style="display:flex;gap:10px;flex-wrap:wrap;">
+    ${kpi('Total working days logged', totalWorking)}${kpi('Session avg. daily attendance', attFmt(sAvg('avgT')))}${kpi('Session avg. boys present', attFmt(sAvg('avgB')))}${kpi('Session avg. girls present', attFmt(sAvg('avgG')))}
+    ${kpi('Gender ratio (boys % / girls %)', (sAvg('bp')*100).toFixed(1)+'% / '+(sAvg('gp')*100).toFixed(1)+'%')}${kpi('Peak single-day attendance', attFmt(Math.max(0,...monthRows.map(r=>r.peak))))}</div>`;
+  const mh = ['Month','Session status','Working days','Holidays / Sundays','Avg. boys','Avg. girls','Avg. total','Boys %','Girls %','Peak day total','Lowest working day','Cumulative student-days'];
+  const mtr = r => `<tr${r.m===selMonth?' style="background:rgba(59,130,246,.08);"':''}><td>${r.label}</td><td>${r.status}</td><td style="text-align:center;">${r.working}</td><td style="text-align:center;">${r.working?r.off:'—'}</td><td style="text-align:center;">${attFmt(r.avgB)}</td><td style="text-align:center;">${attFmt(r.avgG)}</td><td style="text-align:center;">${attFmt(r.avgT)}</td><td style="text-align:center;">${(r.bp*100).toFixed(1)}%</td><td style="text-align:center;">${(r.gp*100).toFixed(1)}%</td><td style="text-align:center;">${attFmt(r.peak)}</td><td style="text-align:center;">${attFmt(r.low)}</td><td style="text-align:center;">${attFmt(r.cum)}</td></tr>`;
+  const allVals = monthRows.flatMap(r => r.vals).map(x => attSum(x.tot)).filter(v => v>0);
+  const totalRow = `<tr style="font-weight:700;"><td>SESSION TOTAL / AVERAGE</td><td>2026–27</td><td style="text-align:center;">${totalWorking}</td><td style="text-align:center;">${monthRows.filter(r=>r.working).reduce((a,r)=>a+r.off,0)}</td><td style="text-align:center;">${attFmt(sAvg('avgB'))}</td><td style="text-align:center;">${attFmt(sAvg('avgG'))}</td><td style="text-align:center;">${attFmt(sAvg('avgT'))}</td><td style="text-align:center;">${sAvg('avgT')?(sAvg('avgB')/sAvg('avgT')*100).toFixed(1):'0.0'}%</td><td style="text-align:center;">${sAvg('avgT')?(sAvg('avgG')/sAvg('avgT')*100).toFixed(1):'0.0'}%</td><td style="text-align:center;">${allVals.length?attFmt(Math.max(...allVals)):0}</td><td style="text-align:center;">${allVals.length?attFmt(Math.min(...allVals)):0}</td><td style="text-align:center;">${attFmt(monthRows.reduce((a,r)=>a+r.cum,0))}</td></tr>`;
+  document.getElementById('attDFMonthTable').innerHTML = `<table class="tt-subs-table"><thead><tr>${mh.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${monthRows.map(mtr).join('')}${totalRow}</tbody></table>`;
+
+  // ---- class-wise across months
+  const classLines = [
+    ...Array.from({length:12}, (_,i) => [`CLASS ${i+1}`, x => attSum(x.cls.get(i+1) || {b:0,g:0,u:0})]),
+    ...ATT_DF_WINGS.map(w => [w[0], x => { let t=0; for(let n=w[1];n<=w[2];n++) t += attSum(x.cls.get(n) || {b:0,g:0,u:0}); return t; }]),
+    ['GRAND TOTAL (I–XII)', x => attSum(x.tot)] ];
+  const lineData = classLines.map(([label,get]) => {
+    const perMonth = monthRows.map(r => attAvgPos(r.vals.map(x => get(x))));
+    return { label, perMonth, avg: attAvgPos(perMonth) };
+  });
+  const grandAvg = lineData[lineData.length-1].avg;
+  document.getElementById('attDFClassTable').innerHTML = `<table class="tt-subs-table"><thead><tr><th>Class / Wing</th>${monthRows.map(r=>`<th>${ATT_DF_MON[Number(r.m.slice(5))-1]} ${r.m.slice(2,4)}</th>`).join('')}<th>Session avg.</th><th>Share %</th></tr></thead><tbody>${
+    lineData.map((l,i) => `<tr${i>=12?' style="font-weight:700;"':''}><td>${l.label}</td>${l.perMonth.map(v=>`<td style="text-align:center;">${v?attFmt(v):'—'}</td>`).join('')}<td style="text-align:center;">${attFmt(l.avg)}</td><td style="text-align:center;">${grandAvg?(l.avg/grandAvg*100).toFixed(1)+'%':'—'}</td></tr>`).join('')}</tbody></table>`;
+
+  // ---- daily register for the selected month (section-wise)
+  const dim = attDaysInMonth(selMonth);
+  const secs = [...attDFData.sections].sort((a,b) => (attDFClassNumber(a)||99) - (attDFClassNumber(b)||99) || a.localeCompare(b));
+  const reg = document.getElementById('attDFRegister');
+  if(!secs.length){ reg.innerHTML = '<div class="empty">No attendance has been recorded this session yet.</div>'; }
+  else {
+    const body = Array.from({length:dim}, (_,i) => {
+      const iso = `${selMonth}-${String(i+1).padStart(2,'0')}`;
+      const x = days.get(iso);
+      const wk = new Date(iso+'T00:00:00').toLocaleDateString('en-IN',{weekday:'short'}).toUpperCase();
+      const cells = secs.map(sc => { const c = x && x.sec.get(sc); return c ? `<td style="text-align:center;">${attFmt(c.b)}</td><td style="text-align:center;">${attFmt(c.g)}</td>` : '<td></td><td></td>'; }).join('');
+      return `<tr><td>${isoToDmy(iso)}</td><td>${wk}</td><td>${escapeHtml(attDFStatus(iso).text)}</td>${cells}<td style="text-align:center;"><b>${x?attFmt(x.tot.b):''}</b></td><td style="text-align:center;"><b>${x?attFmt(x.tot.g):''}</b></td><td style="text-align:center;"><b>${x?attFmt(attSum(x.tot)):''}</b></td></tr>`;
+    }).join('');
+    const mr = monthRows.find(r => r.m === selMonth);
+    reg.innerHTML = `<table class="tt-subs-table"><thead><tr><th rowspan="2">Date</th><th rowspan="2">Day</th><th rowspan="2">Status</th>${secs.map(sc=>`<th colspan="2">${escapeHtml(sc)}</th>`).join('')}<th colspan="3">TOTAL</th></tr><tr>${secs.map(()=>'<th>B</th><th>G</th>').join('')}<th>Boys</th><th>Girls</th><th>All</th></tr></thead><tbody>${body}</tbody>
+      <tfoot><tr style="font-weight:700;"><td colspan="3">MONTHLY CUMULATIVE PRESENT</td>${secs.map(()=>'<td></td><td></td>').join('')}<td colspan="2"></td><td style="text-align:center;">${attFmt(mr.cum)}</td></tr>
+      <tr style="font-weight:700;"><td colspan="3">MONTHLY DAILY AVERAGE (WORKING DAYS)</td>${secs.map(()=>'<td></td><td></td>').join('')}<td style="text-align:center;">${attFmt(mr.avgB)}</td><td style="text-align:center;">${attFmt(mr.avgG)}</td><td style="text-align:center;">${attFmt(mr.avgT)}</td></tr></tfoot></table>`;
+  }
+  if(attDFLast){ attDFLast.months = { head: mh, rows: [...monthRows.map(r => [r.label,r.status,r.working,r.working?r.off:'',attFmt(r.avgB),attFmt(r.avgG),attFmt(r.avgT),(r.bp*100).toFixed(1)+'%',(r.gp*100).toFixed(1)+'%',attFmt(r.peak),attFmt(r.low),attFmt(r.cum)])] }; }
+}
+async function attDFSaveDayType(){
+  const month = document.getElementById('attDFMonth').value, day = Number(document.getElementById('attDFDay').value);
+  const type = document.getElementById('attDFDayType').value;
+  if(day > attDaysInMonth(month)){ alert('Pick a valid day first.'); return; }
+  if(!type){ alert('Choose a day type, or use "Reset to Auto".'); return; }
+  const iso = `${month}-${String(day).padStart(2,'0')}`;
+  try{
+    const { error } = await supabaseClient.from('att_day_types').upsert({ day_date: iso, day_type: type });
+    if(error) throw error;
+    attDFDayTypes.set(iso, type); attRenderDayFinder();
+  } catch(err){ alert('Could not save day type: ' + errMsg(err)); }
+}
+async function attDFClearDayType(){
+  const month = document.getElementById('attDFMonth').value, day = Number(document.getElementById('attDFDay').value);
+  if(day > attDaysInMonth(month)) return;
+  const iso = `${month}-${String(day).padStart(2,'0')}`;
+  try{
+    const { error } = await supabaseClient.from('att_day_types').delete().eq('day_date', iso);
+    if(error) throw error;
+    attDFDayTypes.delete(iso); attRenderDayFinder();
+  } catch(err){ alert('Could not reset day type: ' + errMsg(err)); }
 }
 function attDayFinderExport(){
   if(!attDFLast){ alert('Nothing to export yet.'); return; }
   const esc = v => '"' + String(v ?? '').replace(/"/g,'""') + '"';
-  const csv = [['Date',attDFLast.iso],['Day status',attDFLast.status],[],attDFLast.headers,...attDFLast.rows].map(r => r.map(esc).join(',')).join('\n');
+  const lines = [['Date',attDFLast.iso],['Day status',attDFLast.status],[],attDFLast.clsHead,...attDFLast.rows,[]];
+  if(attDFLast.months) lines.push(['Month-by-month summary'], attDFLast.months.head, ...attDFLast.months.rows);
+  const csv = '﻿' + lines.map(r => r.map(esc).join(',')).join('\n');
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
-  a.download = `day-attendance-${attDFLast.iso}.csv`;
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'}));
+  a.download = `attendance-dashboard-${attDFLast.iso}.csv`;
   a.click(); URL.revokeObjectURL(a.href);
 }
 
