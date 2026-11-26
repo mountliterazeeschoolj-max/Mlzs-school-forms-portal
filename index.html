@@ -2460,7 +2460,10 @@
           <button class="btn-secondary" onclick="attDFClearDayType()">Reset to Auto</button>
           <button class="btn-secondary" onclick="attLoadDayFinder(true)">Refresh</button>
           <button class="btn-secondary" onclick="attDayFinderExport()">Export CSV</button>
+          <button class="btn-secondary" onclick="document.getElementById('attDFImportFile').click()">Import Attendance Workbook (.xlsx)</button>
+          <input type="file" id="attDFImportFile" accept=".xlsx" style="display:none;" onchange="attDFImportWorkbook(this)">
         </div>
+        <div id="attDFImportMsg" class="fs-modal-sub"></div>
         <div id="attDFSummary"></div>
         <div class="table-container"><div id="attDFArea"><div class="loading">Loading...</div></div></div>
       </div>
@@ -9590,6 +9593,7 @@ const ATT_DF_MONFULL = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY'
 const ATT_DF_ROMAN = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
 const ATT_DF_WINGS = [['PRIMARY (I–V)',1,5],['MIDDLE (VI–VIII)',6,8],['SECONDARY (IX–X)',9,10],['SR. SEC (XI–XII)',11,12]];
 const ATT_DF_DAYTYPES = ['WORKING DAY','SUNDAY','HOLIDAY','SUMMER HOLIDAY','DIWALI HOLIDAY','PTM','EXAM DAY','HOLIDAY FOR EXAM','ANNUAL FUNCTION'];
+let attDFSummaryRows = [];  // imported workbook totals: {att_date, class_section, boys, girls}
 let attDFRows = null;        // whole session: [{date, class_section, status, student_fee_id}]
 let attDFSessionMonths = []; // ['2026-04', ... '2027-03']
 let attDFDayTypes = new Map();
@@ -9617,6 +9621,12 @@ async function attInitDayFinder(){
     attDayFinderMonthChanged(now.getDate(), true);
   } else attLoadDayFinder();
 }
+function attDFRefreshDayTypeOptions(){
+  const types = [...new Set([...ATT_DF_DAYTYPES, ...attDFDayTypes.values()])];
+  const sel = document.getElementById('attDFDayType'); const prev = sel.value;
+  sel.innerHTML = '<option value="">Auto (from data / holidays)</option>' + types.map(t => `<option>${escapeHtml(t)}</option>`).join('');
+  sel.value = prev;
+}
 function attDayFinderMonthChanged(preferredDay, skipLoad){
   const month = document.getElementById('attDFMonth').value;
   const daySel = document.getElementById('attDFDay');
@@ -9642,12 +9652,21 @@ async function attLoadDayFinder(force){
         if(!data || data.length < 1000) break;
       }
       attDFRows = rows.map(r => ({ date:r.attendance_date, class_section:r.class_section, status:r.status, sid:r.student_fee_id }));
+      attDFSummaryRows = [];
+      for(let off = 0; ; off += 1000){
+        const { data, error } = await supabaseClient.from('att_daily_summary').select('att_date,class_section,boys,girls')
+          .gte('att_date', from).lte('att_date', to).order('att_date').order('class_section').range(off, off+999);
+        if(error) throw error;
+        attDFSummaryRows.push(...(data||[]));
+        if(!data || data.length < 1000) break;
+      }
       const dt = await supabaseClient.from('att_day_types').select('*');
       if(dt.error) throw dt.error;
       attDFDayTypes = new Map((dt.data||[]).map(r => [r.day_date, r.day_type]));
       const h = await supabaseClient.from('att_holidays').select('*').order('holiday_date');
       if(!h.error) attHolidays = h.data || [];
       attDFCompute();
+      attDFRefreshDayTypeOptions();
     }
     attRenderDayFinder();
   } catch(err){ area.innerHTML = '<div class="empty">Could not load: ' + escapeHtml(errMsg(err)) + '</div>'; }
@@ -9668,6 +9687,19 @@ function attDFCompute(){
     if(!d.cls.has(n)) d.cls.set(n, blank());
     if(!d.sec.has(r.class_section)) d.sec.set(r.class_section, blank());
     d.tot[k] += v; d.cls.get(n)[k] += v; d.sec.get(r.class_section)[k] += v;
+    sections.add(r.class_section);
+  });
+  // Imported workbook totals fill in any date + section that has no per-student records (never double-counted).
+  const hasStudentRows = new Set(attDFRows.map(r => r.date + '|' + r.class_section));
+  attDFSummaryRows.forEach(r => {
+    if(hasStudentRows.has(r.att_date + '|' + r.class_section)) return;
+    if(!days.has(r.att_date)) days.set(r.att_date, { tot:blank(), cls:new Map(), sec:new Map(), marked:0 });
+    const d = days.get(r.att_date);
+    const n = attDFClassNumber(r.class_section) || r.class_section;
+    if(!d.cls.has(n)) d.cls.set(n, blank());
+    if(!d.sec.has(r.class_section)) d.sec.set(r.class_section, blank());
+    const b = Number(r.boys)||0, g = Number(r.girls)||0;
+    d.tot.b += b; d.tot.g += g; d.cls.get(n).b += b; d.cls.get(n).g += g; d.sec.get(r.class_section).b += b; d.sec.get(r.class_section).g += g;
     sections.add(r.class_section);
   });
   attDFData = { days, sections:[...sections] };
@@ -9785,6 +9817,72 @@ function attRenderDFSession(selMonth){
       <tr style="font-weight:700;"><td colspan="3">MONTHLY DAILY AVERAGE (WORKING DAYS)</td>${secs.map(()=>'<td></td><td></td>').join('')}<td style="text-align:center;">${attFmt(mr.avgB)}</td><td style="text-align:center;">${attFmt(mr.avgG)}</td><td style="text-align:center;">${attFmt(mr.avgT)}</td></tr></tfoot></table>`;
   }
   if(attDFLast){ attDFLast.months = { head: mh, rows: [...monthRows.map(r => [r.label,r.status,r.working,r.working?r.off:'',attFmt(r.avgB),attFmt(r.avgG),attFmt(r.avgT),(r.bp*100).toFixed(1)+'%',(r.gp*100).toFixed(1)+'%',attFmt(r.peak),attFmt(r.low),attFmt(r.cum)])] }; }
+}
+/* Import the school's attendance workbook (one sheet per month, sections as column pairs BOYS/GIRLS). */
+function attDFLoadXlsxLib(){
+  if(window.XLSX) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const el = document.createElement('script');
+    el.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+    el.onload = resolve; el.onerror = () => reject(new Error('Could not load the spreadsheet reader. Check your internet connection.'));
+    document.head.appendChild(el);
+  });
+}
+function attDFParseWorkbook(wb){
+  const monthIdx = Object.fromEntries(ATT_DF_MON.map((m,i) => [m, i+1]));
+  const summary = [], dayTypes = [], skipped = [];
+  wb.SheetNames.forEach(name => {
+    const m = /^([A-Z]{3}) (\d{4})$/.exec(name.trim());
+    if(!m || !monthIdx[m[1]]) return;
+    const month = `${m[2]}-${String(monthIdx[m[1]]).padStart(2,'0')}`;
+    const dim = attDaysInMonth(month);
+    const grid = XLSX.utils.sheet_to_json(wb.Sheets[name], { header:1, raw:true, defval:null });
+    const head = grid[2] || [];
+    const sections = [];
+    for(let c = 3; c < head.length; c++){
+      const label = head[c] == null ? '' : String(head[c]).trim();
+      if(!label || /^DAILY TOTAL/i.test(label)) continue;
+      const sm = /^(\d{1,2})\s+(.+)$/.exec(label);
+      if(!sm || Number(sm[1]) < 1 || Number(sm[1]) > 12){ skipped.push(`${name}: header "${label}"`); continue; }
+      sections.push({ col:c, class_section: `${ATT_DF_ROMAN[Number(sm[1])-1]} (${sm[2].trim().toUpperCase()})` });
+    }
+    for(let day = 1; day <= dim; day++){
+      const row = grid[3 + day]; if(!row) continue;      // sheet row 5 = day 1
+      const iso = `${month}-${String(day).padStart(2,'0')}`;
+      const type = row[2] == null ? '' : String(row[2]).trim().toUpperCase();
+      if(type) dayTypes.push({ day_date: iso, day_type: type });
+      sections.forEach(sc => {
+        const b = row[sc.col], g = row[sc.col+1];
+        if(typeof b === 'number' || typeof g === 'number') summary.push({ att_date: iso, class_section: sc.class_section, boys: Number(b)||0, girls: Number(g)||0, source:'workbook' });
+      });
+    }
+  });
+  return { summary, dayTypes, skipped };
+}
+async function attDFImportWorkbook(input){
+  const file = input.files && input.files[0]; input.value = '';
+  const msg = document.getElementById('attDFImportMsg');
+  if(!file) return;
+  try{
+    msg.textContent = 'Reading workbook...';
+    await attDFLoadXlsxLib();
+    const wb = XLSX.read(await file.arrayBuffer(), { type:'array' });
+    const { summary, dayTypes, skipped } = attDFParseWorkbook(wb);
+    if(!summary.length && !dayTypes.length){ msg.textContent = 'No month sheets (like "APR 2026") with attendance were found in this file.'; return; }
+    const dates = new Set(summary.map(r => r.att_date)).size;
+    if(!confirm(`Import ${summary.length} section-day records across ${dates} day(s) and ${dayTypes.length} day-type entries?\n\nExisting entries for the same date and section will be replaced. Per-student attendance marked in the portal is never overwritten.`)){ msg.textContent = ''; return; }
+    for(let i = 0; i < summary.length; i += 500){
+      msg.textContent = `Uploading attendance... ${Math.min(i+500, summary.length)} / ${summary.length}`;
+      const { error } = await supabaseClient.from('att_daily_summary').upsert(summary.slice(i, i+500), { onConflict:'att_date,class_section' });
+      if(error) throw error;
+    }
+    for(let i = 0; i < dayTypes.length; i += 500){
+      const { error } = await supabaseClient.from('att_day_types').upsert(dayTypes.slice(i, i+500), { onConflict:'day_date' });
+      if(error) throw error;
+    }
+    msg.textContent = `Imported ${summary.length} records for ${dates} day(s) and ${dayTypes.length} day types.` + (skipped.length ? ` Skipped: ${skipped.join('; ')}` : '');
+    await attLoadDayFinder(true);
+  } catch(err){ msg.textContent = 'Import failed: ' + errMsg(err); }
 }
 async function attDFSaveDayType(){
   const month = document.getElementById('attDFMonth').value, day = Number(document.getElementById('attDFDay').value);
