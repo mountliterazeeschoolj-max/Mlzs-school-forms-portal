@@ -2467,6 +2467,17 @@
         <div id="attDFSummary"></div>
         <div class="table-container"><div id="attDFArea"><div class="loading">Loading...</div></div></div>
       </div>
+      <div class="fee-panel">
+        <h2>Enter / Edit Day Data</h2>
+        <p class="fs-modal-sub" id="attDFEditHint">Enter Boys and Girls present for each section for the day chosen above, then save. Leave both boxes empty for sections with no data. Sections already marked student-by-student in the portal are shown read-only.</p>
+        <div class="fee-actions">
+          <button class="btn-primary" onclick="attDFSaveDayData()">Save Day Data</button>
+          <button class="btn-secondary" onclick="attDFCopyPrevDay()">Copy from Previous Day</button>
+          <button class="btn-secondary" onclick="attDFClearDayData()">Clear Day Data</button>
+          <span id="attDFEditTotal" class="fs-modal-sub" style="margin:0;"></span>
+        </div>
+        <div class="table-container"><div id="attDFEditArea"></div></div>
+      </div>
       <div class="fee-panel"><h2>Session Snapshot</h2><div id="attDFKpis"></div></div>
       <div class="fee-panel"><h2>1. Month-by-Month Attendance Summary</h2><div class="table-container"><div id="attDFMonthTable"></div></div></div>
       <div class="fee-panel"><h2>2. Class-wise &amp; Wing-wise Average Daily Attendance Across Months</h2><div class="table-container"><div id="attDFClassTable"></div></div></div>
@@ -9755,7 +9766,91 @@ function attRenderDayFinder(){
     attDFLast = { iso, status: st.text, clsHead:['Selected day breakdown',...Array.from({length:12},(_,i)=>'Class '+(i+1)),...ATT_DF_WINGS.map(w=>w[0]),'GRAND TOTAL'],
       rows:[['BOYS',...cols.map(c=>attFmt(c.b))],['GIRLS',...cols.map(c=>attFmt(c.g))],['TOTAL',...cols.map(c=>attFmt(attSum(c)))],['MONTH DAILY AVG',...avgCells.map(attFmt)]] };
   }
+  attRenderDFEdit();
   attRenderDFSession(month);
+}
+/* ---- day-wise entry / edit grid ---- */
+let attDFEditSections = [];
+function attDFCurrentIso(){
+  const month = document.getElementById('attDFMonth').value, day = Number(document.getElementById('attDFDay').value);
+  return day > attDaysInMonth(month) ? null : `${month}-${String(day).padStart(2,'0')}`;
+}
+function attDFAllSections(){
+  const set = new Set([...attDFData.sections, ...attStudents.map(s => s.class_section), ...(typeof ttClasses !== 'undefined' ? (ttClasses||[]).map(c => c.class_section) : [])].filter(Boolean));
+  return [...set].sort((a,b) => (attDFClassNumber(a)||99) - (attDFClassNumber(b)||99) || a.localeCompare(b));
+}
+function attRenderDFEdit(prefill){
+  const area = document.getElementById('attDFEditArea');
+  const iso = attDFCurrentIso();
+  if(!iso){ area.innerHTML = '<div class="empty">Pick a valid day first.</div>'; document.getElementById('attDFEditTotal').textContent=''; return; }
+  const fromStudents = new Set(attDFRows.filter(r => r.date === iso).map(r => r.class_section));
+  const saved = new Map(attDFSummaryRows.filter(r => r.att_date === iso).map(r => [r.class_section, r]));
+  attDFEditSections = attDFAllSections();
+  const inp = (id, v) => `<input type="number" min="0" step="0.5" id="${id}" value="${v ?? ''}" oninput="attDFEditTotals()" style="width:80px;">`;
+  const rows = attDFEditSections.map((sc, i) => {
+    const locked = fromStudents.has(sc);
+    const src = (prefill && prefill.get(sc)) || saved.get(sc);
+    return `<tr><td>${escapeHtml(sc)}</td>` + (locked
+      ? `<td colspan="3" style="opacity:.7;">Marked student-by-student in the portal (edit under Mark Student / Correction)</td>`
+      : `<td>${inp('attDFB'+i, src ? Number(src.boys) : '')}</td><td>${inp('attDFG'+i, src ? Number(src.girls) : '')}</td><td id="attDFT${i}" style="text-align:center;"></td>`) + `</tr>`;
+  }).join('');
+  area.innerHTML = `<table class="tt-subs-table"><thead><tr><th>Section</th><th>Boys present</th><th>Girls present</th><th>Total</th></tr></thead><tbody>${rows}</tbody></table>`;
+  attDFEditTotals();
+}
+function attDFEditTotals(){
+  let b = 0, g = 0;
+  attDFEditSections.forEach((sc, i) => {
+    const be = document.getElementById('attDFB'+i), ge = document.getElementById('attDFG'+i);
+    if(!be) return;
+    const bv = Number(be.value)||0, gv = Number(ge.value)||0; b += bv; g += gv;
+    const t = document.getElementById('attDFT'+i); if(t) t.textContent = (be.value===''&&ge.value==='') ? '' : attFmt(bv+gv);
+  });
+  document.getElementById('attDFEditTotal').textContent = `Entered: Boys ${attFmt(b)} · Girls ${attFmt(g)} · Total ${attFmt(b+g)}`;
+}
+async function attDFSaveDayData(){
+  const iso = attDFCurrentIso();
+  if(!iso){ alert('Pick a valid day first.'); return; }
+  const upserts = [], deletes = [];
+  const existing = new Map(attDFSummaryRows.filter(r => r.att_date === iso).map(r => [r.class_section, r]));
+  for(let i = 0; i < attDFEditSections.length; i++){
+    const be = document.getElementById('attDFB'+i), ge = document.getElementById('attDFG'+i);
+    if(!be) continue;   // locked section
+    const sc = attDFEditSections[i];
+    if(be.value === '' && ge.value === ''){ if(existing.has(sc)) deletes.push(sc); continue; }
+    const b = Number(be.value || 0), g = Number(ge.value || 0);
+    if(!(b >= 0) || !(g >= 0)){ alert(`Enter valid numbers for ${sc}.`); return; }
+    const prev = existing.get(sc);
+    if(prev && Number(prev.boys) === b && Number(prev.girls) === g) continue;
+    upserts.push({ att_date: iso, class_section: sc, boys: b, girls: g, source: 'manual' });
+  }
+  if(!upserts.length && !deletes.length){ alert('No changes to save.'); return; }
+  try{
+    if(upserts.length){ const { error } = await supabaseClient.from('att_daily_summary').upsert(upserts, { onConflict:'att_date,class_section' }); if(error) throw error; }
+    if(deletes.length){ const { error } = await supabaseClient.from('att_daily_summary').delete().eq('att_date', iso).in('class_section', deletes); if(error) throw error; }
+    attDFSummaryRows = attDFSummaryRows.filter(r => !(r.att_date === iso && (deletes.includes(r.class_section) || upserts.some(u => u.class_section === r.class_section))));
+    upserts.forEach(u => attDFSummaryRows.push({ att_date:u.att_date, class_section:u.class_section, boys:u.boys, girls:u.girls }));
+    attDFCompute(); attRenderDayFinder();
+    alert(`Saved: ${upserts.length} section(s) updated, ${deletes.length} cleared.`);
+  } catch(err){ alert('Could not save day data: ' + errMsg(err)); }
+}
+function attDFCopyPrevDay(){
+  const iso = attDFCurrentIso(); if(!iso) return;
+  const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() - 1);
+  const prevIso = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const prev = new Map(attDFSummaryRows.filter(r => r.att_date === prevIso).map(r => [r.class_section, r]));
+  if(!prev.size){ alert('No entered data found for ' + isoToDmy(prevIso) + '.'); return; }
+  attRenderDFEdit(prev);   // fills the boxes only; nothing is saved until you press Save Day Data
+}
+async function attDFClearDayData(){
+  const iso = attDFCurrentIso(); if(!iso) return;
+  if(!attDFSummaryRows.some(r => r.att_date === iso)){ alert('Nothing entered for this day.'); return; }
+  if(!confirm(`Clear all entered / imported section data for ${isoToDmy(iso)}? Student-by-student attendance is not affected.`)) return;
+  try{
+    const { error } = await supabaseClient.from('att_daily_summary').delete().eq('att_date', iso);
+    if(error) throw error;
+    attDFSummaryRows = attDFSummaryRows.filter(r => r.att_date !== iso);
+    attDFCompute(); attRenderDayFinder();
+  } catch(err){ alert('Could not clear: ' + errMsg(err)); }
 }
 function attRenderDFSession(selMonth){
   const days = attDFData.days;
