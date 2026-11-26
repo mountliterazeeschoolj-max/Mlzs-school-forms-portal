@@ -2349,6 +2349,7 @@
       <button class="tab-btn" id="attViewCorrection" onclick="switchAttView('correction')">Correction</button>
       <button class="tab-btn" id="attViewStudentTracker" onclick="switchAttView('studenttracker')">Student Tracker</button>
       <button class="tab-btn" id="attViewMonthwise" onclick="switchAttView('monthwise')">Month-wise</button>
+      <button class="tab-btn" id="attViewDayFinder" onclick="switchAttView('dayfinder')">Day Finder</button>
       <button class="tab-btn" id="attViewMarkEmployee" onclick="switchAttView('markemployee')">Mark Employee</button>
       <button class="tab-btn" id="attViewEmployeeTracker" onclick="switchAttView('employeetracker')">Employee Tracker</button>
       <button class="tab-btn" id="attViewReports" onclick="switchAttView('reports')">Reports</button>
@@ -2444,6 +2445,21 @@
           <button class="btn-secondary" onclick="attPrintMonthwise()">Print</button>
         </div>
         <div class="table-container"><div id="attMonthArea"><div class="empty">Pick a class and month.</div></div></div>
+      </div>
+    </div>
+
+    <div id="attDayFinderView" style="display:none;">
+      <div class="fee-panel">
+        <h2>Day &amp; Month Attendance Finder</h2>
+        <p class="fs-modal-sub">Pick a month and a day to see that day's status and class-wise student attendance, plus the month's daily average.</p>
+        <div class="fee-actions">
+          <label style="display:flex;align-items:center;gap:6px;">Month <select id="attDFMonth" onchange="attDayFinderMonthChanged()"></select></label>
+          <label style="display:flex;align-items:center;gap:6px;">Day <select id="attDFDay" onchange="attLoadDayFinder()"></select></label>
+          <button class="btn-secondary" onclick="attLoadDayFinder(true)">Refresh</button>
+          <button class="btn-secondary" onclick="attDayFinderExport()">Export CSV</button>
+        </div>
+        <div id="attDFSummary"></div>
+        <div class="table-container"><div id="attDFArea"><div class="empty">Pick a month and day.</div></div></div>
       </div>
     </div>
 
@@ -9296,6 +9312,7 @@ function switchAttView(view){
   document.getElementById('attViewCorrection').classList.toggle('active', view === 'correction');
   document.getElementById('attViewStudentTracker').classList.toggle('active', view === 'studenttracker');
   document.getElementById('attViewMonthwise').classList.toggle('active', view === 'monthwise');
+  document.getElementById('attViewDayFinder').classList.toggle('active', view === 'dayfinder');
   document.getElementById('attViewMarkEmployee').classList.toggle('active', view === 'markemployee');
   document.getElementById('attViewEmployeeTracker').classList.toggle('active', view === 'employeetracker');
   document.getElementById('attViewReports').classList.toggle('active', view === 'reports');
@@ -9304,6 +9321,7 @@ function switchAttView(view){
   document.getElementById('attCorrectionView').style.display = view === 'correction' ? 'block' : 'none';
   document.getElementById('attStudentTrackerView').style.display = view === 'studenttracker' ? 'block' : 'none';
   document.getElementById('attMonthwiseView').style.display = view === 'monthwise' ? 'block' : 'none';
+  document.getElementById('attDayFinderView').style.display = view === 'dayfinder' ? 'block' : 'none';
   document.getElementById('attMarkEmployeeView').style.display = view === 'markemployee' ? 'block' : 'none';
   document.getElementById('attEmployeeTrackerView').style.display = view === 'employeetracker' ? 'block' : 'none';
   document.getElementById('attReportsView').style.display = view === 'reports' ? 'block' : 'none';
@@ -9311,6 +9329,7 @@ function switchAttView(view){
   else if(view === 'markstudent' && document.getElementById('attMSClass').value) attLoadStudentRoster('attMS');
   else if(view === 'markemployee') attLoadEmployeeRoster();
   else if(view === 'reports') attRenderReportControls();
+  else if(view === 'dayfinder') attInitDayFinder();
 }
 
 /* ---- Master Setup & Shift Timings ---- */
@@ -9552,6 +9571,140 @@ function attPrintMonthwise(){
   document.body.appendChild(wrap);
   window.print();
   wrap.remove();
+}
+
+/* ---- Day & Month Finder (mirrors the school's attendance workbook dashboard) ---- */
+const ATT_DF_MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+const ATT_DF_ROMAN = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
+const ATT_DF_WINGS = [['PRIMARY (I–V)',1,5],['MIDDLE (VI–VIII)',6,8],['SECONDARY (IX–X)',9,10],['SR. SEC (XI–XII)',11,12]];
+let attDFMonthCache = {};   // 'YYYY-MM' -> rows (date, class_section, status)
+let attDFLast = null;       // for CSV export
+function attDFClassNumber(classSection){
+  const name = splitClassSection(classSection).className.toUpperCase().replace(/^CLASS\s*/,'').trim();
+  const i = ATT_DF_ROMAN.indexOf(name);
+  if(i >= 0) return i + 1;
+  const n = parseInt(name, 10);
+  return (n >= 1 && n <= 12) ? n : 0;   // 0 = Nursery / LKG / UKG / other
+}
+function attInitDayFinder(){
+  const monthSel = document.getElementById('attDFMonth');
+  if(!monthSel.options.length){
+    const now = new Date();
+    const startYear = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;   // April session start
+    const opts = [];
+    for(let i = 0; i < 12; i++){
+      const m = (3 + i) % 12, y = startYear + (3 + i >= 12 ? 1 : 0);
+      opts.push(`<option value="${y}-${String(m+1).padStart(2,'0')}">${ATT_DF_MONTHS[m]} ${y}</option>`);
+    }
+    monthSel.innerHTML = opts.join('');
+    const cur = now.toISOString().slice(0,7);
+    if([...monthSel.options].some(o => o.value === cur)) monthSel.value = cur;
+    attDayFinderMonthChanged(now.getDate());
+  } else attLoadDayFinder();
+}
+function attDayFinderMonthChanged(preferredDay){
+  const month = document.getElementById('attDFMonth').value;
+  const daySel = document.getElementById('attDFDay');
+  const prev = Number(preferredDay || daySel.value || 1);
+  const days = attDaysInMonth(month);
+  daySel.innerHTML = Array.from({length:31}, (_,i) => `<option value="${i+1}" ${i+1>days?'disabled':''}>${i+1}${i+1>days?' (n/a)':''}</option>`).join('');
+  daySel.value = String(Math.min(prev, days));
+  attLoadDayFinder();
+}
+async function attDFFetchMonth(month, force){
+  if(!force && attDFMonthCache[month]) return attDFMonthCache[month];
+  const days = attDaysInMonth(month);
+  const rows = [];
+  for(let from = 0; ; from += 1000){
+    const { data, error } = await supabaseClient.from('att_student_attendance').select('attendance_date,class_section,status')
+      .gte('attendance_date', `${month}-01`).lte('attendance_date', `${month}-${String(days).padStart(2,'0')}`)
+      .order('id').range(from, from + 999);
+    if(error) throw error;
+    rows.push(...(data || []));
+    if(!data || data.length < 1000) break;
+  }
+  attDFMonthCache[month] = rows;
+  return rows;
+}
+async function attLoadDayFinder(force){
+  const month = document.getElementById('attDFMonth').value;
+  const day = Number(document.getElementById('attDFDay').value);
+  const area = document.getElementById('attDFArea');
+  const summary = document.getElementById('attDFSummary');
+  if(!month || !day){ return; }
+  area.innerHTML = '<div class="loading">Loading...</div>'; summary.innerHTML = '';
+  try{
+    const dim = attDaysInMonth(month);
+    if(day > dim){ area.innerHTML = `<div class="empty">Date N/A — ${escapeHtml(month)} has only ${dim} days.</div>`; attDFLast = null; return; }
+    const rows = await attDFFetchMonth(month, force === true);
+    const iso = `${month}-${String(day).padStart(2,'0')}`;
+    const dateObj = new Date(iso + 'T00:00:00');
+    const weekday = dateObj.toLocaleDateString('en-IN', { weekday:'long' });
+    const holiday = attHolidays.find(h => h.holiday_date === iso && (h.applies_to === 'BOTH' || h.applies_to === 'STUDENTS'));
+    const dayRows = rows.filter(r => r.attendance_date === iso);
+    let status, tone;
+    if(holiday){ status = 'Holiday — ' + holiday.label; tone = '#b45309'; }
+    else if(dateObj.getDay() === 0 && !dayRows.length){ status = 'Sunday'; tone = '#b45309'; }
+    else if(dayRows.length){ status = 'Working day (attendance recorded)'; tone = '#15803d'; }
+    else { status = 'Working day — attendance not marked'; tone = '#6b7280'; }
+
+    // per-class tallies for the selected day, and month daily-average present per class
+    const blank = () => ({ P:0, A:0, H:0 });
+    const dayBy = new Map(), perDay = new Map();   // class -> tally ; class -> Map(date -> presentCount)
+    rows.forEach(r => {
+      const c = r.class_section;
+      if(r.attendance_date === iso){ if(!dayBy.has(c)) dayBy.set(c, blank()); const t = dayBy.get(c); if(r.status==='PRESENT') t.P++; else if(r.status==='ABSENT') t.A++; else if(r.status==='HALF_DAY') t.H++; }
+      if(!perDay.has(c)) perDay.set(c, new Map());
+      const m = perDay.get(c); m.set(r.attendance_date, (m.get(r.attendance_date)||0) + (r.status==='PRESENT' ? 1 : r.status==='HALF_DAY' ? 0.5 : 0));
+    });
+    const classNums = new Map();   // number -> {label, day, monthPresentByDate:Map}
+    const addClass = (c) => {
+      const n = attDFClassNumber(c);
+      const key = n || c;
+      if(!classNums.has(key)) classNums.set(key, { n, label: n ? 'Class ' + ATT_DF_ROMAN[n-1] : c, day: blank(), byDate: new Map() });
+      return classNums.get(key);
+    };
+    dayBy.forEach((t,c) => { const e = addClass(c); e.day.P+=t.P; e.day.A+=t.A; e.day.H+=t.H; });
+    perDay.forEach((m,c) => { const e = addClass(c); m.forEach((v,d) => e.byDate.set(d, (e.byDate.get(d)||0) + v)); });
+    const entries = [...classNums.values()].sort((a,b) => (a.n||99) - (b.n||99) || a.label.localeCompare(b.label));
+    const avgOf = e => { const v = [...e.byDate.values()].filter(x => x > 0); return v.length ? v.reduce((a,b)=>a+b,0)/v.length : 0; };
+    const line = (label, d, avg) => { const tot = d.P + d.A + d.H; return { label, P:d.P, H:d.H, A:d.A, tot, pct: tot ? ((d.P + d.H*0.5)/tot*100) : 0, avg }; };
+    const table = entries.map(e => line(e.label, e.day, avgOf(e)));
+    const wings = ATT_DF_WINGS.map(([label,lo,hi]) => {
+      const m = entries.filter(e => e.n >= lo && e.n <= hi);
+      const d = m.reduce((a,e) => ({P:a.P+e.day.P, A:a.A+e.day.A, H:a.H+e.day.H}), blank());
+      const byDate = new Map(); m.forEach(e => e.byDate.forEach((v,k) => byDate.set(k,(byDate.get(k)||0)+v)));
+      const vals = [...byDate.values()].filter(x => x>0);
+      return line(label, d, vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0);
+    });
+    const gd = entries.reduce((a,e) => ({P:a.P+e.day.P, A:a.A+e.day.A, H:a.H+e.day.H}), blank());
+    const gByDate = new Map(); entries.forEach(e => e.byDate.forEach((v,k) => gByDate.set(k,(gByDate.get(k)||0)+v)));
+    const gv = [...gByDate.values()].filter(x => x>0);
+    const grand = line('GRAND TOTAL', gd, gv.length ? gv.reduce((a,b)=>a+b,0)/gv.length : 0);
+
+    const kpi = (label, val) => `<div style="flex:1;min-width:130px;padding:10px 14px;border:1px solid var(--border,#e5e7eb);border-radius:10px;"><div style="font-size:12px;opacity:.7;">${label}</div><div style="font-size:20px;font-weight:700;">${val}</div></div>`;
+    summary.innerHTML = `<div style="display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 12px;">
+      ${kpi('Date', escapeHtml(isoToDmy(iso)) + ' (' + weekday + ')')}
+      <div style="flex:2;min-width:200px;padding:10px 14px;border:1px solid var(--border,#e5e7eb);border-radius:10px;"><div style="font-size:12px;opacity:.7;">Day status</div><div style="font-size:18px;font-weight:700;color:${tone};">${escapeHtml(status)}</div></div>
+      ${kpi('Present', grand.P)}${kpi('Half-day', grand.H)}${kpi('Absent', grand.A)}${kpi('% Present', grand.tot ? grand.pct.toFixed(1)+'%' : '—')}
+    </div>`;
+    const tr = (r, bold) => `<tr style="${bold?'font-weight:700;':''}"><td>${escapeHtml(r.label)}</td><td style="text-align:center;">${r.P}</td><td style="text-align:center;">${r.H}</td><td style="text-align:center;">${r.A}</td><td style="text-align:center;">${r.tot}</td><td style="text-align:center;">${r.tot ? r.pct.toFixed(1)+'%' : '—'}</td><td style="text-align:center;">${r.avg ? r.avg.toFixed(1) : '—'}</td></tr>`;
+    const head = '<thead><tr><th>Class / Wing</th><th>Present</th><th>Half-day</th><th>Absent</th><th>Marked</th><th>% Present</th><th>Month daily avg. present</th></tr></thead>';
+    area.innerHTML = table.length || dayRows.length
+      ? `<table class="tt-subs-table">${head}<tbody>${table.map(r=>tr(r)).join('')}${wings.map(r=>tr(r,true)).join('')}${tr(grand,true)}</tbody></table>
+         <p class="fs-modal-sub" style="margin-top:8px;">Half-day counts as 0.5 in % Present and in the month average. Month daily avg. is taken over days that have attendance recorded.</p>`
+      : '<div class="empty">No attendance has been recorded in this month yet.</div>';
+    attDFLast = { iso, status, headers:['Class / Wing','Present','Half-day','Absent','Marked','% Present','Month daily avg present'], rows:[...table,...wings,grand].map(r => [r.label,r.P,r.H,r.A,r.tot,r.tot?r.pct.toFixed(1)+'%':'',r.avg?r.avg.toFixed(1):'']) };
+  } catch(err){ area.innerHTML = '<div class="empty">Could not load: ' + escapeHtml(errMsg(err)) + '</div>'; }
+}
+function attDayFinderExport(){
+  if(!attDFLast){ alert('Nothing to export yet.'); return; }
+  const esc = v => '"' + String(v ?? '').replace(/"/g,'""') + '"';
+  const csv = [['Date',attDFLast.iso],['Day status',attDFLast.status],[],attDFLast.headers,...attDFLast.rows].map(r => r.map(esc).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
+  a.download = `day-attendance-${attDFLast.iso}.csv`;
+  a.click(); URL.revokeObjectURL(a.href);
 }
 
 /* ---- Mark Employee Attendance ---- */
